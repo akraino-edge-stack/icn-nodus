@@ -1,0 +1,172 @@
+---
+- name: Deploy the SD-EWAN controller in cluster
+  hosts: master
+
+  tasks:
+  - name: Apply YAML files
+    shell: |
+      kubectl apply -f https://github.com/jetstack/cert-manager/releases/download/v0.11.0/cert-manager.yaml --validate=false
+      kubectl -n cert-manager wait pods --all --for=condition=ready --timeout=300s
+      kubectl apply -f https://raw.githubusercontent.com/akraino-edge-stack/icn-sdwan/master/platform/crd-ctrlr/examples/sdewan-controller.yaml
+      kubectl -n sdewan-system wait deployments/sdewan-controller-manager --for=condition=available --timeout=300s
+    register: apply_result
+    changed_when: apply_result.stdout is not search('unchanged')
+
+- name: Create test scenario
+  hosts: master
+
+  tasks:
+  - name: Create test scenario
+    block:
+    - name: "Create test scenario : Copy YAML files to host"
+      copy:
+        src: "deploy/{{ item }}"
+        dest: "{{ ansible_user_dir }}"
+      with_items:
+      - "sfc-network.yaml"
+      - "slb-ngfw-sdewan-cnf-deployment.yaml"
+      - "ms1.yaml"
+    - name: "Create test scenario : Apply YAML files"
+      shell: "kubectl apply -f {{ item }}"
+      with_items:
+      - "sfc-network.yaml"
+      - "slb-ngfw-sdewan-cnf-deployment.yaml"
+      - "ms1.yaml"
+      args:
+        chdir: "{{ ansible_user_dir }}"
+      register: apply_result
+      changed_when: apply_result.stdout is not search('unchanged')
+    - name: "Create test scenario : Wait for deployments up and running"
+      shell: "kubectl wait deployments/{{ item }} --for=condition=available --timeout=300s"
+      with_items:
+      - "slb"
+      - "ngfw"
+      - "sdwan"
+      - "ms1"
+      changed_when: false
+
+- name: Traffic from external entities with SFC
+  hosts: tm1-node
+  tasks:
+  - import_tasks: demo-traffic-test.yml
+    vars:
+      prefix: ""
+      ping_xfail: true
+      curl_xfail: true
+- name: Traffic from pod within the cluster with SFC
+  hosts: master
+  tasks:
+  - import_tasks: demo-traffic-test.yml
+    vars:
+      prefix: "kubectl exec -it $(kubectl get pods -l app=ms1 -o jsonpath='{.items[0].metadata.name}') --"
+      ping_xfail: true
+      curl_xfail: true
+
+- name: Deploy the SFC
+  hosts: master
+
+  tasks:
+  - name: Deploy the SFC
+    block:
+    - name: "Deploy the SFC : Copy YAML files to host"
+      copy:
+        src: "deploy/{{ item }}"
+        dest: "{{ ansible_user_dir }}"
+      with_items:
+      - "sfc.yaml"
+    - name: "Deploy the SFC : Apply YAML files"
+      shell: "kubectl apply -f {{ item }}"
+      with_items:
+      - "sfc.yaml"
+      args:
+        chdir: "{{ ansible_user_dir }}"
+      register: apply_result
+      changed_when: apply_result.stdout is not search('unchanged')
+
+- name: Traffic from external entities with SFC
+  hosts: tm1-node
+  tasks:
+  - import_tasks: demo-traffic-test.yml
+    vars:
+      prefix: ""
+- name: Traffic from pod within the cluster with SFC
+  hosts: master
+  tasks:
+  - import_tasks: demo-traffic-test.yml
+    vars:
+      prefix: "kubectl exec -it $(kubectl get pods -l app=ms1 -o jsonpath='{.items[0].metadata.name}') --"
+
+- name: Apply ICMP reject rule in SD-EWAN CNF
+  hosts: master
+
+  tasks:
+  - name: Apply ICMP reject rule in SD-EWAN CNF
+    block:
+    - name: "Apply ICMP reject rule in SD-EWAN CNF : Copy YAML files to host"
+      copy:
+        src: "deploy/{{ item }}"
+        dest: "{{ ansible_user_dir }}"
+      with_items:
+      - "firewall-dyn-net-2.yaml"
+      - "firewall-right-pnetwork.yaml"
+      - "firewall-rule-reject-icmp-right-pnetwork.yaml"
+    - name: "Apply ICMP reject rule in SD-EWAN CNF : Apply YAML files"
+      shell: |
+        set -e
+        for i in {1..3}; do
+            kubectl apply -f {{ item.yaml }}
+            for j in {1..10}; do
+                if kubectl exec -it $(kubectl get pods -l app=sdwan -o jsonpath='{.items[0].metadata.name}') -- iptables -S | grep {{ item.iptables }}; then
+                    break 2
+                fi
+                sleep 1
+            done
+            kubectl delete -f {{ item.yaml }}
+        done
+      args:
+        chdir: "{{ ansible_user_dir }}"
+        executable: /bin/bash
+      with_items:
+      - { yaml: "firewall-dyn-net-2.yaml", iptables: "dynnet2" }
+      - { yaml: "firewall-right-pnetwork.yaml", iptables: "rpnetwork" }
+      - { yaml: "firewall-rule-reject-icmp-right-pnetwork.yaml", iptables: "firewallrule-icmp-right-pnetwork" }
+      register: apply_result
+      changed_when: apply_result.stdout is not search('unchanged')
+
+- name: Traffic from external entities with SFC
+  hosts: tm1-node
+  tasks:
+  - import_tasks: demo-traffic-test.yml
+    vars:
+      prefix: ""
+      ping_xfail: true
+- name: Traffic from pod within the cluster with SFC
+  hosts: master
+  tasks:
+  - import_tasks: demo-traffic-test.yml
+    vars:
+      prefix: "kubectl exec -it $(kubectl get pods -l app=ms1 -o jsonpath='{.items[0].metadata.name}') --"
+      ping_xfail: true
+
+- name: Delete test resources
+  hosts: master
+
+  tasks:
+  - name: Delete test resources
+    shell: |
+      kubectl delete --ignore-not-found=true --wait=true -f {{ item }}
+    with_items:
+      - "firewall-rule-reject-icmp-right-pnetwork.yaml"
+      - "firewall-right-pnetwork.yaml"
+      - "firewall-dyn-net-2.yaml"
+      - "sfc.yaml"
+      - "sfc-network.yaml"
+      - "slb-ngfw-sdewan-cnf-deployment.yaml"
+      - "ms1.yaml"
+      - "https://raw.githubusercontent.com/akraino-edge-stack/icn-sdwan/master/platform/crd-ctrlr/examples/sdewan-controller.yaml"
+      - "https://github.com/jetstack/cert-manager/releases/download/v0.11.0/cert-manager.yaml"
+    args:
+      chdir: "{{ ansible_user_dir }}"
+    register: delete_result
+    changed_when: delete_result.stdout is not search('unchanged')
+    ignore_errors: true

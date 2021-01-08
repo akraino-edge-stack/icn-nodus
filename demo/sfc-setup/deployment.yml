@@ -1,0 +1,259 @@
+---
+- name: Install kubeadm
+  hosts: master,minion01,minion02
+
+  tasks:
+  - name: Let iptables see bridged traffic
+    become: yes
+    block:
+    - name: "Let iptables see bridged traffic : Load br_netfilter module"
+      modprobe:
+        name: br_netfilter
+    - name: "Let iptables see bridged traffic : Persist load of br_netfilter module"
+      lineinfile:
+        path: /etc/modules-load.d/k8s.conf
+        create: yes
+        line: br_netfilter
+    - name: "Let iptables see bridged traffic : Set net.bridge.bridge-nf-call-iptables to 1"
+      sysctl:
+        name: "{{ item.name }}"
+        value: "{{ item.value }}"
+      with_items:
+      - { name: 'net.bridge.bridge-nf-call-ip6tables', value: '1' }
+      - { name: 'net.bridge.bridge-nf-call-iptables', value: '1' }
+    # TODO Kubernetes recommends:
+    #   sysctl_file: /etc/sysctl.d/k8s.conf
+    #   sysctl --system
+    # But ansible does sysctl -p instead.
+
+  - name: Install runtime
+    become: yes
+    block:
+    - name: "Install runtime : Install docker prerequisite packages"
+      apt:
+        name:
+        - apt-transport-https
+        - ca-certificates
+        - curl
+        - gnupg-agent
+        - make
+        - software-properties-common
+        update_cache: yes
+    - name: "Install runtime : Add docker package signing key"
+      apt_key:
+        url: "https://download.docker.com/linux/{{ ansible_lsb.id | lower }}/gpg"
+        state: present
+    - name: "Install runtime : Add docker package repository"
+      apt_repository:
+        repo: "deb [arch=amd64] https://download.docker.com/linux/{{ ansible_lsb.id | lower }} {{ ansible_lsb.codename | lower }} stable"
+        state: present
+    - name: "Install runtime : Create /etc/docker"
+      file:
+        path: "/etc/docker"
+        state: directory
+    - name: "Install runtime : Set up the docker daemon"
+      copy:
+        dest: /etc/docker/daemon.json
+        content: |
+          {
+            "exec-opts": ["native.cgroupdriver=systemd"],
+            "iptables": false,
+            "log-driver": "json-file",
+            "log-opts": {
+              "max-size": "100m"
+            },
+            "storage-driver": "overlay2"
+          }
+    - name: "Install runtime : Create /etc/systemd/system/docker.service.d"
+      file:
+        path: "/etc/systemd/system/docker.service.d"
+        state: directory
+    - name: "Install runtime : Install docker packages"
+      apt:
+        name:
+        - docker-ce=5:19.03.14~3-0~{{ ansible_lsb.id | lower }}-{{ ansible_lsb.codename | lower }}
+        - docker-ce-cli=5:19.03.14~3-0~{{ ansible_lsb.id | lower }}-{{ ansible_lsb.codename | lower }}
+        - containerd.io=1.3.9-1
+        update_cache: yes
+    - name: "Install runtime : Restart docker"
+      service:
+        name: docker
+        enabled: true
+        state: reloaded
+
+  - name: Install kubeadm, kubelet, and kubectl
+    become: yes
+    block:
+    - name: "Install kubeadm, kubelet, and kubectl : Add kubernetes package signing key"
+      apt_key:
+        url: "https://packages.cloud.google.com/apt/doc/apt-key.gpg"
+        state: present
+    - name: "Install kubeadm, kubelet, and kubectl : Add kubernetes package repository"
+      apt_repository:
+        repo: "deb https://apt.kubernetes.io/ kubernetes-xenial main"
+        state: present
+    - name: "Install kubeadm, kubelet, and kubectl : Install kubernetes packages"
+      apt:
+        name:
+        - kubelet
+        - kubeadm
+        - kubectl
+        update_cache: yes
+    # TODO Kubernetes recommends: sudo apt-mark hold kubelet kubeadm kubectl (see dpkg_selections module)
+
+- name: Initialize control-plane node
+  hosts: master
+
+  tasks:
+  - name: Initialize control-plane node
+    block:
+    - name: "Initialize control-plane node : Check cluster status"
+      shell: kubectl cluster-info
+      register: cluster_info
+      changed_when: false
+      ignore_errors: yes
+    - name: "Initialize control-plane node : Initialize control-plane node"
+      become: yes
+      shell: "kubeadm init --pod-network-cidr=10.233.64.0/18 --apiserver-advertise-address={{ ansible_default_ipv4.address }}"
+      when: (cluster_info.rc != 0) or
+        (cluster_info.stdout.find('Kubernetes control plane is running') != -1 and
+         cluster_info.stdout.find('KubeDNS is running') != -1)
+  - name: Enable kubectl operation for user
+    become: yes
+    block:
+    - name: "Enable kubectl operation for user : Create $HOME/.kube"
+      file:
+        path: "{{ ansible_user_dir }}/.kube"
+        state: directory
+    - name: "Enable kubectl operation for user : Copy admin.conf to $HOME/.kube/config"
+      become: yes
+      copy:
+        remote_src: yes
+        src: /etc/kubernetes/admin.conf
+        dest: "{{ ansible_user_dir }}/.kube/config"
+        owner: "{{ ansible_user_uid }}"
+        group: "{{ ansible_user_gid }}"
+  - name: Register variables for later joins
+    become: yes
+    block:
+    - name: "Register variables for later joins : token"
+      shell: kubeadm token list -o=jsonpath='{.token}'
+      register: kubeadm_token
+      changed_when: false
+    - name: "Register variables for later joins : discovery-token-ca-cert-hash"
+      shell: openssl x509 -pubkey -in /etc/kubernetes/pki/ca.crt | openssl rsa -pubin -outform der 2>/dev/null | openssl dgst -sha256 -hex | sed 's/^.* //'
+      register: kubeadm_discovery_token_ca_cert_hash
+      changed_when: false
+
+- name: Install ovn4nfv Pod network add-on
+  hosts: master
+
+  tasks:
+  - name: Label master node with ovn4nfv-k8s-plugin=ovn-control-plane
+    shell: kubectl label --overwrite node master ovn4nfv-k8s-plugin=ovn-control-plane
+    register: label_result
+    changed_when: "label_result.stdout is not search('not labeled')"
+  - name: Deploy the ovn4nfv Pod network to the cluster
+    block:
+    - name: "Deploy the ovn4nfv Pod network to the cluster : Copy YAML files to host"
+      copy:
+        src: "{{ item }}"
+        dest: "{{ ansible_user_dir }}"
+      with_items:
+      - "../../deploy/ovn-daemonset.yaml"
+      - "../../deploy/ovn4nfv-k8s-plugin.yaml"
+    - name: "Deploy the ovn4nfv Pod network to the cluster : Apply YAML files"
+      shell: kubectl apply -f "{{ item }}"
+      with_items:
+      - "ovn-daemonset.yaml"
+      - "ovn4nfv-k8s-plugin.yaml"
+      args:
+        chdir: "{{ ansible_user_dir }}"
+      register: apply_ovn_result
+      changed_when: apply_ovn_result.stdout is not search('unchanged')
+  - name: Wait for CoreDNS deployment up and running
+    shell: kubectl -n kube-system wait deployments/coredns --for=condition=available --timeout=300s
+    changed_when: false
+
+- name: Disable control plane node isolation
+  hosts: master
+
+  tasks:
+  - name: Check master node taint for no schedule
+    shell: kubectl get node/master -o=jsonpath='{.spec.taints[].effect}'
+    register: taints_result
+    changed_when: false
+  - name: Remove the master node taint for no schedule
+    shell: kubectl taint node master node-role.kubernetes.io/master:NoSchedule-
+    when: "taints_result.stdout is search('NoSchedule')"
+
+- name: Join nodes
+  hosts: minion01,minion02
+
+  tasks:
+  - name: Join nodes
+    become: yes
+    block:
+    - name: "Join nodes : Check kubelet status"
+      shell: systemctl is-active --quiet kubelet
+      register: kubelet_status
+      changed_when: false
+      ignore_errors: yes
+    - name: "Join nodes : Check kube-proxy status"
+      shell: docker ps -f "label=io.kubernetes.container.name=kube-proxy"
+      register: kube_proxy_status
+      changed_when: false
+    - name: "Join nodes : Join node"
+      shell: "kubeadm join --token {{ hostvars['master']['kubeadm_token'].stdout }} {{ hostvars['master']['ansible_default_ipv4']['address'] }}:6443 --discovery-token-ca-cert-hash sha256:{{ hostvars['master']['kubeadm_discovery_token_ca_cert_hash'].stdout }}"
+      when: (kubelet_status.rc != 0) or (kube_proxy_status.stdout is not search('kube-proxy'))
+
+- name: Wait for nodes to be ready
+  hosts: master
+
+  tasks:
+  # Nodes are reported as ready before all pods are up and running,
+  # so wait for the pods.
+  - name: Wait for all pods to be ready
+    shell: kubectl wait -A pods --all --for=condition=ready --timeout=300s
+    changed_when: false
+
+- name: Attach to the left provider network
+  hosts: tm1-node
+  become: yes
+
+  tasks:
+  - name: Attach to the left provider network
+    shell: |
+      ip addr flush dev eth1
+      ip link add link eth1 name eth1.100 type vlan id 100
+      ip link set dev eth1.100 up
+      ip addr add 172.30.10.101/24 dev eth1.100
+      ip route del default
+      ip route add default via 172.30.10.3
+
+- name: Attach to the right provider network
+  hosts: tm2-node
+  become: yes
+
+  tasks:
+  - name: Attach to the right provider network
+    shell: |
+      ip addr flush dev eth1
+      ip link add link eth1 name eth1.200 type vlan id 200
+      ip link set dev eth1.200 up
+      ip addr add 172.30.20.2/24 dev eth1.200
+
+- name: Create virtual router
+  hosts: tm2-node
+  become: yes
+
+  tasks:
+  - name: Create virtual router
+    shell: |
+      ip route add 172.30.10.0/24 via 172.30.20.3
+      ip route add 172.30.33.0/24 via 172.30.20.3
+      ip route add 172.30.44.0/24 via 172.30.20.3
+      echo 1 > /proc/sys/net/ipv4/ip_forward
+      /sbin/iptables -t nat -A POSTROUTING -o eth0 -j MASQUERADE
+      iptables -A FORWARD -i eth1 -o eth0 -j ACCEPT
+      iptables -A FORWARD -i eth1.200 -o eth0 -j ACCEPT

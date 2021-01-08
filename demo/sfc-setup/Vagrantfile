@@ -97,6 +97,15 @@ Vagrant.configure("2") do |config|
       # Only run ansible provisioner once by specifying that it runs
       # only for the last node in the list.
       if node['name'] == nodes[-1]['name']
+        nodeconfig.vm.provision 'deployment', type: 'ansible', run: 'never' do |ansible|
+          # ansible.verbose = 'vvv'
+          ansible.limit ='all' # Do not limit ansible hosts to the last node
+          ansible.playbook = 'deployment.yml'
+        end
+        nodeconfig.vm.provision 'demo', type: 'ansible', run: 'never' do |ansible|
+          ansible.limit ='all'
+          ansible.playbook = 'demo.yml'
+        end
         nodeconfig.vm.provision 'connectivity-test', type: 'ansible', run: 'never' do |ansible|
           ansible.limit ='all'
           ansible.playbook = 'connectivity-test.yml'

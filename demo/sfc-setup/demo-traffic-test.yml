@@ -1,0 +1,23 @@
+- when: ping_xfail is defined
+  name: "Ping google.com : XFAIL"
+  shell: "{{ prefix }} ping -c 1 google.com"
+  register: ping_result
+  changed_when: false
+  failed_when: ping_result.rc == 0
+
+- when: ping_xfail is undefined
+  name: "Ping google.com : PASS"
+  shell: "{{ prefix }} ping -c 1 google.com"
+  changed_when: false
+
+- when: curl_xfail is defined
+  name: "Curl example.com : XFAIL"
+  shell: "{{ prefix }} curl --max-time 5 example.com"
+  register: curl_result
+  changed_when: false
+  failed_when: curl_result.rc == 0
+
+- when: curl_xfail is undefined
+  name: "Curl example.com : PASS"
+  shell: "{{ prefix }} curl --max-time 5 example.com"
+  changed_when: false

@@ -690,6 +690,43 @@ spec:
           name: host-sys
         - mountPath: /var/run/ovn4nfv-k8s-plugin
           name: host-var-cniserver-socket-dir
+      initContainers:
+      - name: init-ovs
+        image: docker.io/integratedcloudnative/ovn4nfv-k8s-plugin:v2.2.0
+        command: ["/bin/sh", "-c", "until ovs-vsctl show >/dev/null; do echo waiting for ovs; sleep 2; done"]
+        imagePullPolicy: IfNotPresent
+        securityContext:
+          runAsUser: 0
+          privileged: true
+        env:
+          - name: POD_IP
+            valueFrom:
+              fieldRef:
+                fieldPath: status.podIP
+        volumeMounts:
+          - mountPath: /lib/modules
+            name: host-modules
+            readOnly: true
+          - mountPath: /var/run/openvswitch
+            name: host-run-ovs
+          - mountPath: /var/run/ovn
+            name: host-run-ovn
+          - mountPath: /sys
+            name: host-sys
+            readOnly: true
+          - mountPath: /etc/openvswitch
+            name: host-config-openvswitch
+          - mountPath: /var/log/openvswitch
+            name: host-log-ovs
+          - mountPath: /var/log/ovn
+            name: host-log-ovn
+        resources:
+          requests:
+            cpu: 200m
+            memory: 300Mi
+          limits:
+            cpu: 1000m
+            memory: 800Mi
       volumes:
       - name: host-run-ovs
         hostPath:
@@ -712,3 +749,18 @@ spec:
       - name: host-sys
         hostPath:
           path: /sys
+      - name: host-modules
+        hostPath:
+          path: /lib/modules
+      - name: host-run-ovn
+        hostPath:
+          path: /run/ovn
+      - name: host-config-openvswitch
+        hostPath:
+          path: /etc/origin/openvswitch
+      - name: host-log-ovs
+        hostPath:
+          path: /var/log/openvswitch
+      - name: host-log-ovn
+        hostPath:
+          path: /var/log/ovn

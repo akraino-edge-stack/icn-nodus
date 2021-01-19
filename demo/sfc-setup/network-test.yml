@@ -1,0 +1,112 @@
+---
+- name: Fetch the network tests
+  hosts: master
+
+  tasks:
+  - name: Fetch the network tests
+    git:
+      repo: "https://github.com/opnfv/ovn4nfv-k8s-plugin.git"
+      dest: "{{ ansible_user_dir }}/ovn4nfv-k8s-plugin"
+      depth: 1
+
+- name: Network testing
+  hosts: master
+
+  tasks:
+  - name: Create two pods
+    shell: kubectl apply -f ovn4nfv-deployment-replica-2-noannotation.yaml
+    args:
+      chdir: "{{ ansible_user_dir }}/ovn4nfv-k8s-plugin/example"
+  - name: Wait for deployment
+    shell: kubectl wait deployments/ovn4nfv-deployment-noannotation --for=condition=available --timeout=300s
+    changed_when: false
+  - name: Test the ping operation between the pods
+    shell: kubectl exec -it $(kubectl get pods -l app=ovn4nfv-noannotation -o jsonpath='{.items[0].metadata.name}') -- ping $(kubectl get pods -l app=ovn4nfv-noannotation -o jsonpath='{.items[1].status.podIP}') -c 1
+    register: ping_result
+    changed_when: false
+  - debug:
+      var: ping_result.stdout
+
+  - name: Create hostname deployment
+    shell: kubectl apply -f ovn4nfv-deployment-noannotation-hostnames.yaml
+    args:
+      chdir: "{{ ansible_user_dir }}/ovn4nfv-k8s-plugin/example"
+  - name: Wait for deployment
+    shell: kubectl wait deployments/hostnames --for=condition=available --timeout=300s
+    changed_when: false
+  - name: Create hostname service
+    shell: kubectl apply -f ovn4nfv-deployment-hostnames-svc.yaml
+    args:
+      chdir: "{{ ansible_user_dir }}/ovn4nfv-k8s-plugin/example"
+  - name: Create sandbox for executing test
+    shell: kubectl apply -f ovn4nfv-deployment-noannotation-sandbox.yaml
+    args:
+      chdir: "{{ ansible_user_dir }}/ovn4nfv-k8s-plugin/example"
+  - name: Wait for deployment
+    shell: kubectl wait deployments/ovn4nfv-deployment-noannotation-sandbox --for=condition=available --timeout=300s
+    changed_when: false
+  - name: Test the k8s service query
+    shell: |
+      kubectl exec -it $(kubectl get pods -l app=ovn4nfv-noannotation-sandbox -o jsonpath='{.items[0].metadata.name}') -- wget -qO- hostnames
+      echo
+      kubectl exec -it $(kubectl get pods -l app=ovn4nfv-noannotation-sandbox -o jsonpath='{.items[0].metadata.name}') -- wget -qO- hostnames
+      echo
+      kubectl exec -it $(kubectl get pods -l app=ovn4nfv-noannotation-sandbox -o jsonpath='{.items[0].metadata.name}') -- wget -qO- hostnames
+      echo
+    register: service_query_result
+    changed_when: false
+  - debug:
+      var: service_query_result.stdout
+
+  - name: Test the reachablity
+    shell: |
+      kubectl exec -it $(kubectl get pods -l app=ovn4nfv-noannotation-sandbox -o jsonpath='{.items[0].metadata.name}') -- wget -qO- example.com
+    register: reachability_result
+    changed_when: false
+  - debug:
+      var: reachability_result.stdout
+
+- name: Multiple network setup and testing
+  hosts: master
+
+  tasks:
+  - name: Create two networks ovn-priv-net and ovn-port-net
+    shell: |
+      kubectl apply -f ovn-priv-net.yaml
+      kubectl apply -f ovn-port-net.yaml
+    args:
+      chdir: "{{ ansible_user_dir }}/ovn4nfv-k8s-plugin/example"
+  - name: Get CRDs
+    shell: kubectl get crds
+    register: get_crds_result
+  - debug:
+      var: get_crds_result.stdout
+  - name: Get networks
+    shell: kubectl get networks
+    register: get_networks_result
+  - debug:
+      var: get_networks_result.stdout
+
+  - name: Test the network connectivity between the pods
+    shell: kubectl apply -f ovn4nfv-deployment-replica-2-withannotation.yaml
+    args:
+      chdir: "{{ ansible_user_dir }}/ovn4nfv-k8s-plugin/example"
+  - name: Wait for deployment
+    shell: kubectl wait deployments/ovn4nfv-deployment-2-annotation --for=condition=available --timeout=300s
+    changed_when: false
+  - name: Get the interface configuration of the first pod
+    shell: kubectl exec -it $(kubectl get pods -l app=ovn4nfv-2-annotation -o jsonpath='{.items[0].metadata.name}') -- ifconfig
+    register: ifconfig_result
+  - debug:
+      var: ifconfig_result.stdout
+  - name: Get the interface configuration of the second pod
+    shell: kubectl exec -it $(kubectl get pods -l app=ovn4nfv-2-annotation -o jsonpath='{.items[1].metadata.name}') -- ifconfig
+    register: ifconfig_result
+  - debug:
+      var: ifconfig_result.stdout
+  - name: Test the ping operation between the pods
+    shell: kubectl exec -it $(kubectl get pods -l app=ovn4nfv-2-annotation -o jsonpath='{.items[1].metadata.name}') -- ping 172.16.44.2 -c 1
+    register: ping_result
+    changed_when: false
+  - debug:
+      var: ping_result.stdout

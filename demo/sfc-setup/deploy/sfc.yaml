@@ -9,10 +9,10 @@ spec:
     namespace: "default"
     networkChain: "app=slb,dync-net1,app=ngfw,dync-net2,app=sdwan"
     leftNetwork:
-    - networkName: "right-pnetwork"
+    - networkName: "left-pnetwork"
       gatewayIp: "172.30.10.2"
       subnet: "172.30.10.0/24"
     rightNetwork:
-    - networkName: "left-pnetwork"
+    - networkName: "right-pnetwork"
       gatewayIp: "172.30.20.2"
       subnet: "172.30.20.0/24"

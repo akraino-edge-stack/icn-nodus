@@ -1,0 +1,182 @@
+---
+- name: Deploy the SD-EWAN controller in cluster
+  hosts: master
+
+  tasks:
+  - name: Apply YAML files
+    shell: |
+      kubectl apply -f https://github.com/jetstack/cert-manager/releases/download/v0.11.0/cert-manager.yaml --validate=false
+      kubectl -n cert-manager wait pods --all --for=condition=ready --timeout=300s
+      kubectl apply -f https://raw.githubusercontent.com/akraino-edge-stack/icn-sdwan/master/platform/crd-ctrlr/examples/sdewan-controller.yaml
+      kubectl -n sdewan-system wait deployments/sdewan-controller-manager --for=condition=available --timeout=300s
+    register: apply_result
+    changed_when: apply_result.stdout is not search('unchanged')
+
+- name: Create test scenario
+  hosts: master
+
+  tasks:
+  - name: Create test scenario
+    block:
+    - name: "Create test scenario : Copy YAML files to host"
+      copy:
+        src: "deploy/{{ item }}"
+        dest: "{{ ansible_user_dir }}"
+      with_items:
+      - "sfc-network.yaml"
+      - "slb-ngfw-sdewan-cnf-deployment.yaml"
+      - "ms1.yaml"
+    - name: "Create test scenario : Apply YAML files"
+      shell: "kubectl apply -f {{ item }}"
+      with_items:
+      - "sfc-network.yaml"
+      - "slb-ngfw-sdewan-cnf-deployment.yaml"
+      - "ms1.yaml"
+      args:
+        chdir: "{{ ansible_user_dir }}"
+      register: apply_result
+      changed_when: apply_result.stdout is not search('unchanged')
+    - name: "Create test scenario : Wait for deployments up and running"
+      shell: "kubectl wait deployments/{{ item }} --for=condition=available --timeout=300s"
+      with_items:
+      - "slb"
+      - "ngfw"
+      - "sdwan"
+      - "ms1"
+      changed_when: false
+
+- name: Deploy the SFC
+  hosts: master
+
+  tasks:
+  - name: Deploy the SFC
+    block:
+    - name: "Deploy the SFC : Copy YAML files to host"
+      copy:
+        src: "deploy/{{ item }}"
+        dest: "{{ ansible_user_dir }}"
+      with_items:
+      - "sfc.yaml"
+    - name: "Deploy the SFC : Apply YAML files"
+      shell: "kubectl apply -f {{ item }}"
+      with_items:
+      - "sfc.yaml"
+      args:
+        chdir: "{{ ansible_user_dir }}"
+      register: apply_result
+      changed_when: apply_result.stdout is not search('unchanged')
+
+- name: Test connectivity
+  hosts: master
+
+  tasks:
+  - name: Test connectivity
+    block:
+    - name: "Test connectivity : Copy YAML files to host"
+      copy:
+        src: "deploy/{{ item }}"
+        dest: "{{ ansible_user_dir }}"
+      with_items:
+      - "connectivity.yaml"
+    - name: "Test connectivity : Apply YAML files"
+      shell: |
+        kubectl apply -f {{ item }}
+        kubectl wait pods -l app=connectivity --for=condition=ready --timeout=300s
+      with_items:
+      - "connectivity.yaml"
+      args:
+        chdir: "{{ ansible_user_dir }}"
+      register: apply_result
+      changed_when: apply_result.stdout is not search('unchanged')
+    - name: "Test connectivity : Test ping and HTTP"
+      shell: |
+        set -eu -o pipefail
+
+        echo "# Ping from POD to Internet"
+        kubectl exec -it connectivity-minion01-pod1 -c busybox -- ping -c 1 google.com
+        echo "# HTTP from POD to Internet"
+        kubectl exec -it connectivity-minion01-pod1 -c busybox -- wget -qO- example.com
+
+        pod_ip=$(kubectl get po/connectivity-minion01-pod2 -o jsonpath='{.status.podIP}')
+        echo "# Ping from POD to POD, same node"
+        kubectl exec -it connectivity-minion01-pod1 -c busybox -- ping -c 1 "${pod_ip}"
+        echo "# HTTP from POD to POD, same node"
+        kubectl exec -it connectivity-minion01-pod1 -c busybox -- wget -qO- "${pod_ip}:9376"
+
+        pod_ip=$(kubectl get po/connectivity-minion02-pod2 -o jsonpath='{.status.podIP}')
+        echo "# Ping/HTTP from POD to POD, different nodes"
+        kubectl exec -it connectivity-minion01-pod1 -c busybox -- ping -c 1 "${pod_ip}"
+        echo "# HTTP from POD to POD, different nodes"
+        kubectl exec -it connectivity-minion01-pod1 -c busybox -- wget -qO- "${pod_ip}:9376"
+
+        cluster_ip=$(kubectl get svc/connectivity-minion01 -o jsonpath='{.spec.clusterIP}')
+        echo "# HTTP from POD to Service (which is implemented) by POD2 - Both PODs are on the same node."
+        kubectl exec -it connectivity-minion01-pod1 -c busybox -- wget -qO- "${cluster_ip}:80"
+
+        cluster_ip=$(kubectl get svc/connectivity-minion02 -o jsonpath='{.spec.clusterIP}')
+        echo "# HTTP from Client POD to service POD which in some other node."
+        kubectl exec -it connectivity-minion01-pod1 -c busybox -- wget -qO- "${cluster_ip}:80"
+
+        internal_ip=$(kubectl get node/minion01 -o jsonpath='{.status.addresses[?(.type=="InternalIP")].address}')
+        echo "# Ping from POD to Node IP of the same node."
+        kubectl exec -it connectivity-minion01-pod1 -c busybox -- ping -c 1 "${internal_ip}"
+
+        internal_ip=$(kubectl get node/minion02 -o jsonpath='{.status.addresses[?(.type=="InternalIP")].address}')
+        echo "# Ping from POD to Node IP of different node."
+        kubectl exec -it connectivity-minion01-pod1 -c busybox -- ping -c 1 "${internal_ip}"
+      args:
+        chdir: "{{ ansible_user_dir }}"
+        executable: /bin/bash
+      register: test_result
+    - name: "Test connectivity : Show results of test ping and HTTP"
+      debug:
+        var: test_result
+    - name: "Test connectivity : Register node address for external cluster test"
+      shell: kubectl get no/minion01 -o jsonpath='{.status.addresses[0].address}'
+      register: node_ip
+      changed_when: false
+    - name: "Test connectivity : Register node port for external cluster test"
+      shell: kubectl get svc/connectivity-minion01 -o jsonpath='{.spec.ports[0].nodePort}'
+      register: node_port
+      changed_when: false
+
+- name: Test external connectivity
+  hosts: tm1-node, tm2-node
+
+  tasks:
+  - name: Test external connectivity
+    block:
+    - name: "Test external connectivity : Test ping and HTTP"
+      shell: |
+        set -eu -o pipefail
+
+        echo '# HTTP from Internet client to service POD.'
+        wget -qO- {{ hostvars['master']['node_ip'].stdout }}:{{ hostvars['master']['node_port'].stdout }}
+      args:
+        chdir: "{{ ansible_user_dir }}"
+        executable: /bin/bash
+      register: test_result
+    - name: "Test external connectivity : Show results of test ping and HTTP"
+      debug:
+        var: test_result
+
+- name: Delete test resources
+  hosts: master
+
+  tasks:
+  - name: Delete test resources
+    shell: |
+      kubectl delete --ignore-not-found=true --wait=true -f {{ item }}
+    with_items:
+      - "connectivity.yaml"
+      - "sfc.yaml"
+      - "sfc-network.yaml"
+      - "slb-ngfw-sdewan-cnf-deployment.yaml"
+      - "ms1.yaml"
+      - "https://raw.githubusercontent.com/akraino-edge-stack/icn-sdwan/master/platform/crd-ctrlr/examples/sdewan-controller.yaml"
+      - "https://github.com/jetstack/cert-manager/releases/download/v0.11.0/cert-manager.yaml"
+    args:
+      chdir: "{{ ansible_user_dir }}"
+    register: delete_result
+    changed_when: delete_result.stdout is not search('unchanged')
+    ignore_errors: true

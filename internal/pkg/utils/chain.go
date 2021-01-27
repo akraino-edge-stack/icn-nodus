@@ -19,6 +19,7 @@ package nfn
 import (
 	"context"
 	"fmt"
+	"ovn4nfv-k8s-plugin/internal/pkg/kube"
 	"ovn4nfv-k8s-plugin/internal/pkg/network"
 	"ovn4nfv-k8s-plugin/internal/pkg/ovn"
 	k8sv1alpha1 "ovn4nfv-k8s-plugin/pkg/apis/k8s/v1alpha1"
@@ -29,8 +30,6 @@ import (
 	"github.com/containernetworking/plugins/pkg/ns"
 	"github.com/docker/docker/client"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/kubernetes"
-	"sigs.k8s.io/controller-runtime/pkg/client/config"
 	logf "sigs.k8s.io/controller-runtime/pkg/runtime/log"
 )
 
@@ -56,16 +55,12 @@ func calculateDeploymentRoutes(namespace, label string, pos int, num int, ln []k
 
 	r.Namespace = namespace
 	// Get a config to talk to the apiserver
-	cfg, err := config.GetConfig()
+	k, err := kube.GetKubeConfig()
 	if err != nil {
+		log.Error(err, "Error in kube clientset")
 		return RoutingInfo{}, err
 	}
-	var k *kubernetes.Clientset
-	k, err = kubernetes.NewForConfig(cfg)
-	if err != nil {
-		log.Error(err, "Error building Kuberenetes clientset")
-		return RoutingInfo{}, err
-	}
+
 	lo := v1.ListOptions{LabelSelector: label}
 	// List the Pods matching the Labels
 	pods, err := k.CoreV1().Pods(namespace).List(lo)
@@ -177,6 +172,19 @@ func ContainerAddRoute(containerPid int, route []*pb.RouteData) error {
 		return err
 	}
 
+	k, err := kube.GetKubeConfig()
+	if err != nil {
+		log.Error(err, "Error in kube clientset")
+		return err
+	}
+
+	kubecli := &kube.Kube{KClient: k}
+	k8sClusterCidr, err := kubecli.GetControlPlaneServiceIPRange()
+	if err != nil {
+		log.Error(err, "Error in getting svc cidr range")
+		return err
+	}
+
 	nms, err := ns.GetNS(str)
 	if err != nil {
 		log.Error(err, "Failed namesapce", "containerID", containerPid)
@@ -191,6 +199,12 @@ func ContainerAddRoute(containerPid int, route []*pb.RouteData) error {
 		}
 
 		stdout, stderr, err := ovn.RunIP("route", "add", hostNet, "via", podGW)
+		if err != nil && !strings.Contains(stderr, "RTNETLINK answers: File exists") {
+			log.Error(err, "Failed to ip route add", "stdout", stdout, "stderr", stderr)
+			return err
+		}
+
+		stdout, stderr, err = ovn.RunIP("route", "add", k8sClusterCidr, "via", podGW)
 		if err != nil && !strings.Contains(stderr, "RTNETLINK answers: File exists") {
 			log.Error(err, "Failed to ip route add", "stdout", stdout, "stderr", stderr)
 			return err

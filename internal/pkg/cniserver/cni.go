@@ -6,6 +6,7 @@ import (
 	"net"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -14,6 +15,7 @@ import (
 	"ovn4nfv-k8s-plugin/cmd/ovn4nfvk8s-cni/app"
 	"ovn4nfv-k8s-plugin/internal/pkg/config"
 	"ovn4nfv-k8s-plugin/internal/pkg/kube"
+	//"ovn4nfv-k8s-plugin/internal/pkg/sriov"
 
 	"github.com/containernetworking/cni/pkg/types"
 	"github.com/containernetworking/cni/pkg/types/current"
@@ -91,7 +93,7 @@ func isNotFoundError(err error) bool {
 	return ok && statusErr.Status().Code == http.StatusNotFound
 }
 
-func (cr *CNIServerRequest) addMultipleInterfaces(ovnAnnotation, namespace, podName string) types.Result {
+func (cr *CNIServerRequest) addMultipleInterfaces(ovnAnnotation, namespace, podName string, deviceID string) types.Result {
 	klog.Infof("ovn4nfvk8s-cni: addMultipleInterfaces ")
 	var ovnAnnotatedMap []map[string]string
 	ovnAnnotatedMap, err := parseOvnNetworkObject(ovnAnnotation)
@@ -144,12 +146,31 @@ func (cr *CNIServerRequest) addMultipleInterfaces(ovnAnnotation, namespace, podN
 			defaultGateway = "false"
 		}
 
+		interfaceType := ovnNet["interfaceType"]
+		currentDeviceID := ""
+		if interfaceType == "sriov" {
+		        if len(deviceID) > 0 {
+		                dev := strings.Split(deviceID, " ")
+		                if len(dev) > 1 {// multiple pci device IDs
+		                        klog.Infof("len(dev)=%d", len(dev))
+					currentDeviceID = dev[0]
+					tempStr := strings.TrimPrefix(deviceID, dev[0])
+		                        deviceID = strings.TrimLeft(tempStr, " ")
+					klog.Infof("addMultipleInterfaces: if multiple interfaceType==sriov: interfaceType %+v, deviceID %s currentDeviceID %s", interfaceType, deviceID, currentDeviceID)
+		                } else {// single pci device ID
+					currentDeviceID = deviceID
+					klog.Infof("addMultipleInterfaces: if single interfaceType==sriov: interfaceType %+v, deviceID %s currentDeviceID %s", interfaceType, deviceID, currentDeviceID)
+				}
+			}
+		}
+		klog.Infof("addMultipleInterfaces: calling with currentDeviceID=%s, deviceID=%s, interfaceType=%s", currentDeviceID, deviceID, interfaceType)
 		klog.Infof("addMultipleInterfaces: ipAddress-%v ovn4nfv-interface-%v cni-ifname-%v", ipAddress, interfaceName, cr.IfName)
-		interfacesArray, err = app.ConfigureInterface(cr.Netns, cr.SandboxID, cr.IfName, namespace, podName, macAddress, ipAddress, gatewayIP, interfaceName, defaultGateway, index, config.Default.MTU, isDefaultGW)
+		interfacesArray, err = app.ConfigureInterface(cr.Netns, cr.SandboxID, cr.IfName, namespace, podName, macAddress, ipAddress, gatewayIP, interfaceName, defaultGateway, index, config.Default.MTU, isDefaultGW, currentDeviceID)
 		if err != nil {
 			klog.Errorf("Failed to configure interface in pod: %v", err)
 			return nil
 		}
+
 		addr, addrNet, err := net.ParseCIDR(ipAddress)
 		if err != nil {
 			klog.Errorf("failed to parse IP address %q: %v", ipAddress, err)
@@ -249,6 +270,8 @@ func (cr *CNIServerRequest) cmdAdd(kclient kubernetes.Interface) ([]byte, error)
 	klog.Infof("ovn4nfvk8s-cni: cmdAdd")
 	namespace := cr.PodNamespace
 	podname := cr.PodName
+	deviceid := cr.DeviceID
+
 	if namespace == "" || podname == "" {
 		return nil, fmt.Errorf("required CNI variable missing")
 	}
@@ -280,7 +303,7 @@ func (cr *CNIServerRequest) cmdAdd(kclient kubernetes.Interface) ([]byte, error)
 	if !ok {
 		return nil, fmt.Errorf("Error while obtaining pod annotations")
 	}
-	result := cr.addMultipleInterfaces(ovnAnnotation, namespace, podname)
+	result := cr.addMultipleInterfaces(ovnAnnotation, namespace, podname, deviceid)
 	//Add Routes to the pod if annotation found for routes
 	ovnRouteAnnotation, ok := annotation["ovnNetworkRoutes"]
 	if ok {
@@ -313,5 +336,12 @@ func (cr *CNIServerRequest) cmdDel() ([]byte, error) {
 			break
 		}
 	}
+	klog.Infof("CNIServerRequest cmdDel %+v, %+v, %+v", cr.Netns, cr.IfName, cr.SandboxID)
+/*
+	err := app.ReleaseVF(cr.Netns, cr.IfName, cr.SandboxID)
+	if err != nil {
+		klog.Errorf("cmdDel: Teardown error: %v", err)
+	}
+*/
 	return []byte{}, nil
 }

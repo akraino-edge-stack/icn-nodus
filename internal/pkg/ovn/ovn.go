@@ -64,6 +64,7 @@ type netInterface struct {
 	IPAddress      string
 	MacAddress     string
 	GWIPaddress    string
+	InterfaceType  string
 }
 
 var ovnCtl *Controller
@@ -167,7 +168,8 @@ func (oc *Controller) AddLogicalPorts(pod *kapi.Pod, ovnNetObjs []map[string]int
 		last := len(outStr) - 1
 		tmpString := outStr[:last]
 		tmpString += "," + "\\\"defaultGateway\\\":" + "\\\"" + ns.DefaultGateway + "\\\""
-		tmpString += "," + "\\\"interface\\\":" + "\\\"" + ns.Interface + "\\\"}"
+		tmpString += "," + "\\\"interface\\\":" + "\\\"" + ns.Interface + "\\\""
+		tmpString += "," + "\\\"interfaceType\\\":" + "\\\"" + ns.InterfaceType + "\\\"}"
 		ovnString += tmpString
 		ovnString += ","
 	}

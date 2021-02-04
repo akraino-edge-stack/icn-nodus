@@ -9,6 +9,7 @@ import (
 	"ovn4nfv-k8s-plugin/internal/pkg/config"
 	"ovn4nfv-k8s-plugin/internal/pkg/network"
 	"ovn4nfv-k8s-plugin/internal/pkg/ovn"
+	"ovn4nfv-k8s-plugin/internal/pkg/sriov"
 	"strconv"
 	"strings"
 
@@ -185,8 +186,204 @@ func setupInterface(netns ns.NetNS, containerID, ifName, macAddress, ipAddress, 
 	return hostIface, contIface, nil
 }
 
+func setupInterfaceSRIOV(netns ns.NetNS, containerID, ifName, macAddress, ipAddress, gatewayIP, defaultGateway string, idx, mtu int, isDefaultGW bool, deviceID string) (*current.Interface, *current.Interface, error) {
+        hostIface := &current.Interface{}
+        contIface := &current.Interface{}
+        var hostNet string
+	//var vfID int
+        if defaultGateway == "false" && isDefaultGW == true && ifName == "eth0" {
+                var err error
+                hostNet, err = network.GetHostNetwork()
+                if err != nil {
+                        log.Error(err, "setupInterfaceSRIOV: Failed to get host network")
+                        return nil, nil, fmt.Errorf("setupInterfaceSRIOV: failed to get host network: %v", err)
+                }
+        }
+
+        if deviceID != "" && macAddress != "" {
+                // Get rest of the VF information
+                pfName, vfID, err := sriov.GetVfInfo(deviceID)
+                fmt.Println("setupInterfaceSRIOV: pfName and vfID of deviceID: %+v, %+v, %+v", pfName, vfID, deviceID)
+                if err != nil {
+                        return nil, nil, fmt.Errorf("setupInterfaceSRIOV: failed to get VF information: %q", err)
+                }
+/*
+                // For 82599 NIC
+                // Get PF netdevice
+                pfLinkObj, err := netlink.LinkByName(pfName)
+                if err != nil {
+                        return nil, nil, fmt.Errorf("setupInterfaceSRIOV: error getting PF netdevice with name %s", pfName)
+                } else {
+                        hwaddr, err := net.ParseMAC(macAddress)
+                        if err != nil {
+                                return nil, nil, fmt.Errorf("setupInterfaceSRIOV: failed to parse macAddress %s: %+v, %+v", macAddress, hwaddr, err)
+                        }
+
+                        // Change VF link HW address
+                        err = netlink.LinkSetVfHardwareAddr(pfLinkObj, vfID, hwaddr)
+			fmt.Println("setupInterfaceSRIOV: pfLinkObj, vfID, hwaddr, err: %+v, %+v, %+v, %+v", pfLinkObj, vfID, hwaddr, err)
+                        if err != nil {
+                                return nil, nil, fmt.Errorf("setupInterfaceSRIOV: failed to set hardware address to VF: %v", err)
+                        }
+                }
+*/
+        } else {
+                return nil, nil, fmt.Errorf("setupInterfaceSRIOV: VF pci addr is required")
+        }
+
+        // Assuming VF is netdev interface; Get interface name(s)
+        hostIFNames, err := sriov.GetVFLinkNames(deviceID)
+        if err != nil || hostIFNames == "" {
+                // VF interface not found; check if VF has dpdk driver
+                hasDpdkDriver, err := sriov.HasDpdkDriver(deviceID)
+                fmt.Println("setupInterfaceSRIOV: hasDpdkDriver deviceID: %+v, %+v", hasDpdkDriver, deviceID)
+                if err != nil {
+                        return nil, nil, fmt.Errorf("setupInterfaceSRIOV: failed to detect if VF %s has dpdk driver %q", deviceID, err)
+                }
+        }
+
+        linkName := hostIFNames
+        hostIFName := containerID[:14] + strconv.Itoa(idx)
+        var linkObj netlink.Link
+
+        linkObj, er := netlink.LinkByName(linkName)
+        if er != nil {
+                return nil, nil, fmt.Errorf("setupInterfaceSRIOV: error getting VF netdevice with name %s", linkName)
+        }
+
+        // 1. Set link down
+        if er = netlink.LinkSetDown(linkObj); er != nil {
+                return nil, nil, fmt.Errorf("setupInterfaceSRIOV: failed to down VF netdevice %q: %v", linkName, er)
+        }
+
+        // 2. Set VF link name
+        if er = netlink.LinkSetName(linkObj, hostIFName); er != nil {
+                return nil, nil, fmt.Errorf("setupInterfaceSRIOV: error setting temp hostIFName %s for %s", hostIFName, linkName)
+        }
+
+        // 3. Change VF link HW address (done above)
+	mac := linkObj.Attrs().HardwareAddr.String()
+
+        // For XL710 NIC
+        if macAddress != "" {
+		hwaddr, err := net.ParseMAC(macAddress)
+		if err != nil {
+			return nil, nil, fmt.Errorf("setupInterfaceSRIOV: failed to parse macAddress %s: %+v, %+v", macAddress, hwaddr, err)
+		}
+
+		err = netlink.LinkSetHardwareAddr(linkObj, hwaddr)
+		fmt.Println("setupInterfaceSRIOV: linkObj, mac, hwaddr, err: %+v, %+v, %+v, %+v", linkObj, mac, hwaddr, err)
+		mac := linkObj.Attrs().HardwareAddr.String()
+		fmt.Println("setupInterfaceSRIOV: linkObj, mac, hwaddr, err: %+v, %+v, %+v, %+v", linkObj, mac, hwaddr, err)
+		if err != nil {
+			return nil, nil, fmt.Errorf("setupInterfaceSRIOV: failed to set hardware address to VF: %v", err)
+		}
+	}
+
+        // 4. Change netns
+        if er = netlink.LinkSetNsFd(linkObj, int(netns.Fd())); er != nil {
+                return nil, nil, fmt.Errorf("setupInterfaceSRIOV: failed to move IF %s to netns: %q", linkName, er)
+        }
+        fmt.Println("setupInterfaceSRIOV: no error after linksetnsfd linkObj %+v, linkName %+v, mac %+v", linkObj, linkName, mac)
+
+        if err := netns.Do(func(_ ns.NetNS) error {
+                nl, _ := netlink.LinkList()
+                for _, link := range nl {
+                        fmt.Println("setupInterfaceSRIOV: POD NETNS LinkList() link.Attrs().Name %+v", link.Attrs().Name)
+                }
+
+                fmt.Println("setupInterfaceSRIOV: POD NETNS linkObj %+v, ifName %+v", linkObj, ifName)
+
+                // 5. Set Pod IF name
+                if er := netlink.LinkSetName(linkObj, ifName); er != nil {
+                        return fmt.Errorf("setupInterfaceSRIOV: error setting container interface name %s for %s", linkName, ifName)
+                }
+
+                // 6. Bring IF up in Pod netns
+                if er := netlink.LinkSetUp(linkObj); er != nil {
+                        return fmt.Errorf("setupInterfaceSRIOV: error bringing interface up in container ns: %q", er)
+                }
+
+                addr, er := netlink.ParseAddr(ipAddress)
+                if er != nil {
+                        return err
+                }
+                fmt.Println("addr=%+v", addr)
+                if er := netlink.AddrAdd(linkObj, addr); er != nil {
+                        return fmt.Errorf("setupInterfaceSRIOV: failed to add IP addr %s to %s: %v", ipAddress, ifName, er)
+                }
+
+                if defaultGateway == "true" {
+                        gw := net.ParseIP(gatewayIP)
+                        if gw == nil {
+                                return fmt.Errorf("setupInterfaceSRIOV: parse ip of gateway failed")
+                        }
+                        if er := ip.AddRoute(nil, gw, linkObj); er != nil {
+                                return fmt.Errorf("setupInterfaceSRIOV: ip.AddRoute failed %v gw %v link %v", er, gw, linkObj)
+                        }
+                }
+
+                if defaultGateway == "false" && isDefaultGW == true && ifName == "eth0" {
+                        stdout, stderr, err := ovn.RunIP("route", "add", hostNet, "via", gatewayIP)
+                        if err != nil && !strings.Contains(stderr, "RTNETLINK answers: File exists") {
+                                logrus.Errorf("setupInterfaceSRIOV: Failed to ip route add stout %s, stderr %s, err %v", stdout, stderr, err)
+                                return fmt.Errorf("setupInterfaceSRIOV: Failed to ip route add stout %s, stderr %s, err %v", stdout, stderr, err)
+                        }
+                }
+                hostIface.Name = hostIFName
+                hostIface.Mac = macAddress
+                contIface.Name = ifName
+                contIface.Mac = macAddress
+                contIface.Sandbox = netns.Path()
+
+                return nil
+        }); err != nil {
+                return nil, nil, fmt.Errorf("setupInterfaceSRIOV: error finding LinkList in container namespace: %q", err)
+        }
+        fmt.Println("setupInterfaceSRIOV: hostIface %+v, contIface %+v", hostIface, contIface)
+
+        return hostIface, contIface, nil
+}
+
+/*
+// ReleaseVF reset a VF from Pod netns and return it to init netns
+func ReleaseVF(containerNetns, podifName string, cid string) error {
+        netns, err := ns.GetNS(containerNetns)
+	fmt.Println("ReleaseVF: containerNetns %+v, podifName %s, cid %s, netns %+v, err %+v", containerNetns, podifName, cid, netns, err)
+        if err != nil {
+		return fmt.Errorf("ReleaseVF: failed to open netns %+v %q: %v", netns, containerNetns, err)
+        }
+        defer netns.Close()
+
+        if err = netns.Do(func(_ ns.NetNS) error {
+                // get VF device
+                linkObj, er := netlink.LinkByName(podifName)
+		fmt.Println("ReleaseVF: linkObj %+v, er %+v", linkObj, er)
+                if er != nil {
+			return fmt.Errorf("ReleaseVF: not a VF device with pod interface name: %s, err: %q, linkObj: %+v", podifName, er, linkObj)
+                }
+
+                // tempName used to avoid name conflicts
+		tempName := fmt.Sprintf("%s%d", "temp_", linkObj.Attrs().Index)
+
+	        er = renameLink(podifName, tempName)
+		fmt.Println("ReleaseVF: podifName %s, tempName %s, er %+v", podifName, tempName, er)
+		if er != nil {
+			return fmt.Errorf("ReleaseVF: failed to rename pod interface name: %s to temp name: %s, err: %v", podifName, tempName, er)
+	        }
+
+                return nil
+        }); err != nil {
+                return fmt.Errorf("ReleaseVF: error finding LinkList in container namespace: %q", err)
+        }
+
+	fmt.Println("ReleaseVF: netns %+v, podifName %s", netns, podifName)
+	return nil
+}
+*/
+
 // ConfigureInterface sets up the container interface
-var ConfigureInterface = func(containerNetns, containerID, ifName, namespace, podName, macAddress, ipAddress, gatewayIP, interfaceName, defaultGateway string, idx, mtu int, isDefaultGW bool) ([]*current.Interface, error) {
+var ConfigureInterface = func(containerNetns, containerID, ifName, namespace, podName, macAddress, ipAddress, gatewayIP, interfaceName, defaultGateway string, idx, mtu int, isDefaultGW bool, deviceID string) ([]*current.Interface, error) {
 	netns, err := ns.GetNS(containerNetns)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open netns %q: %v", containerNetns, err)
@@ -200,7 +397,17 @@ var ConfigureInterface = func(containerNetns, containerID, ifName, namespace, po
 		ifaceID = fmt.Sprintf("%s_%s", namespace, podName)
 		interfaceName = ifName
 	}
-	hostIface, contIface, err := setupInterface(netns, containerID, interfaceName, macAddress, ipAddress, gatewayIP, defaultGateway, idx, mtu, isDefaultGW)
+	logrus.Infof("ifaceID: %s", ifaceID)
+
+	hostIface := &current.Interface{}
+	contIface := &current.Interface{}
+	if deviceID != "" {
+		hostIface, contIface, err = setupInterfaceSRIOV(netns, containerID, interfaceName, macAddress, ipAddress, gatewayIP, defaultGateway, idx, mtu, isDefaultGW, deviceID)
+	} else {
+		hostIface, contIface, err = setupInterface(netns, containerID, interfaceName, macAddress, ipAddress, gatewayIP, defaultGateway, idx, mtu, isDefaultGW)
+	}
+
+	logrus.Infof("ConfigureInterface: hostIface: %+v, contIface: %+v, err: %+v", hostIface, contIface, err)
 	if err != nil {
 		return nil, err
 	}
@@ -213,6 +420,7 @@ var ConfigureInterface = func(containerNetns, containerID, ifName, namespace, po
 		fmt.Sprintf("external_ids:ip_address=%s", ipAddress),
 		fmt.Sprintf("external_ids:sandbox=%s", containerID),
 	}
+	logrus.Infof("ConfigureInterface: ovsArgs: %+v", ovsArgs)
 
 	var out []byte
 	out, err = exec.Command("ovs-vsctl", ovsArgs...).CombinedOutput()

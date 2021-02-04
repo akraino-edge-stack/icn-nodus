@@ -81,6 +81,7 @@ require (
 	sigs.k8s.io/controller-runtime v0.2.0-beta.4
 	sigs.k8s.io/controller-tools v0.1.10 // indirect
 	sigs.k8s.io/structured-merge-diff v1.0.1 // indirect
+	k8s.io/kubernetes v1.13.4
 )
 
 // Pinned to kubernetes-1.13.4
@@ -89,6 +90,7 @@ replace (
 	k8s.io/apiextensions-apiserver => k8s.io/apiextensions-apiserver v0.0.0-20190918161926-8f644eb6e783
 	k8s.io/apimachinery => k8s.io/apimachinery v0.0.0-20190913080033-27d36303b655
 	k8s.io/client-go => k8s.io/client-go v0.0.0-20190918160344-1fbdaa4c8d90
+	k8s.io/kubernetes => k8s.io/kubernetes v1.13.4
 	sigs.k8s.io/controller-runtime => sigs.k8s.io/controller-runtime v0.4.0
 	sigs.k8s.io/controller-tools => sigs.k8s.io/controller-tools v0.2.4
 )

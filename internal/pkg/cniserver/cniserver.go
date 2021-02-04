@@ -39,6 +39,7 @@ type CNIServerRequest struct {
 	SandboxID    string
 	Netns        string
 	IfName       string
+	DeviceID     string
 	CNIConf      *types.NetConf
 }
 
@@ -115,6 +116,11 @@ func loadCNIRequestToCNIServer(r *CNIEndpointRequest) (*CNIServerRequest, error)
 	if !ok {
 		return nil, fmt.Errorf("cnishim req missing CNI_IFNAME")
 	}
+
+        cnishimreq.DeviceID, ok = r.ArgEnv["POD_DEVICEID"]
+        if !ok {
+                return nil, fmt.Errorf("cnishim req missing POD_DEVICEID")
+        }
 
 	cnishimArgs, err := loadCNIShimArgs(r.ArgEnv)
 	if err != nil {

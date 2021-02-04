@@ -10,6 +10,7 @@ import (
 	"os"
 	"ovn4nfv-k8s-plugin/internal/pkg/cniserver"
 	"ovn4nfv-k8s-plugin/internal/pkg/config"
+	"ovn4nfv-k8s-plugin/internal/pkg/sriov"
 	"strings"
 
 	"github.com/containernetworking/cni/pkg/skel"
@@ -44,6 +45,20 @@ func cniEndpointRequest(args *skel.CmdArgs) *cniserver.CNIEndpointRequest {
 		ArgEnv:    osEnvMap,
 		NetConfig: args.StdinData,
 	}
+}
+
+func cniGetPodPciDeviceIdRequest(args *skel.CmdArgs) {
+        // Parse pod resources list and get the PCI device for K8S_POD_NAME and K8S_POD_NAMESPACE
+        os.Setenv("POD_DEVICEID", "")
+        k8sArgs, err := sriov.GetK8sArgs(args)
+        if k8sArgs != nil && err == nil {
+                deviceid, err := sriov.GetPodResourceRequests(string(k8sArgs.K8S_POD_NAME), string(k8sArgs.K8S_POD_NAMESPACE))
+                if deviceid != "" && err == nil {
+			os.Setenv("POD_DEVICEID", deviceid)
+		} else {
+                        logrus.Infof("Error getting pci device ids: %+v", err)
+                }
+        }
 }
 
 func (ep *Endpoint) sendCNIServerReq(req *cniserver.CNIEndpointRequest) ([]byte, error) {
@@ -85,6 +100,11 @@ func (ep *Endpoint) CmdAdd(args *skel.CmdArgs) error {
 		return fmt.Errorf("invalid stdin args")
 	}
 	logrus.Infof("ovn4nfvk8s-cni: cmdAdd configure net conf details -%+v", conf)
+
+        // Parse pod resources list and get the PCI device for K8S_POD_NAME and K8S_POD_NAMESPACE
+	cniGetPodPciDeviceIdRequest(args)
+	logrus.Infof("ovn4nfvk8s-cni: cmdAdd cniGetPodPciDeviceIdRequest:%+v",os.Getenv("POD_DEVICEID"))
+
 	req := cniEndpointRequest(args)
         logrus.Infof("ovn4nfvk8s-cni: cmdAdd CNIEndpoint Request:%+v",req)
 	reponsebody, err := ep.sendCNIServerReq(req)
@@ -105,6 +125,11 @@ func (ep *Endpoint) CmdCheck(args *skel.CmdArgs) error {
 
 func (ep *Endpoint) CmdDel(args *skel.CmdArgs) error {
 	logrus.Infof("ovn4nfvk8s-cni: cmdDel ")
+
+        // Parse pod resources list and get the PCI device for K8S_POD_NAME and K8S_POD_NAMESPACE
+        cniGetPodPciDeviceIdRequest(args)
+        //logrus.Infof("ovn4nfvk8s-cni: cmdDel cniGetPodPciDeviceIdRequest:%+v",os.Getenv("POD_DEVICEID"))
+
 	req := cniEndpointRequest(args)
 	_, err := ep.sendCNIServerReq(req)
 	return err

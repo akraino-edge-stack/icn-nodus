@@ -1,0 +1,20 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pod-case-01
+  labels:
+    app: pod-case-01
+  annotations:
+          k8s.plugin.opnfv.org/nfn-network: '{"type": "ovn4nfv", "interface": [{"name": "sriov-network", "interface": "netif1", "interfaceType": "sriov"}]}'
+spec:
+  containers:
+  - name: test-pod
+    image: docker.io/centos/tools:latest
+    command:
+    - /sbin/init
+    imagePullPolicy: IfNotPresent
+    resources:
+      requests:
+        intel.com/intel_sriov_netdevice: '1'
+      limits:
+        intel.com/intel_sriov_netdevice: '1'

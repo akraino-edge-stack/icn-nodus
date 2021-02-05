@@ -1,0 +1,73 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "acf72662_8fb0aaa2",
+        "filename": "cmd/ovn4nfvk8s-cni/app/helper_linux.go",
+        "patchSetId": 2
+      },
+      "lineNbr": 194,
+      "author": {
+        "id": 412
+      },
+      "writtenOn": "2021-02-05T05:42:25Z",
+      "side": 1,
+      "message": "Please try to avoid hardcoded interface names.",
+      "range": {
+        "startLine": 194,
+        "startChar": 74,
+        "endLine": 194,
+        "endChar": 78
+      },
+      "revId": "40d3cbb3eeb56a6e865cb754f11a34cf78aeb955",
+      "serverId": "4cada01b-0314-4fe0-84a1-f9ddc89863f9",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "23377bfd_4c328d6d",
+        "filename": "cmd/ovn4nfvk8s-cni/app/helper_linux.go",
+        "patchSetId": 2
+      },
+      "lineNbr": 206,
+      "author": {
+        "id": 412
+      },
+      "writtenOn": "2021-02-05T05:42:25Z",
+      "side": 1,
+      "message": "Need to be logged instead of println?. also, I think this need to be logged after err check?.",
+      "range": {
+        "startLine": 206,
+        "startChar": 16,
+        "endLine": 206,
+        "endChar": 19
+      },
+      "revId": "40d3cbb3eeb56a6e865cb754f11a34cf78aeb955",
+      "serverId": "4cada01b-0314-4fe0-84a1-f9ddc89863f9",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "e4481555_67209bba",
+        "filename": "cmd/ovn4nfvk8s-cni/app/helper_linux.go",
+        "patchSetId": 2
+      },
+      "lineNbr": 213,
+      "author": {
+        "id": 412
+      },
+      "writtenOn": "2021-02-05T05:42:25Z",
+      "side": 1,
+      "message": "Please clarify on this commented code (where try to get the mac address)",
+      "range": {
+        "startLine": 213,
+        "startChar": 0,
+        "endLine": 213,
+        "endChar": 60
+      },
+      "revId": "40d3cbb3eeb56a6e865cb754f11a34cf78aeb955",
+      "serverId": "4cada01b-0314-4fe0-84a1-f9ddc89863f9",
+      "unresolved": true
+    }
+  ]
+}

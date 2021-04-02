@@ -102,6 +102,7 @@ case ${cmd} in
     ;;
 
     "agent")
+        until ovs-vsctl show >/dev/null; do echo "waiting for ovs"; sleep 2; done
         shift
         exec ${AGENT} $@
     ;;

@@ -135,6 +135,14 @@ func (r *ReconcilePod) Reconcile(request reconcile.Request) (reconcile.Result, e
 	if instance.Name == "" || instance.Namespace == "" {
 		return reconcile.Result{}, nil
 	}
+
+	if !instance.ObjectMeta.DeletionTimestamp.IsZero() {
+		// Pod is marked delete, process delete allowing appropriate
+		// cleanup of ports from OVN CNI
+		r.deleteLogicalPorts(instance.Name, instance.Namespace)
+		return reconcile.Result{}, nil
+	}
+
 	if instance.Spec.HostNetwork {
 		return reconcile.Result{}, nil
 	}

@@ -75,6 +75,7 @@ func subscribeNotif(client pb.NfnNotifyClient) error {
 				shutDownAgent("Stream closed from server")
 				return err
 			}
+			log.Info("Got Err message", "err", err)
 			log.Info("Got message", "msg", in)
 			handleNotif(in)
 		}
@@ -281,6 +282,27 @@ func handleNotif(msg *pb.Notification) {
 				return
 			}
 			err = chaining.ContainerAddRoute(pid, payload.ContainterRtInsert.GetRoute())
+			if err != nil {
+				return
+			}
+
+		case *pb.Notification_PodAddNetwork:
+			id := payload.PodAddNetwork.GetContainerId()
+			pid, err := chaining.GetPidForContainer(id)
+			if err != nil {
+				log.Error(err, "Failed to get pid", "containerID", id)
+				return
+			}
+
+			err = chaining.ContainerAddInteface(pid, payload.PodAddNetwork)
+			if err != nil {
+				return
+			}
+
+			var route []*pb.RouteData
+			route = append(route, payload.PodAddNetwork.GetRoute())
+			log.Info("route information from msg", "route", route)
+			err = chaining.ContainerAddRoute(pid, route)
 			if err != nil {
 				return
 			}

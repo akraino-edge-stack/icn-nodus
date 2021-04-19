@@ -20,8 +20,8 @@ import (
 	"fmt"
 	"net"
 	pb "ovn4nfv-k8s-plugin/internal/pkg/nfnNotify/proto"
-	chaining "ovn4nfv-k8s-plugin/internal/pkg/utils"
 	"ovn4nfv-k8s-plugin/internal/pkg/node"
+	chaining "ovn4nfv-k8s-plugin/internal/pkg/utils"
 	v1alpha1 "ovn4nfv-k8s-plugin/pkg/apis/k8s/v1alpha1"
 	clientset "ovn4nfv-k8s-plugin/pkg/generated/clientset/versioned"
 	"strings"
@@ -286,7 +286,7 @@ func sendMsg(msg pb.Notification, labels string, option string, nodeReq string) 
 	return nil
 }
 
-//SendProviderNotif to client
+//SendRouteNotif return ...
 func SendRouteNotif(chainRoutingInfo []chaining.RoutingInfo, msgType string) error {
 	var msg pb.Notification
 	var err error
@@ -296,24 +296,38 @@ func SendRouteNotif(chainRoutingInfo []chaining.RoutingInfo, msgType string) err
 		ins.ContainerId = r.Id
 		ins.Route = nil
 
-		rt := &pb.RouteData{
-			Dst: r.LeftNetworkRoute.Dst,
-			Gw:  r.LeftNetworkRoute.GW,
-		}
-		ins.Route = append(ins.Route, rt)
+		//if !r.LeftNetworkRoute.IsEmpty() {
+		//	rt := &pb.RouteData{
+		//		Dst: r.LeftNetworkRoute.Dst,
+		//		Gw:  r.LeftNetworkRoute.GW,
+		//	}
+		//	ins.Route = append(ins.Route, rt)
+		//}
 
-		rt = &pb.RouteData{
-			Dst: r.RightNetworkRoute.Dst,
-			Gw:  r.RightNetworkRoute.GW,
-		}
-		ins.Route = append(ins.Route, rt)
-
-		for _, d := range r.DynamicNetworkRoutes {
-			rt = &pb.RouteData{
-				Dst: d.Dst,
-				Gw:  d.GW,
+		for _, ln := range r.LeftNetworkRoute {
+			rt := &pb.RouteData{
+				Dst: ln.Dst,
+				Gw:  ln.GW,
 			}
 			ins.Route = append(ins.Route, rt)
+		}
+
+		if !r.RightNetworkRoute.IsEmpty() {
+			rt := &pb.RouteData{
+				Dst: r.RightNetworkRoute.Dst,
+				Gw:  r.RightNetworkRoute.GW,
+			}
+			ins.Route = append(ins.Route, rt)
+		}
+
+		for _, d := range r.DynamicNetworkRoutes {
+			if !d.IsEmpty() {
+				rt := &pb.RouteData{
+					Dst: d.Dst,
+					Gw:  d.GW,
+				}
+				ins.Route = append(ins.Route, rt)
+			}
 		}
 		if msgType == "create" {
 			msg = pb.Notification{
@@ -323,10 +337,51 @@ func SendRouteNotif(chainRoutingInfo []chaining.RoutingInfo, msgType string) err
 				},
 			}
 		}
+
 		client := notifServer.GetClient(r.Node)
 		if client.stream != nil {
 			if err := client.stream.Send(&msg); err != nil {
 				log.Error(err, "Failed to send msg", "Node", r.Node)
+				return err
+			}
+		}
+		// TODO: Handle Delete
+	}
+	return err
+}
+
+//SendPodNetworkNotif return ...
+func SendPodNetworkNotif(pni []chaining.PodNetworkInfo, msgType string) error {
+	var msg pb.Notification
+	var err error
+	var add pb.PodAddNetwork
+
+	for _, p := range pni {
+		add.Pod = &pb.PodInfo{
+			Namespace: p.Namespace,
+			Name:      p.Name,
+		}
+		add.ContainerId = p.Id
+		add.Net = &pb.NetConf{
+			Data: p.NetworkInfo,
+		}
+		add.Route = &pb.RouteData{
+			Dst: p.Route.Dst,
+			Gw:  p.Route.GW,
+		}
+
+		if msgType == "create" {
+			msg = pb.Notification{
+				CniType: "ovn4nfv",
+				Payload: &pb.Notification_PodAddNetwork{
+					PodAddNetwork: &add,
+				},
+			}
+		}
+		client := notifServer.GetClient(p.Node)
+		if client.stream != nil {
+			if err := client.stream.Send(&msg); err != nil {
+				log.Error(err, "Failed to send msg", "Node", p.Node)
 				return err
 			}
 		}

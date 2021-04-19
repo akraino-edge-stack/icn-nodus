@@ -21,26 +21,22 @@ require (
 	github.com/go-openapi/swag v0.19.6 // indirect
 	github.com/gogo/protobuf v1.3.1 // indirect
 	github.com/golang/glog v0.0.0-20160126235308-23def4e6c14b // indirect
-	github.com/golang/groupcache v0.0.0-20191227052852-215e87163ea7 // indirect
-	github.com/golang/protobuf v1.4.1
+	github.com/golang/protobuf v1.4.2
 	github.com/google/btree v1.0.0 // indirect
 	github.com/gophercloud/gophercloud v0.2.0 // indirect
 	github.com/gorilla/mux v1.7.4
 	github.com/gregjones/httpcache v0.0.0-20190611155906-901d90724c79 // indirect
-	github.com/grpc-ecosystem/grpc-gateway v1.8.5 // indirect
 	github.com/hashicorp/golang-lru v0.5.3 // indirect
 	github.com/json-iterator/go v1.1.9 // indirect
 	github.com/jung-kurt/gofpdf v1.16.2 // indirect
 	github.com/kr/pty v1.1.8 // indirect
 	github.com/mitchellh/mapstructure v1.1.2
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
-	github.com/onsi/ginkgo v1.11.0
-	github.com/onsi/gomega v1.8.1
-	github.com/opencontainers/go-digest v1.0.0-rc1 // indirect
+	github.com/onsi/ginkgo v1.12.1
+	github.com/onsi/gomega v1.10.1
 	github.com/opencontainers/image-spec v1.0.1 // indirect
 	github.com/phpdave11/gofpdi v1.0.8 // indirect
-	github.com/prometheus/client_golang v0.9.3-0.20190127221311-3c4408c8b829 // indirect
-	github.com/prometheus/common v0.2.0
+	github.com/prometheus/common v0.9.1
 	github.com/rogpeppe/go-charset v0.0.0-20190617161244-0dc95cdf6f31 // indirect
 	github.com/safchain/ethtool v0.0.0-20190326074333-42ed695e3de8 // indirect
 	github.com/sirupsen/logrus v1.4.2
@@ -50,12 +46,10 @@ require (
 	github.com/vishvananda/netlink v1.0.0
 	github.com/vishvananda/netns v0.0.0-20190625233234-7109fa855b0f // indirect
 	github.com/zmb3/gogetdoc v0.0.0-20190228002656-b37376c5da6a // indirect
-	golang.org/x/crypto v0.0.0-20191227163750-53104e6ec876 // indirect
 	golang.org/x/exp v0.0.0-20191227195350-da58074b4299 // indirect
 	golang.org/x/image v0.0.0-20191214001246-9130b4cfad52 // indirect
 	golang.org/x/lint v0.0.0-20190409202823-959b441ac422 // indirect
 	golang.org/x/mobile v0.0.0-20191210151939-1a1fef82734d // indirect
-	golang.org/x/net v0.0.0-20200324143707-d3edc9973b7e // indirect
 	golang.org/x/tools v0.0.0-20191227053925-7b8e75db28f4 // indirect
 	golang.org/x/tools/gopls v0.1.3 // indirect
 	golang.org/x/xerrors v0.0.0-20191204190536-9bdfabe68543 // indirect
@@ -64,23 +58,24 @@ require (
 	gonum.org/v1/plot v0.0.0-20191107103940-ca91d9d40d0a // indirect
 	google.golang.org/genproto v0.0.0-20200325114520-5b2d0af7952b // indirect
 	google.golang.org/grpc v1.28.0
-	google.golang.org/protobuf v1.22.0
+	google.golang.org/protobuf v1.23.0
 	gopkg.in/gcfg.v1 v1.2.3
 	gopkg.in/warnings.v0 v0.1.2 // indirect
-	gopkg.in/yaml.v2 v2.2.7 // indirect
 	honnef.co/go/tools v0.0.0-20190523083050-ea95bdfd59fc // indirect
-	k8s.io/api v0.0.0-20190918155943-95b840bb6a1f
-	k8s.io/apimachinery v0.17.0
+	k8s.io/api v0.17.9
+	k8s.io/apimachinery v0.17.9
 	//k8s.io/apimachinery v0.0.0-20190612125636-6a5db36e93ad
 	k8s.io/client-go v11.0.1-0.20190409021438-1a26190bd76a+incompatible
 	k8s.io/code-generator v0.17.0 // indirect
 	k8s.io/gengo v0.0.0-20191120174120-e74f70b9b27e // indirect
 	k8s.io/klog v1.0.0
-	k8s.io/kube-openapi v0.0.0-20191107075043-30be4d16710a
-	k8s.io/utils v0.0.0-20190801114015-581e00157fb1
-	sigs.k8s.io/controller-runtime v0.2.0-beta.4
+	k8s.io/kube-openapi v0.0.0-20200410145947-bcb3869e6f29
+	k8s.io/utils v0.0.0-20200619165400-6e3d28b6ed19
+	sigs.k8s.io/cluster-api v0.3.15
+	sigs.k8s.io/controller-runtime v0.5.14
 	sigs.k8s.io/controller-tools v0.1.10 // indirect
 	sigs.k8s.io/structured-merge-diff v1.0.1 // indirect
+	sigs.k8s.io/yaml v1.2.0
 )
 
 // Pinned to kubernetes-1.13.4

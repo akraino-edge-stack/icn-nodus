@@ -21,7 +21,8 @@ message Notification {
         ProviderNetworkRemove provider_nw_remove = 4;
         ContainerRouteInsert containter_rt_insert = 5;
         ContainerRouteRemove containter_rt_remove = 6;
-
+        PodAddNetwork pod_add_network = 7;
+        PodDelNetwork pod_del_network = 8;
     }
 }
 
@@ -62,6 +63,29 @@ message ContainerRouteInsert {
 message ContainerRouteRemove {
     string container_id = 1;
     repeated RouteData route = 2;
+}
+
+message PodInfo {
+    string namespace = 1;
+    string name = 2;
+}
+
+message NetConf {
+    string data =1;
+}
+
+message PodAddNetwork {
+    string container_id = 1;
+    PodInfo pod = 2;
+    NetConf net = 3;
+    RouteData route = 4;
+}
+
+message PodDelNetwork {
+    string container_id = 1;
+    PodInfo pod = 2;
+    NetConf net = 3;
+    RouteData route = 4;
 }
 
 message InSync {

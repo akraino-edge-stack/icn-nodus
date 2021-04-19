@@ -7,11 +7,17 @@ spec:
   chainType: "Routing"
   routingSpec:
     namespace: "default"
-    networkChain: "app=slb,dync-net1,app=ngfw,dync-net2,app=sdwan"
+    networkChain: "app=slb,dync-net1,app=ngfw,dync-net2,app=sdewan"
     leftNetwork:
     - networkName: "left-pnetwork"
       gatewayIp: "172.30.10.2"
       subnet: "172.30.10.0/24"
+      podSelector:
+        matchLabels:
+          app: nginx
+      namespaceSelector:
+        matchLabels:
+          app: nginx
     rightNetwork:
     - networkName: "right-pnetwork"
       gatewayIp: "172.30.20.2"

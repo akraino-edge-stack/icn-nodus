@@ -17,20 +17,24 @@
 package networkchaining
 
 import (
-	"fmt"
 	"context"
+	"fmt"
 	notif "ovn4nfv-k8s-plugin/internal/pkg/nfnNotify"
 	chaining "ovn4nfv-k8s-plugin/internal/pkg/utils"
 	k8sv1alpha1 "ovn4nfv-k8s-plugin/pkg/apis/k8s/v1alpha1"
 	"ovn4nfv-k8s-plugin/pkg/utils"
+	"reflect"
+
+	"github.com/go-logr/logr"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
+	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
-	"github.com/go-logr/logr"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 )
@@ -56,8 +60,42 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		return err
 	}
 
+	log.V(1).Info("Adding the networking chainings")
+	// Define Predicates On Create and Update function
+	p := predicate.Funcs{
+		UpdateFunc: func(e event.UpdateEvent) bool {
+			// updates are ingored, if they are already in the "created"
+			obj, ok := e.ObjectNew.(*k8sv1alpha1.NetworkChaining)
+			if !ok {
+				return false
+			}
+			if (obj.Status.State == k8sv1alpha1.CreateInternalError) || (obj.Status.State == k8sv1alpha1.DeleteInternalError) {
+				log.V(1).Info("obj.status.Status is internal error", "obj.Status.State", obj.Status.State)
+				return true
+			}
+
+			if e.MetaNew.GetGeneration() == e.MetaOld.GetGeneration() && reflect.DeepEqual(e.MetaOld.GetFinalizers(), e.MetaNew.GetFinalizers()) {
+				return false
+			}
+
+			log.V(1).Info("value of e.MetaNew.GetGeneration()", "e.MetaNew.GetGeneration()", e.MetaNew.GetGeneration())
+			log.V(1).Info("value of e.MetaOld.GetGeneration()", "e.MetaOld.GetGeneration()", e.MetaOld.GetGeneration())
+			log.V(1).Info("value of e.MetaOld.GetFinalizers()", "e.MetaOld.GetFinalizers()", e.MetaOld.GetFinalizers())
+			log.V(1).Info("value of e.MetaNew.GetFinalizers()", "e.MetaNew.GetFinalizers()", e.MetaNew.GetFinalizers())
+			return true
+		},
+		CreateFunc: func(e event.CreateEvent) bool {
+			log.V(1).Info("create event return true")
+			return true
+		},
+		DeleteFunc: func(e event.DeleteEvent) bool {
+			log.V(1).Info("create delete return true")
+			return true
+		},
+	}
+
 	// Watch for changes to primary resource NetworkChaining
-	err = c.Watch(&source.Kind{Type: &k8sv1alpha1.NetworkChaining{}}, &handler.EnqueueRequestForObject{})
+	err = c.Watch(&source.Kind{Type: &k8sv1alpha1.NetworkChaining{}}, &handler.EnqueueRequestForObject{}, p)
 	if err != nil {
 		return err
 	}
@@ -75,6 +113,7 @@ type ReconcileNetworkChaining struct {
 	scheme *runtime.Scheme
 }
 type reconcileFun func(instance *k8sv1alpha1.NetworkChaining, reqLogger logr.Logger) error
+
 // Reconcile reads that state of the cluster for a NetworkChaining object and makes changes based on the state read
 // and what is in the NetworkChaining.Spec
 // TODO(user): Modify this Reconcile function to implement your Controller logic.  This example creates
@@ -85,7 +124,7 @@ type reconcileFun func(instance *k8sv1alpha1.NetworkChaining, reqLogger logr.Log
 func (r *ReconcileNetworkChaining) Reconcile(request reconcile.Request) (reconcile.Result, error) {
 	reqLogger := log.WithValues("Request.Namespace", request.Namespace, "Request.Name", request.Name)
 	reqLogger.Info("Reconciling NetworkChaining")
-
+	log.V(1).Info("Entering the reconile")
 	// Fetch the NetworkChaining instance
 	instance := &k8sv1alpha1.NetworkChaining{}
 	err := r.client.Get(context.TODO(), request.NamespacedName, instance)
@@ -94,9 +133,11 @@ func (r *ReconcileNetworkChaining) Reconcile(request reconcile.Request) (reconci
 			// Request object not found, could have been deleted after reconcile request.
 			// Owned objects are automatically garbage collected. For additional cleanup logic use finalizers.
 			// Return and don't requeue
+			log.V(1).Info("Request object not found")
 			return reconcile.Result{}, nil
 		}
 		// Error reading the object - requeue the request.
+		log.V(1).Info("Request object error in reading")
 		return reconcile.Result{}, err
 	}
 	for _, fun := range []reconcileFun{
@@ -104,35 +145,59 @@ func (r *ReconcileNetworkChaining) Reconcile(request reconcile.Request) (reconci
 		r.createChain,
 	} {
 		if err = fun(instance, reqLogger); err != nil {
+			log.V(1).Info("err in fun")
 			return reconcile.Result{}, err
 		}
 	}
-
-
+	log.V(1).Info("return nothing")
 	return reconcile.Result{}, nil
 }
+
 const (
 	nfnNetworkChainFinalizer = "nfnCleanUpNetworkChain"
 )
 
 func (r *ReconcileNetworkChaining) createChain(cr *k8sv1alpha1.NetworkChaining, reqLogger logr.Logger) error {
+	log.V(1).Info("Entering the createchain")
 
 	if !cr.DeletionTimestamp.IsZero() {
 		// Marked for deletion
+		log.V(1).Info("Marked for deletion")
 		return nil
 	}
+
+	if cr.Status.State == k8sv1alpha1.Created {
+		// Already created CR
+		log.V(1).Info("Already created chain")
+		return nil
+	}
+
 	switch {
 	case cr.Spec.ChainType == "Routing":
-		routeList, err := chaining.CalculateRoutes(cr)
+		podnetworkList, routeList, err := chaining.CalculateRoutes(cr)
 		if err != nil {
 			return err
 		}
 		err = notif.SendRouteNotif(routeList, "create")
 		if err != nil {
 			cr.Status.State = k8sv1alpha1.CreateInternalError
-			reqLogger.Error(err, "Error Sending Message")
+			reqLogger.Error(err, "Error Sending route Message")
 		} else {
 			cr.Status.State = k8sv1alpha1.Created
+		}
+
+		log.Info("length of the podnetworkList", "len(podnetworkList)", len(podnetworkList))
+		log.Info("value of the podnetworkList", "podnetworkList", podnetworkList)
+		log.Info("value of the cr.Status.State", "cr.Status.State", cr.Status.State)
+
+		if cr.Status.State != k8sv1alpha1.CreateInternalError {
+			err = notif.SendPodNetworkNotif(podnetworkList, "create")
+			if err != nil {
+				cr.Status.State = k8sv1alpha1.CreateInternalError
+				reqLogger.Error(err, "Error Sending pod network Message")
+			} else {
+				cr.Status.State = k8sv1alpha1.Created
+			}
 		}
 
 		err = r.client.Status().Update(context.TODO(), cr)
@@ -140,7 +205,7 @@ func (r *ReconcileNetworkChaining) createChain(cr *k8sv1alpha1.NetworkChaining, 
 			return err
 		}
 		return nil
-	// Add other Chaining types here
+		// Add other Chaining types here
 	}
 	reqLogger.Info("Chaining type not supported", "name", cr.Spec.ChainType)
 	return fmt.Errorf("Chaining type not supported")
@@ -153,7 +218,7 @@ func (r *ReconcileNetworkChaining) deleteChain(cr *k8sv1alpha1.NetworkChaining, 
 }
 
 func (r *ReconcileNetworkChaining) reconcileFinalizers(instance *k8sv1alpha1.NetworkChaining, reqLogger logr.Logger) (err error) {
-
+	log.V(1).Info("Entering the reconcileFinalizers")
 	if !instance.DeletionTimestamp.IsZero() {
 		// Instance marked for deletion
 		if utils.Contains(instance.ObjectMeta.Finalizers, nfnNetworkChainFinalizer) {

@@ -29,7 +29,8 @@ const (
 	// Ovn4nfvAnnotationTag tag on already processed Pods
 	Ovn4nfvAnnotationTag = "k8s.plugin.opnfv.org/ovnInterfaces"
 	// OVN Default Network name
-	Ovn4nfvDefaultNw = "ovn4nfvk8s-default-nw"
+	Ovn4nfvDefaultNw           = "ovn4nfvk8s-default-nw"
+	SFCnetworkIntefacePrefixes = "sn"
 )
 
 var ovnConf *OVNNetworkConf
@@ -56,7 +57,7 @@ func GetOvnNetConf() error {
 	return nil
 }
 
-type netInterface struct {
+type NetInterface struct {
 	Name           string
 	Interface      string
 	NetType        string
@@ -117,22 +118,24 @@ func (oc *Controller) AddNodeLogicalPorts(node string) (ipAddr, macAddr string, 
 }
 
 // AddLogicalPorts adds ports to the Pod
-func (oc *Controller) AddLogicalPorts(pod *kapi.Pod, ovnNetObjs []map[string]interface{}) (key, value string) {
+func (oc *Controller) AddLogicalPorts(pod *kapi.Pod, ovnNetObjs []map[string]interface{}, IsExtraInterfaces bool) (key, value string) {
 
 	if pod.Spec.HostNetwork {
 		return
 	}
 
-	if _, ok := pod.Annotations[Ovn4nfvAnnotationTag]; ok {
-		log.V(1).Info("AddLogicalPorts : Pod annotation found")
-		return
+	if !IsExtraInterfaces {
+		if _, ok := pod.Annotations[Ovn4nfvAnnotationTag]; ok {
+			log.V(1).Info("AddLogicalPorts : Pod annotation found")
+			return
+		}
 	}
 
 	var ovnString, outStr string
 	var defaultInterface bool
 
 	ovnString = "["
-	var ns netInterface
+	var ns NetInterface
 	for _, net := range ovnNetObjs {
 		err := mapstructure.Decode(net, &ns)
 		if err != nil {
@@ -172,7 +175,7 @@ func (oc *Controller) AddLogicalPorts(pod *kapi.Pod, ovnNetObjs []map[string]int
 		ovnString += ","
 	}
 	var last int
-	if defaultInterface == false {
+	if defaultInterface == false && !IsExtraInterfaces {
 		// Add Default interface
 		portName := fmt.Sprintf("%s_%s", pod.Namespace, pod.Name)
 		outStr = oc.addLogicalPortWithSwitch(pod, Ovn4nfvDefaultNw, "", "", "", portName)
@@ -567,4 +570,15 @@ func (oc *Controller) addLogicalPortWithSwitch(pod *kapi.Pod, logicalSwitch, ipA
 	annotation = fmt.Sprintf(`{\"ip_address\":\"%s/%s\", \"mac_address\":\"%s\", \"gateway_ip\": \"%s\"}`, addresses[1], mask, addresses[0], gatewayIP)
 
 	return annotation
+}
+
+func GetSFCNetworkIfname() (f func() string) {
+	var interfaceIndex int
+	f = func() string {
+		ifname := fmt.Sprintf("%s%d", SFCnetworkIntefacePrefixes, interfaceIndex)
+		interfaceIndex++
+		return ifname
+	}
+
+	return
 }

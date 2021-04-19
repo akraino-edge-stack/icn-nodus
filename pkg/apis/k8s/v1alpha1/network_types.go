@@ -1,6 +1,8 @@
 package v1alpha1
 
 import (
+	"reflect"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -46,6 +48,8 @@ const (
 	CreateInternalError = "CreateInternalError"
 	//DeleteInternalError indicates delete internal irrecoverable Error
 	DeleteInternalError = "DeleteInternalError"
+	//Deleted indicated the status of success
+	Deleted = "Deleted"
 )
 
 // NetworkStatus defines the observed state of Network
@@ -81,4 +85,8 @@ type NetworkList struct {
 
 func init() {
 	SchemeBuilder.Register(&Network{}, &NetworkList{})
+}
+
+func (r Route) IsEmpty() bool {
+	return reflect.DeepEqual(r, Route{})
 }

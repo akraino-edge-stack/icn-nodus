@@ -310,3 +310,11 @@ func GetNodeIntfName(node string) string {
 	encodednodeStr := hex.EncodeToString(bs)
 	return fmt.Sprintf("ovn4nfv0-%s", encodednodeStr[:6])
 }
+
+func GeneratePodNameID(podname string) string {
+	h := sha1.New()
+	h.Write([]byte(podname))
+	bs := h.Sum(nil)
+	encodeIDStr := hex.EncodeToString(bs)
+	return encodeIDStr
+}

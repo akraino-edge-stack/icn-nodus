@@ -1,11 +1,14 @@
 package kube
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
 
 	"github.com/prometheus/common/log"
 	"github.com/sirupsen/logrus"
+
+	k8sv1alpha1 "ovn4nfv-k8s-plugin/pkg/generated/clientset/versioned/typed/k8s/v1alpha1"
 
 	kapi "k8s.io/api/core/v1"
 	kapisnetworking "k8s.io/api/networking/v1"
@@ -13,11 +16,16 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/util/retry"
+	kubeadmtypes "sigs.k8s.io/cluster-api/bootstrap/kubeadm/types/v1beta1"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
+	"sigs.k8s.io/yaml"
 )
 
 const apiserverNamespace = "kube-system"
 const apiserverPodName = "kube-apiserver-master"
+const kubeconfigmap = "kubeadm-config"
+const kubesystemNamespace = "kube-system"
 const controlplaneOption = "--service-cluster-ip-range"
 
 // Interface represents the exported methods for dealing with getting/setting
@@ -44,6 +52,25 @@ type Kube struct {
 	KClient kubernetes.Interface
 }
 
+// GetKubev1alpha1Config return k8s v1alpha1 Clientset
+func GetKubev1alpha1Config() (*k8sv1alpha1.K8sV1alpha1Client, error) {
+	var k *k8sv1alpha1.K8sV1alpha1Client
+	// Get a config to talk to the apiserver
+	cfg, err := config.GetConfig()
+	if err != nil {
+		return nil, err
+	}
+
+	k, err = k8sv1alpha1.NewForConfig(cfg)
+	if err != nil {
+		log.Error(err, "Error building Kuberenetes clientset")
+		return nil, err
+	}
+
+	return k, nil
+}
+
+// GetKubeConfig return kubernetes Clientset
 func GetKubeConfig() (*kubernetes.Clientset, error) {
 	var k *kubernetes.Clientset
 	// Get a config to talk to the apiserver
@@ -70,6 +97,69 @@ func (k *Kube) SetAnnotationOnPod(pod *kapi.Pod, key, value string) error {
 		logrus.Errorf("Error in setting annotation on pod %s/%s: %v", pod.Name, pod.Namespace, err)
 	}
 	return err
+}
+
+// AppendAnnotationOnPod takes the pod object and key/value string pair to set it as an annotation
+func (k *Kube) AppendAnnotationOnPod(pod *kapi.Pod, key, value string) error {
+	logrus.Infof("Appending Annotation %s=%s on pod %s", key, value, pod.Name)
+	if len(pod.Annotations) == 0 {
+		pod.Annotations = make(map[string]string)
+	}
+
+	//Start code from here
+	currrentnfnannotation := pod.Annotations[key]
+	if len(currrentnfnannotation) == 0 {
+		//create a new annotations
+		logrus.Infof(" create a new Annotation")
+	}
+
+	var nfnannotationmaps, newnfnannotationmaps []map[string]interface{}
+
+	err := json.Unmarshal([]byte(currrentnfnannotation), &nfnannotationmaps)
+	if err != nil {
+		return fmt.Errorf("error in unmarshalling current pod annotation - %v", err)
+	}
+
+	err = json.Unmarshal([]byte(strings.ReplaceAll(value, "\\", "")), &newnfnannotationmaps)
+	if err != nil {
+		return fmt.Errorf("error in unmarshalling new annotation value created - %v", err)
+	}
+
+	newnfnannotationmaps = append(newnfnannotationmaps, nfnannotationmaps...)
+
+	nfnrawbytes, err := json.Marshal(newnfnannotationmaps)
+	if err != nil {
+		return fmt.Errorf("error in marshalling new append annotation - %v", err)
+	}
+
+	newnfnannotation := string(nfnrawbytes)
+	logrus.Infof("Appending Annotation %s=%s on pod %s", key, newnfnannotation, pod.Name)
+
+	kc := k.KClient.CoreV1()
+	pod.Annotations[key] = newnfnannotation
+	pod = pod.DeepCopy()
+
+	if r := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+		if err != nil {
+			pod, err = kc.Pods(pod.Namespace).Get(pod.Name, metav1.GetOptions{})
+			if err != nil {
+				return err
+			}
+		}
+
+		pod, err = kc.Pods(pod.Namespace).UpdateStatus(pod)
+		return err
+	}); r != nil {
+		return fmt.Errorf("status update failed for pod %s/%s: %v", pod.Namespace, pod.Name, r)
+	}
+
+	pod, err = kc.Pods(pod.Namespace).Get(pod.Name, metav1.GetOptions{})
+	if err != nil {
+		return err
+	}
+
+	logrus.Infof("checking the appended Annotation %s=%s on pod %s", key, pod.Annotations[key], pod.Name)
+	return nil
 }
 
 // SetAnnotationOnNode takes the node object and key/value string pair to set it as an annotation
@@ -124,6 +214,42 @@ func (k *Kube) GetControlPlaneServiceIPRange() (string, error) {
 	}
 	clusterIP = findServiceIP(pod.Spec.Containers[0].Command, controlplaneOption)
 	return clusterIP, nil
+}
+
+// GetAnotherControlPlaneServiceIPRange return the service IP
+func (k *Kube) GetAnotherControlPlaneServiceIPRange() (kubeadmtypes.Networking, error) {
+
+	configmap, err := k.KClient.CoreV1().ConfigMaps(kubesystemNamespace).Get(kubeconfigmap, metav1.GetOptions{})
+	if err != nil {
+		return kubeadmtypes.Networking{}, fmt.Errorf("Error in gettin the config %s on the namespace %s - %v", kubeconfigmap, kubesystemNamespace, err)
+	}
+	var clusterconf kubeadmtypes.ClusterConfiguration
+
+	//fmt.Printf("Value of the config Data - %v\n", configmap.Data)
+	//fmt.Printf("Value of the config Data[ClusterConfiguration] as string - %v\n", configmap.Data["ClusterConfiguration"])
+
+	j1, err := yaml.YAMLToJSON([]byte(configmap.Data["ClusterConfiguration"]))
+	if err != nil {
+		return kubeadmtypes.Networking{}, fmt.Errorf("YAMLToJSON err: %v", err)
+	}
+
+	//fmt.Printf("Value of j1 =%s\n", string(j1))
+
+	err = json.Unmarshal(j1, &clusterconf)
+	if err != nil {
+		return kubeadmtypes.Networking{}, fmt.Errorf("Error in un marshalling the config %s on the namespace %s - %v", kubeconfigmap, kubesystemNamespace, err)
+	}
+
+	if clusterconf.Networking == (kubeadmtypes.Networking{}) {
+		return kubeadmtypes.Networking{}, fmt.Errorf(" %s in the namespace %s - kubeadm network value is empty", kubeconfigmap, kubesystemNamespace)
+	}
+
+	//fmt.Printf("Value of the clusterconf Networking ServiceSubnet=%+v\n", clusterconf)
+	//svcCidr = controlplaneNetwork.ServiceSubnet
+	//podCidr = controlplaneNetwork.PodSubnet
+
+	return clusterconf.Networking, nil
+
 }
 
 // GetAnnotationsOnPod obtains the pod annotations from kubernetes apiserver, given the name and namespace

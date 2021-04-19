@@ -19,10 +19,14 @@ package nfn
 import (
 	"context"
 	"fmt"
+	"ovn4nfv-k8s-plugin/internal/pkg/cniserver"
+	"ovn4nfv-k8s-plugin/internal/pkg/config"
 	"ovn4nfv-k8s-plugin/internal/pkg/kube"
 	"ovn4nfv-k8s-plugin/internal/pkg/network"
 	"ovn4nfv-k8s-plugin/internal/pkg/ovn"
 	k8sv1alpha1 "ovn4nfv-k8s-plugin/pkg/apis/k8s/v1alpha1"
+	pc "ovn4nfv-k8s-plugin/pkg/controller/pod"
+	"reflect"
 	"strings"
 
 	pb "ovn4nfv-k8s-plugin/internal/pkg/nfnNotify/proto"
@@ -30,22 +34,174 @@ import (
 	"github.com/containernetworking/plugins/pkg/ns"
 	"github.com/docker/docker/client"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/util/json"
 	logf "sigs.k8s.io/controller-runtime/pkg/runtime/log"
 )
 
 var log = logf.Log.WithName("chaining")
 
+// RoutingInfo is ...
 type RoutingInfo struct {
-	Name                 string            // Name of the pod
-	Namespace            string            // Namespace of the Pod
-	Id                   string            // Container ID for pod
-	Node                 string            // Hostname where Pod is scheduled
-	LeftNetworkRoute     k8sv1alpha1.Route // TODO: Update to support multiple networks
-	RightNetworkRoute    k8sv1alpha1.Route // TODO: Update to support multiple networks
+	Name                 string              // Name of the pod
+	Namespace            string              // Namespace of the Pod
+	Id                   string              // Container ID for pod
+	Node                 string              // Hostname where Pod is scheduled
+	LeftNetworkRoute     []k8sv1alpha1.Route // TODO: Update to support multiple networks
+	RightNetworkRoute    k8sv1alpha1.Route   // TODO: Update to support multiple networks
 	DynamicNetworkRoutes []k8sv1alpha1.Route
 }
 
-var chainRoutingInfo []RoutingInfo
+// PodNetworkInfo is ...
+type PodNetworkInfo struct {
+	Name        string
+	Namespace   string
+	Id          string
+	Node        string
+	NetworkInfo string
+	Route       k8sv1alpha1.Route
+}
+
+//IsEmpty return true or false
+func (r RoutingInfo) IsEmpty() bool {
+	return reflect.DeepEqual(r, RoutingInfo{})
+}
+
+//configurePodSelectorDeployment
+func configurePodSelectorDeployment(ln k8sv1alpha1.RoutingNetwork, sfcEntryPodLabel string) ([]RoutingInfo, []PodNetworkInfo, error) {
+	var rt []RoutingInfo
+	var pni []PodNetworkInfo
+
+	// Get a config to talk to the apiserver
+	clientset, err := kube.GetKubeConfig()
+	if err != nil {
+		log.Error(err, "Error in kube clientset")
+		return nil, nil, err
+	}
+
+	log.Info("The value of sfcEntryPodLabel", "sfcEntryPodLabel", sfcEntryPodLabel)
+	log.Info("The value of ln.NetworkName", "ln.NetworkName", ln.NetworkName)
+
+	k8sv1alpha1Clientset, err := kube.GetKubev1alpha1Config()
+	if err != nil {
+		log.Error(err, "Error in getting k8s v1alpha1 clientset")
+		return nil, nil, err
+	}
+
+	pn, err := k8sv1alpha1Clientset.ProviderNetworks("default").Get(ln.NetworkName, v1.GetOptions{})
+	if err != nil {
+		log.Error(err, "Error in getting Provider Networks")
+		return nil, nil, err
+	}
+
+	pods, err := clientset.CoreV1().Pods("default").List(v1.ListOptions{LabelSelector: sfcEntryPodLabel})
+	if err != nil {
+		//fmt.Printf("List Pods of namespace[%s] error:%v", ns.GetName(), err)
+		log.Error(err, "Error in kube clientset in listing the pods for default namespace with label", "sfcEntryPodLabel", sfcEntryPodLabel)
+		return nil, nil, err
+	}
+
+	if len(pods.Items) != 1 {
+		err := fmt.Errorf("Currently load balancing is not supported, expected SFC deployment has only 1 replica")
+		log.Error(err, "Error in kube clientset in listing the pods for namespace", "sfcEntryPodLabel")
+		return nil, nil, err
+	}
+
+	podName := pods.Items[0].GetName()
+	pnName := pn.GetName()
+
+	log.Info("The value of podName", "podName", podName)
+	log.Info("The value of pnName", "pnName", pnName)
+
+	sfcEntryIP, err := ovn.GetIPAdressForPod(pnName, podName)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	//Add Default Route based on Right Network
+	defaultRoute := k8sv1alpha1.Route{
+		GW:  sfcEntryIP,
+		Dst: "0.0.0.0",
+	}
+
+	log.Info("The value of sfcEntryIP", "sfcEntryIP", sfcEntryIP)
+	log.Info("The value of namespaceSelector", "namespaceSelector.MatchLabels", ln.NamespaceSelector.MatchLabels)
+	nsLabel := labels.Set(ln.NamespaceSelector.MatchLabels)
+	log.Info("The value of nslabel", "nsLabel.AsSelector().String()", nsLabel.AsSelector().String())
+
+	nslist, err := clientset.CoreV1().Namespaces().List(v1.ListOptions{LabelSelector: nsLabel.AsSelector().String()})
+	if err != nil {
+		log.Error(err, "Error in kube clientset in listing the namespaces")
+		return nil, nil, err
+	}
+
+	//fmt.Printf("There are %d namespaces in the cluster\n", len(nslist.Items))
+	log.Info("The value of nslabel", "len(nslist.Items)", len(nslist.Items))
+
+	for _, ns := range nslist.Items {
+		if ns.GetLabels() == nil {
+			//fmt.Printf("The name of the namesp is %s and label is empty\n", ns.GetName())
+			log.Info("The namespace label is empty", "namespace", ns.GetName())
+			continue
+		}
+		//fmt.Printf("The name of the namespace is %s and label is %s\n", ns.GetName(), ns.GetLabels())
+		log.Info("The value of ", "namespace", ns.GetName(), "labels", ns.GetLabels())
+		set := labels.Set(ns.GetLabels())
+		//fmt.Printf("The namespace %s as Selector is %+v\n", ns.GetName(), set.AsSelector())
+		log.Info("The value of ", "namespace", ns.GetName(), "selector", set.AsSelector())
+		pods, err := clientset.CoreV1().Pods(ns.GetName()).List(v1.ListOptions{LabelSelector: set.AsSelector().String()})
+		if err != nil {
+			//fmt.Printf("List Pods of namespace[%s] error:%v", ns.GetName(), err)
+			log.Error(err, "Error in kube clientset in listing the pods for namespace", "namespace", ns.GetName())
+			return nil, nil, err
+		}
+
+		for _, pod := range pods.Items {
+			//fmt.Println(v.GetName(), v.Spec.NodeName)
+			var IsNetworkattached bool
+			var netinfo string
+			log.Info("The value of ", "Pod", pod.GetName(), "Node", pod.Spec.NodeName)
+			IsNetworkattached, err := pc.IsPodNetwork(pod, pnName)
+			if !IsNetworkattached {
+				if err != nil {
+					log.Error(err, "Error getting pod network", "network", pnName)
+					return nil, nil, err
+				}
+				log.Info("The pod is not having the network", "pod", pod.GetName(), "network", pnName)
+				netinfo, err = pc.AddPodNetworkAnnotations(pod, pnName)
+				if err != nil {
+					log.Error(err, "Error in adding the network pod annotations")
+					return nil, nil, err
+				}
+			}
+			if IsNetworkattached {
+				// Get the containerID of the first container
+				var r RoutingInfo
+				r.Id = strings.TrimPrefix(pod.Status.ContainerStatuses[0].ContainerID, "docker://")
+				r.Namespace = pod.GetNamespace()
+				r.Name = pod.GetName()
+				r.Node = pod.Spec.NodeName
+				r.DynamicNetworkRoutes = append(r.DynamicNetworkRoutes, defaultRoute)
+				log.Info("length of r.LeftNetworkRoute", "r.LeftNetworkRoute", len(r.LeftNetworkRoute))
+				log.Info("length of r.LeftNetworkRoute", "r.LeftNetworkRoute", r.RightNetworkRoute.IsEmpty())
+				log.Info("length of r.DynamicNetworkRoutes", "r.DynamicNetworkRoutes", len(r.DynamicNetworkRoutes))
+				rt = append(rt, r)
+			} else {
+				var p PodNetworkInfo
+				p.Id = strings.TrimPrefix(pod.Status.ContainerStatuses[0].ContainerID, "docker://")
+				p.Namespace = pod.GetNamespace()
+				p.Name = pod.GetName()
+				p.Node = pod.Spec.NodeName
+				p.NetworkInfo = netinfo
+				p.Route = defaultRoute
+				pni = append(pni, p)
+			}
+		}
+	}
+
+	log.Info("Value of rt", "rt", rt)
+	return rt, pni, nil
+}
 
 // Calcuate route to get to left and right edge networks and other networks (not adjacent) in the chain
 func calculateDeploymentRoutes(namespace, label string, pos int, num int, ln []k8sv1alpha1.RoutingNetwork, rn []k8sv1alpha1.RoutingNetwork, networkList, deploymentList []string) (r RoutingInfo, err error) {
@@ -77,16 +233,24 @@ func calculateDeploymentRoutes(namespace, label string, pos int, num int, ln []k
 	r.Id = strings.TrimPrefix(pods.Items[0].Status.ContainerStatuses[0].ContainerID, "docker://")
 	r.Name = pods.Items[0].GetName()
 	r.Node = pods.Items[0].Spec.NodeName
-	// Calcluate IP addresses for next neighbours on both sides
-	if pos == 0 {
-		nextLeftIP = ln[0].GatewayIP
-	} else {
-		name := strings.Split(deploymentList[pos-1], "=")
-		nextLeftIP, err = ovn.GetIPAdressForPod(networkList[pos-1], name[1])
-		if err != nil {
-			return RoutingInfo{}, err
+
+	// Calcluate IP addresses for next neighbours on left
+	for _, l := range ln {
+		var routeinfo k8sv1alpha1.Route
+		if pos == 0 {
+			nextLeftIP = l.GatewayIP
+		} else {
+			name := strings.Split(deploymentList[pos-1], "=")
+			nextLeftIP, err = ovn.GetIPAdressForPod(networkList[pos-1], name[1])
+			if err != nil {
+				return RoutingInfo{}, err
+			}
 		}
+		routeinfo.GW = nextLeftIP
+		routeinfo.Dst = l.Subnet
+		r.LeftNetworkRoute = append(r.LeftNetworkRoute, routeinfo)
 	}
+	// Calcluate IP addresses for next neighbours on right sides
 	if pos == num-1 {
 		nextRightIP = rn[0].GatewayIP
 	} else {
@@ -97,8 +261,8 @@ func calculateDeploymentRoutes(namespace, label string, pos int, num int, ln []k
 		}
 	}
 	// Calcuate left right Route to be inserted in Pod
-	r.LeftNetworkRoute.Dst = ln[0].Subnet
-	r.LeftNetworkRoute.GW = nextLeftIP
+	//r.LeftNetworkRoute.Dst = ln[0].Subnet
+	//r.LeftNetworkRoute.GW = nextLeftIP
 	r.RightNetworkRoute.Dst = rn[0].Subnet
 	r.RightNetworkRoute.GW = nextRightIP
 	// For each network that is not adjacent add route
@@ -129,7 +293,8 @@ func calculateDeploymentRoutes(namespace, label string, pos int, num int, ln []k
 	return
 }
 
-func CalculateRoutes(cr *k8sv1alpha1.NetworkChaining) ([]RoutingInfo, error) {
+// CalculateRoutes returns the routing info
+func CalculateRoutes(cr *k8sv1alpha1.NetworkChaining) ([]PodNetworkInfo, []RoutingInfo, error) {
 	//
 	var deploymentList []string
 	var networkList []string
@@ -138,6 +303,7 @@ func CalculateRoutes(cr *k8sv1alpha1.NetworkChaining) ([]RoutingInfo, error) {
 	ln := cr.Spec.RoutingSpec.LeftNetwork
 	rn := cr.Spec.RoutingSpec.RightNetwork
 	chains := strings.Split(cr.Spec.RoutingSpec.NetworkChain, ",")
+
 	i := 0
 	for _, chain := range chains {
 		if i%2 == 0 {
@@ -153,16 +319,176 @@ func CalculateRoutes(cr *k8sv1alpha1.NetworkChaining) ([]RoutingInfo, error) {
 	log.Info("Display the rn", "rn", rn)
 	log.Info("Display the networklist", "networkList", networkList)
 	log.Info("Display the deploymentlist", "deploymentList", deploymentList)
+
+	var chainRoutingInfo []RoutingInfo
+	var lnRoutingInfo []RoutingInfo
+	var podsNetworkInfo []PodNetworkInfo
+	//var rnRoutingInfo []RoutingInfo
+
+	for _, leftNetworks := range cr.Spec.RoutingSpec.LeftNetwork {
+		log.Info("Display the ln", "GatewayIP", leftNetworks.GatewayIP)
+		log.Info("Display the ln", "NetworkName", leftNetworks.NetworkName)
+		log.Info("Display the ln", "Subnet", leftNetworks.Subnet)
+		log.Info("Display the ln", "PodSelector.MatchLabels", leftNetworks.PodSelector.MatchLabels)
+		log.Info("Display the ln", "NamespaceSelector.MatchLabels", leftNetworks.NamespaceSelector.MatchLabels)
+		var r []RoutingInfo
+		var pni []PodNetworkInfo
+
+		r, pni, err := configurePodSelectorDeployment(leftNetworks, deploymentList[0])
+		if err != nil {
+			return nil, nil, err
+		}
+
+		lnRoutingInfo = append(lnRoutingInfo, r...)
+		podsNetworkInfo = append(podsNetworkInfo, pni...)
+		log.Info("Value of lnRoutingInfo ", "lnRoutingInfo ", lnRoutingInfo)
+		log.Info("Value of podsNetworkInfo ", "podsNetworkInfo ", podsNetworkInfo)
+	}
+
+	chainRoutingInfo = append(chainRoutingInfo, lnRoutingInfo...)
+
+	for _, rightNetworks := range cr.Spec.RoutingSpec.RightNetwork {
+		log.Info("Display the rn", "GatewayIP", rightNetworks.GatewayIP)
+		log.Info("Display the rn", "NetworkName", rightNetworks.NetworkName)
+		log.Info("Display the rn", "Subnet", rightNetworks.Subnet)
+		log.Info("Display the rn", "PodSelector.MatchLabels", rightNetworks.PodSelector.MatchLabels)
+		log.Info("Display the rn", "NamespaceSelector.MatchLabels", rightNetworks.NamespaceSelector.MatchLabels)
+	}
+
 	for i, deployment := range deploymentList {
 		r, err := calculateDeploymentRoutes(cr.Namespace, deployment, i, num, ln, rn, networkList, deploymentList)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		chainRoutingInfo = append(chainRoutingInfo, r)
 	}
-	return chainRoutingInfo, nil
+	log.Info("Value of podsNetworkInfo ", "podsNetworkInfo ", podsNetworkInfo)
+	return podsNetworkInfo, chainRoutingInfo, nil
 }
 
+//ContainerAddInteface return
+func ContainerAddInteface(containerPid int, payload *pb.PodAddNetwork) error {
+	log.Info("Container pid", "containerPid", containerPid)
+	log.Info("payload network", "payload.GetNet()", payload.GetNet())
+	log.Info("payload pod", "payload.GetPod()", payload.GetPod())
+	log.Info("payload route", "payload.GetRoute()", payload.GetRoute())
+
+	podinfo := payload.GetPod()
+	//podroute := payload.GetRoute()
+	podnetconf := payload.GetNet()
+
+	var netconfs []map[string]string
+	err := json.Unmarshal([]byte(podnetconf.Data), &netconfs)
+	if err != nil {
+		return fmt.Errorf("Error in unmarshal podnet conf=%v", err)
+	}
+
+	cnishimreq := &cniserver.CNIServerRequest{
+		Command:      cniserver.CNIAdd,
+		PodNamespace: podinfo.Namespace,
+		PodName:      podinfo.Name,
+		SandboxID:    config.GeneratePodNameID(podinfo.Name),
+		Netns:        fmt.Sprintf("/host/proc/%d/ns/net", containerPid),
+		IfName:       netconfs[0]["interface"],
+		CNIConf:      nil,
+	}
+
+	result := cnishimreq.AddMultipleInterfaces(podnetconf.Data, podinfo.Namespace, podinfo.Name)
+	if result == nil {
+		return fmt.Errorf("result is nil from cni server for adding interface in the existing pod")
+	}
+
+	return nil
+}
+
+// ContainerDelRoute return containerPid and route
+func ContainerDelRoute(containerPid int, route []*pb.RouteData) error {
+	str := fmt.Sprintf("/host/proc/%d/ns/net", containerPid)
+
+	hostNet, err := network.GetHostNetwork()
+	if err != nil {
+		log.Error(err, "Failed to get host network")
+		return err
+	}
+
+	k, err := kube.GetKubeConfig()
+	if err != nil {
+		log.Error(err, "Error in kube clientset")
+		return err
+	}
+
+	kubecli := &kube.Kube{KClient: k}
+	_, err = kubecli.GetControlPlaneServiceIPRange()
+	if err != nil {
+		log.Error(err, "Error in getting svc cidr range")
+		return err
+	}
+
+	kn, err := kubecli.GetAnotherControlPlaneServiceIPRange()
+	if err != nil {
+		log.Error(err, "Error in getting svc cidr range")
+		return err
+	}
+
+	nms, err := ns.GetNS(str)
+	if err != nil {
+		log.Error(err, "Failed namesapce", "containerID", containerPid)
+		return err
+	}
+	defer nms.Close()
+	err = nms.Do(func(_ ns.NetNS) error {
+		podGW, err := network.GetGatewayInterface(kn.ServiceSubnet)
+		if err != nil {
+			log.Error(err, "Failed to get service subnet route gateway")
+			return err
+		}
+
+		stdout, stderr, err := ovn.RunIP("route", "del", hostNet, "via", podGW)
+		if err != nil && !strings.Contains(stderr, "RTNETLINK answers: File exists") {
+			log.Error(err, "Failed to ip route add", "stdout", stdout, "stderr", stderr)
+			return err
+		}
+
+		stdout, stderr, err = ovn.RunIP("route", "del", kn.ServiceSubnet, "via", podGW)
+		if err != nil && !strings.Contains(stderr, "RTNETLINK answers: File exists") {
+			log.Error(err, "Failed to ip route add", "stdout", stdout, "stderr", stderr)
+			return err
+		}
+
+		stdout, stderr, err = ovn.RunIP("route", "del", kn.PodSubnet, "via", podGW)
+		if err != nil && !strings.Contains(stderr, "RTNETLINK answers: File exists") {
+			log.Error(err, "Failed to ip route add", "stdout", stdout, "stderr", stderr)
+			return err
+		}
+
+		for _, r := range route {
+			dst := r.GetDst()
+			gw := r.GetGw()
+			// Replace default route
+			if dst == "0.0.0.0" {
+				stdout, stderr, err := ovn.RunIP("route", "replace", "default", "via", podGW)
+				if err != nil {
+					log.Error(err, "Failed to ip route replace", "stdout", stdout, "stderr", stderr)
+					return err
+				}
+			} else {
+				stdout, stderr, err := ovn.RunIP("route", "del", dst, "via", gw)
+				if err != nil && !strings.Contains(stderr, "RTNETLINK answers: File exists") {
+					log.Error(err, "Failed to ip route add", "stdout", stdout, "stderr", stderr)
+					return err
+				}
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		log.Error(err, "Failed Netns Do", "containerID", containerPid)
+		return err
+	}
+	return nil
+}
+
+// ContainerAddRoute return containerPid and route
 func ContainerAddRoute(containerPid int, route []*pb.RouteData) error {
 	str := fmt.Sprintf("/host/proc/%d/ns/net", containerPid)
 
@@ -179,7 +505,13 @@ func ContainerAddRoute(containerPid int, route []*pb.RouteData) error {
 	}
 
 	kubecli := &kube.Kube{KClient: k}
-	k8sClusterCidr, err := kubecli.GetControlPlaneServiceIPRange()
+	_, err = kubecli.GetControlPlaneServiceIPRange()
+	if err != nil {
+		log.Error(err, "Error in getting svc cidr range")
+		return err
+	}
+
+	kn, err := kubecli.GetAnotherControlPlaneServiceIPRange()
 	if err != nil {
 		log.Error(err, "Error in getting svc cidr range")
 		return err
@@ -204,7 +536,13 @@ func ContainerAddRoute(containerPid int, route []*pb.RouteData) error {
 			return err
 		}
 
-		stdout, stderr, err = ovn.RunIP("route", "add", k8sClusterCidr, "via", podGW)
+		stdout, stderr, err = ovn.RunIP("route", "add", kn.ServiceSubnet, "via", podGW)
+		if err != nil && !strings.Contains(stderr, "RTNETLINK answers: File exists") {
+			log.Error(err, "Failed to ip route add", "stdout", stdout, "stderr", stderr)
+			return err
+		}
+
+		stdout, stderr, err = ovn.RunIP("route", "add", kn.PodSubnet, "via", podGW)
 		if err != nil && !strings.Contains(stderr, "RTNETLINK answers: File exists") {
 			log.Error(err, "Failed to ip route add", "stdout", stdout, "stderr", stderr)
 			return err

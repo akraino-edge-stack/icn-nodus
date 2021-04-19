@@ -2,11 +2,34 @@ package network
 
 import (
 	"errors"
+	"fmt"
 	"net"
 	"syscall"
 
 	"github.com/vishvananda/netlink"
 )
+
+//GetGatewayInterface return gw string for a given dst route
+func GetGatewayInterface(dst string) (string, error) {
+	routes, err := netlink.RouteList(nil, syscall.AF_INET)
+	if err != nil {
+		return "", err
+	}
+
+	for _, route := range routes {
+		if route.Dst != nil {
+			if route.Dst.String() == dst {
+				fmt.Printf("route gw = %s\n", route.Gw.String())
+				if route.Gw.To4() == nil {
+					return "", errors.New("Found dst route but could not determine gateway")
+				}
+				return route.Gw.To4().String(), nil
+			}
+		}
+	}
+
+	return "", fmt.Errorf("Unable to find gw for route dst -%s", dst)
+}
 
 //GetDefaultGateway return default gateway of the network namespace
 func GetDefaultGateway() (string, error) {

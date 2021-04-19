@@ -1,0 +1,33 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx-deployment
+  namespace: production
+  labels:
+    app: nginx
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: nginx
+  template:
+    metadata:
+      labels:
+        app: nginx
+      annotations:
+        k8s.v1.cni.cncf.io/networks: '[                                        
+            { "name": "ovn4nfv-k8s-plugin",
+            "namespace": "default",            
+              "interface": "net1"                                              
+            }]'
+        #k8s.plugin.opnfv.org/nfn-network: '{ "type": "ovn4nfv", "interface": [{ "name": "left2-pnetwork", "interface": "net2", "defaultGateway": "false"}]}'
+
+    spec:
+      containers:
+      - name: nginx
+        image: rkamudhan/netshoot:v1.0
+        imagePullPolicy: IfNotPresent
+        stdin: true
+        tty: true
+        ports:
+        - containerPort: 80

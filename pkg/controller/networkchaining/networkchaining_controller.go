@@ -174,7 +174,7 @@ func (r *ReconcileNetworkChaining) createChain(cr *k8sv1alpha1.NetworkChaining, 
 
 	switch {
 	case cr.Spec.ChainType == "Routing":
-		podnetworkList, routeList, err := chaining.CalculateRoutes(cr)
+		podnetworkList, routeList, err := chaining.CalculateRoutes(cr, false)
 		if err != nil {
 			return err
 		}
@@ -212,9 +212,51 @@ func (r *ReconcileNetworkChaining) createChain(cr *k8sv1alpha1.NetworkChaining, 
 }
 
 func (r *ReconcileNetworkChaining) deleteChain(cr *k8sv1alpha1.NetworkChaining, reqLogger logr.Logger) error {
+	log.V(1).Info("Entering the deletechain")
 
-	reqLogger.Info("Delete Chain not implementated")
-	return fmt.Errorf("Not Implemented")
+	if cr.Status.State == k8sv1alpha1.Deleted {
+		// Already deleted CR
+		log.V(1).Info("Already deleted chain")
+		return nil
+	}
+
+	switch {
+	case cr.Spec.ChainType == "Routing":
+		podnetworkList, routeList, err := chaining.CalculateRoutes(cr, true)
+		if err != nil {
+			return err
+		}
+		err = notif.SendDeleteRouteNotif(routeList, "delete")
+		if err != nil {
+			cr.Status.State = k8sv1alpha1.DeleteInternalError
+			reqLogger.Error(err, "Error Sending route Message")
+		} else {
+			cr.Status.State = k8sv1alpha1.Deleted
+		}
+
+		log.Info("length of the podnetworkList", "len(podnetworkList)", len(podnetworkList))
+		log.Info("value of the podnetworkList", "podnetworkList", podnetworkList)
+		log.Info("value of the cr.Status.State", "cr.Status.State", cr.Status.State)
+
+		if cr.Status.State != k8sv1alpha1.CreateInternalError {
+			err = notif.SendDeletePodNetworkNotif(podnetworkList, "delete")
+			if err != nil {
+				cr.Status.State = k8sv1alpha1.DeleteInternalError
+				reqLogger.Error(err, "Error Sending pod network Message")
+			} else {
+				cr.Status.State = k8sv1alpha1.Deleted
+			}
+		}
+
+		err = r.client.Status().Update(context.TODO(), cr)
+		if err != nil {
+			return err
+		}
+		return nil
+		// Add other Chaining types here
+	}
+	reqLogger.Info("Chaining type not supported", "name", cr.Spec.ChainType)
+	return fmt.Errorf("Chaining type not supported")
 }
 
 func (r *ReconcileNetworkChaining) reconcileFinalizers(instance *k8sv1alpha1.NetworkChaining, reqLogger logr.Logger) (err error) {

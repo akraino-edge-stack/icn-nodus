@@ -318,3 +318,59 @@ func (cr *CNIServerRequest) cmdDel() ([]byte, error) {
 	}
 	return []byte{}, nil
 }
+
+//DeleteMultipleInterfaces return ...
+func (cr *CNIServerRequest) DeleteMultipleInterfaces(ovnAnnotation, namespace, podName string) error {
+	klog.Infof("Delete Interface")
+	klog.Infof("ovn4nfvk8s-cni: DeleteInterface ovn annotation %v namespace %v podName %v", ovnAnnotation, namespace, podName)
+
+	var ovnAnnotatedMap []map[string]string
+	ovnAnnotatedMap, err := parseOvnNetworkObject(ovnAnnotation)
+	if err != nil {
+		klog.Infof("addLogicalPort : Error Parsing Ovn Network List %v %v", ovnAnnotatedMap, err)
+		klog.Errorf("addLogicalPort : Error Parsing Ovn Network List %v %v", ovnAnnotatedMap, err)
+		return nil
+	}
+
+	if namespace == "" || podName == "" {
+		klog.Infof("required CNI variable missing")
+		klog.Errorf("required CNI variable missing")
+		return nil
+	}
+
+	for i, ovnNet := range ovnAnnotatedMap {
+		ipAddress := ovnNet["ip_address"]
+		macAddress := ovnNet["mac_address"]
+
+		if ipAddress == "" || macAddress == "" {
+			klog.Errorf("failed in pod annotation key extract")
+			return nil
+		}
+
+		interfaceName := ovnNet["interface"]
+		if interfaceName == "" {
+			klog.Errorf("addMultipleInterfaces: interface can't be null")
+			return nil
+		}
+
+		klog.Infof("Delete MultipleInterfaces: ipAddress-%v ovn4nfv-interface-%v cni-ifname-%v", ipAddress, interfaceName, cr.IfName)
+		err = app.ConfigureDeleteInterface(cr.Netns, cr.IfName)
+		if err != nil {
+			klog.Errorf("Failed to configure interface in pod: %v", err)
+			return nil
+		}
+
+		ifaceName := cr.SandboxID[:14] + strconv.Itoa(i)
+		done, err := app.PlatformSpecificCleanup(ifaceName)
+		if err != nil {
+			klog.Errorf("Teardown error: %v", err)
+		}
+
+		if done {
+			klog.Infof("no port avaiable %v", ifaceName)
+		}
+
+	}
+
+	return nil
+}

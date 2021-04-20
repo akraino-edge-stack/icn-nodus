@@ -68,7 +68,7 @@ func (r RoutingInfo) IsEmpty() bool {
 }
 
 //configurePodSelectorDeployment
-func configurePodSelectorDeployment(ln k8sv1alpha1.RoutingNetwork, sfcEntryPodLabel string) ([]RoutingInfo, []PodNetworkInfo, error) {
+func configurePodSelectorDeployment(ln k8sv1alpha1.RoutingNetwork, sfcEntryPodLabel string, toDelete bool) ([]RoutingInfo, []PodNetworkInfo, error) {
 	var rt []RoutingInfo
 	var pni []PodNetworkInfo
 
@@ -168,7 +168,7 @@ func configurePodSelectorDeployment(ln k8sv1alpha1.RoutingNetwork, sfcEntryPodLa
 					return nil, nil, err
 				}
 				log.Info("The pod is not having the network", "pod", pod.GetName(), "network", pnName)
-				netinfo, err = pc.AddPodNetworkAnnotations(pod, pnName)
+				netinfo, err = pc.AddPodNetworkAnnotations(pod, pnName, toDelete)
 				if err != nil {
 					log.Error(err, "Error in adding the network pod annotations")
 					return nil, nil, err
@@ -294,7 +294,7 @@ func calculateDeploymentRoutes(namespace, label string, pos int, num int, ln []k
 }
 
 // CalculateRoutes returns the routing info
-func CalculateRoutes(cr *k8sv1alpha1.NetworkChaining) ([]PodNetworkInfo, []RoutingInfo, error) {
+func CalculateRoutes(cr *k8sv1alpha1.NetworkChaining, cs bool) ([]PodNetworkInfo, []RoutingInfo, error) {
 	//
 	var deploymentList []string
 	var networkList []string
@@ -334,7 +334,7 @@ func CalculateRoutes(cr *k8sv1alpha1.NetworkChaining) ([]PodNetworkInfo, []Routi
 		var r []RoutingInfo
 		var pni []PodNetworkInfo
 
-		r, pni, err := configurePodSelectorDeployment(leftNetworks, deploymentList[0])
+		r, pni, err := configurePodSelectorDeployment(leftNetworks, deploymentList[0], cs)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -401,6 +401,40 @@ func ContainerAddInteface(containerPid int, payload *pb.PodAddNetwork) error {
 	return nil
 }
 
+//ContainerDelInteface return
+func ContainerDelInteface(containerPid int, payload *pb.PodDelNetwork) error {
+	log.Info("Container pid", "containerPid", containerPid)
+	log.Info("payload network", "payload.GetNet()", payload.GetNet())
+	log.Info("payload pod", "payload.GetPod()", payload.GetPod())
+	log.Info("payload route", "payload.GetRoute()", payload.GetRoute())
+
+	podinfo := payload.GetPod()
+	podnetconf := payload.GetNet()
+
+	var netconfs []map[string]string
+	err := json.Unmarshal([]byte(podnetconf.Data), &netconfs)
+	if err != nil {
+		return fmt.Errorf("Error in unmarshal podnet conf=%v", err)
+	}
+
+	cnishimreq := &cniserver.CNIServerRequest{
+		Command:      cniserver.CNIDel,
+		PodNamespace: podinfo.Namespace,
+		PodName:      podinfo.Name,
+		SandboxID:    config.GeneratePodNameID(podinfo.Name),
+		Netns:        fmt.Sprintf("/host/proc/%d/ns/net", containerPid),
+		IfName:       netconfs[0]["interface"],
+		CNIConf:      nil,
+	}
+
+	err = cnishimreq.DeleteMultipleInterfaces(podnetconf.Data, podinfo.Namespace, podinfo.Name)
+	if err != nil {
+		return fmt.Errorf("cni server for deleting interface in the existing pod=%v", err)
+	}
+
+	return nil
+}
+
 // ContainerDelRoute return containerPid and route
 func ContainerDelRoute(containerPid int, route []*pb.RouteData) error {
 	str := fmt.Sprintf("/host/proc/%d/ns/net", containerPid)
@@ -445,19 +479,19 @@ func ContainerDelRoute(containerPid int, route []*pb.RouteData) error {
 
 		stdout, stderr, err := ovn.RunIP("route", "del", hostNet, "via", podGW)
 		if err != nil && !strings.Contains(stderr, "RTNETLINK answers: File exists") {
-			log.Error(err, "Failed to ip route add", "stdout", stdout, "stderr", stderr)
+			log.Error(err, "Failed to ip route del", "stdout", stdout, "stderr", stderr)
 			return err
 		}
 
 		stdout, stderr, err = ovn.RunIP("route", "del", kn.ServiceSubnet, "via", podGW)
 		if err != nil && !strings.Contains(stderr, "RTNETLINK answers: File exists") {
-			log.Error(err, "Failed to ip route add", "stdout", stdout, "stderr", stderr)
+			log.Error(err, "Failed to ip route del", "stdout", stdout, "stderr", stderr)
 			return err
 		}
 
 		stdout, stderr, err = ovn.RunIP("route", "del", kn.PodSubnet, "via", podGW)
 		if err != nil && !strings.Contains(stderr, "RTNETLINK answers: File exists") {
-			log.Error(err, "Failed to ip route add", "stdout", stdout, "stderr", stderr)
+			log.Error(err, "Failed to ip route del", "stdout", stdout, "stderr", stderr)
 			return err
 		}
 
@@ -474,7 +508,7 @@ func ContainerDelRoute(containerPid int, route []*pb.RouteData) error {
 			} else {
 				stdout, stderr, err := ovn.RunIP("route", "del", dst, "via", gw)
 				if err != nil && !strings.Contains(stderr, "RTNETLINK answers: File exists") {
-					log.Error(err, "Failed to ip route add", "stdout", stdout, "stderr", stderr)
+					log.Error(err, "Failed to ip route del", "stdout", stdout, "stderr", stderr)
 					return err
 				}
 			}

@@ -266,7 +266,7 @@ func IsPodNetwork(pod corev1.Pod, networkname string) (bool, error) {
 	return false, nil
 }
 
-func buildNfnAnnotations(pod corev1.Pod, ifname, networkname string) (string, error) {
+func buildNfnAnnotations(pod corev1.Pod, ifname, networkname string, toDelete bool) (string, error) {
 	var IsExtraInterfaces bool
 
 	annotations := pod.GetAnnotations()
@@ -320,18 +320,19 @@ func buildNfnAnnotations(pod corev1.Pod, ifname, networkname string) (string, er
 		log.Info("Extra Annotations values key - %v | value - %v", key, value)
 	}
 
-	k, err := kube.GetKubeConfig()
-	if err != nil {
-		log.Error(err, "Error in kube clientset")
-		return "", fmt.Errorf("Error in getting kube clientset - %v", err)
-	}
+	if !toDelete {
+		k, err := kube.GetKubeConfig()
+		if err != nil {
+			log.Error(err, "Error in kube clientset")
+			return "", fmt.Errorf("Error in getting kube clientset - %v", err)
+		}
 
-	kubecli := &kube.Kube{KClient: k}
-	err = kubecli.AppendAnnotationOnPod(&pod, key, value)
-	if err != nil {
-		return "", fmt.Errorf("error in the appending annotation in pod -%v", err)
+		kubecli := &kube.Kube{KClient: k}
+		err = kubecli.AppendAnnotationOnPod(&pod, key, value)
+		if err != nil {
+			return "", fmt.Errorf("error in the appending annotation in pod -%v", err)
+		}
 	}
-
 	//netinformation already appended into the pod annotation
 	appendednetinfo := strings.ReplaceAll(value, "\\", "")
 
@@ -339,7 +340,7 @@ func buildNfnAnnotations(pod corev1.Pod, ifname, networkname string) (string, er
 }
 
 //AddPodNetworkAnnotations returns ...
-func AddPodNetworkAnnotations(pod corev1.Pod, networkname string) (string, error) {
+func AddPodNetworkAnnotations(pod corev1.Pod, networkname string, toDelete bool) (string, error) {
 	log.Info("checking the pod network %s on pod %s", networkname, pod.GetName())
 	annotations := pod.GetAnnotations()
 	sfcIfname := ovn.GetSFCNetworkIfname()
@@ -347,7 +348,7 @@ func AddPodNetworkAnnotations(pod corev1.Pod, networkname string) (string, error
 	annotationsValue, result := annotations[nfnNetworkAnnotation]
 	if !result {
 		// no nfn-network annotations, create a new one
-		networkInfo, err := buildNfnAnnotations(pod, inet, networkname)
+		networkInfo, err := buildNfnAnnotations(pod, inet, networkname, toDelete)
 		if err != nil {
 			return "", err
 		}
@@ -387,7 +388,7 @@ func AddPodNetworkAnnotations(pod corev1.Pod, networkname string) (string, error
 
 	// set pod annotation with nfn-intefaces
 	// In this case, we already have annotation.
-	networkInfo, err := buildNfnAnnotations(pod, inet, networkname)
+	networkInfo, err := buildNfnAnnotations(pod, inet, networkname, toDelete)
 	if err != nil {
 		return "", err
 	}

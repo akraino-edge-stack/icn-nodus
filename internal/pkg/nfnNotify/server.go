@@ -350,6 +350,61 @@ func SendRouteNotif(chainRoutingInfo []chaining.RoutingInfo, msgType string) err
 	return err
 }
 
+//SendDeleteRouteNotif return ...
+func SendDeleteRouteNotif(chainRoutingInfo []chaining.RoutingInfo, msgType string) error {
+	var msg pb.Notification
+	var err error
+	var rve pb.ContainerRouteRemove
+
+	for _, r := range chainRoutingInfo {
+		rve.ContainerId = r.Id
+		rve.Route = nil
+
+		for _, ln := range r.LeftNetworkRoute {
+			rt := &pb.RouteData{
+				Dst: ln.Dst,
+				Gw:  ln.GW,
+			}
+			rve.Route = append(rve.Route, rt)
+		}
+
+		if !r.RightNetworkRoute.IsEmpty() {
+			rt := &pb.RouteData{
+				Dst: r.RightNetworkRoute.Dst,
+				Gw:  r.RightNetworkRoute.GW,
+			}
+			rve.Route = append(rve.Route, rt)
+		}
+
+		for _, d := range r.DynamicNetworkRoutes {
+			if !d.IsEmpty() {
+				rt := &pb.RouteData{
+					Dst: d.Dst,
+					Gw:  d.GW,
+				}
+				rve.Route = append(rve.Route, rt)
+			}
+		}
+		if msgType == "delete" {
+			msg = pb.Notification{
+				CniType: "ovn4nfv",
+				Payload: &pb.Notification_ContainterRtRemove{
+					ContainterRtRemove: &rve,
+				},
+			}
+		}
+
+		client := notifServer.GetClient(r.Node)
+		if client.stream != nil {
+			if err := client.stream.Send(&msg); err != nil {
+				log.Error(err, "Failed to send msg", "Node", r.Node)
+				return err
+			}
+		}
+	}
+	return err
+}
+
 //SendPodNetworkNotif return ...
 func SendPodNetworkNotif(pni []chaining.PodNetworkInfo, msgType string) error {
 	var msg pb.Notification
@@ -386,6 +441,45 @@ func SendPodNetworkNotif(pni []chaining.PodNetworkInfo, msgType string) error {
 			}
 		}
 		// TODO: Handle Delete
+	}
+	return err
+}
+
+//SendDeletePodNetworkNotif return ...
+func SendDeletePodNetworkNotif(pni []chaining.PodNetworkInfo, msgType string) error {
+	var msg pb.Notification
+	var err error
+	var rve pb.PodDelNetwork
+
+	for _, p := range pni {
+		rve.Pod = &pb.PodInfo{
+			Namespace: p.Namespace,
+			Name:      p.Name,
+		}
+		rve.ContainerId = p.Id
+		rve.Net = &pb.NetConf{
+			Data: p.NetworkInfo,
+		}
+		rve.Route = &pb.RouteData{
+			Dst: p.Route.Dst,
+			Gw:  p.Route.GW,
+		}
+
+		if msgType == "delete" {
+			msg = pb.Notification{
+				CniType: "ovn4nfv",
+				Payload: &pb.Notification_PodDelNetwork{
+					PodDelNetwork: &rve,
+				},
+			}
+		}
+		client := notifServer.GetClient(p.Node)
+		if client.stream != nil {
+			if err := client.stream.Send(&msg); err != nil {
+				log.Error(err, "Failed to send msg", "Node", p.Node)
+				return err
+			}
+		}
 	}
 	return err
 }

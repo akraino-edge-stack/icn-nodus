@@ -307,6 +307,39 @@ func handleNotif(msg *pb.Notification) {
 				return
 			}
 
+		case *pb.Notification_ContainterRtRemove:
+			id := payload.ContainterRtRemove.GetContainerId()
+			pid, err := chaining.GetPidForContainer(id)
+			if err != nil {
+				log.Error(err, "Failed to get pid", "containerID", id)
+				return
+			}
+			err = chaining.ContainerDelRoute(pid, payload.ContainterRtRemove.GetRoute())
+			if err != nil {
+				return
+			}
+
+		case *pb.Notification_PodDelNetwork:
+			id := payload.PodDelNetwork.GetContainerId()
+			pid, err := chaining.GetPidForContainer(id)
+			if err != nil {
+				log.Error(err, "Failed to get pid", "containerID", id)
+				return
+			}
+
+			var route []*pb.RouteData
+			route = append(route, payload.PodDelNetwork.GetRoute())
+			log.Info("route information from msg", "route", route)
+			err = chaining.ContainerDelRoute(pid, route)
+			if err != nil {
+				return
+			}
+
+			err = chaining.ContainerDelInteface(pid, payload.PodDelNetwork)
+			if err != nil {
+				return
+			}
+
 		case *pb.Notification_InSync:
 			inSyncVlanProvidernetwork()
 			inSyncDirectProvidernetwork()

@@ -185,6 +185,46 @@ func setupInterface(netns ns.NetNS, containerID, ifName, macAddress, ipAddress, 
 	return hostIface, contIface, nil
 }
 
+//DeleteInterface return ...
+func DeleteInterface(netns ns.NetNS, ifName string) error {
+	var err error
+
+	err = netns.Do(func(hostNS ns.NetNS) error {
+		link, err := netlink.LinkByName(ifName)
+		if err != nil {
+			return fmt.Errorf("failed to lookup %s: %v", ifName, err)
+		}
+
+		err = netlink.LinkDel(link)
+		if err != nil {
+			return fmt.Errorf("failed to delete %s: %v", link.Attrs().Name, err)
+		}
+		return nil
+	})
+
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// ConfigureDeleteInterface sets up the container interface
+var ConfigureDeleteInterface = func(containerNetns, ifName string) error {
+	netns, err := ns.GetNS(containerNetns)
+	if err != nil {
+		return fmt.Errorf("failed to open netns %q: %v", containerNetns, err)
+	}
+	defer netns.Close()
+
+	err = DeleteInterface(netns, ifName)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
 // ConfigureInterface sets up the container interface
 var ConfigureInterface = func(containerNetns, containerID, ifName, namespace, podName, macAddress, ipAddress, gatewayIP, interfaceName, defaultGateway string, idx, mtu int, isDefaultGW bool) ([]*current.Interface, error) {
 	netns, err := ns.GetNS(containerNetns)

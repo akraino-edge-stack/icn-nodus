@@ -134,6 +134,9 @@ data:
               "policy": {
                 "type": "k8s"
               },
+              "container_settings": {
+                "allow_ip_forwarding": true
+              },
               "kubernetes": {
                 "kubeconfig": "/etc/cni/net.d/calico-kubeconfig"
               }

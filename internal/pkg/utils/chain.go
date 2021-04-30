@@ -506,10 +506,17 @@ func ContainerDelRoute(containerPid int, route []*pb.RouteData) error {
 					return err
 				}
 			} else {
-				stdout, stderr, err := ovn.RunIP("route", "del", dst, "via", gw)
-				if err != nil && !strings.Contains(stderr, "RTNETLINK answers: File exists") {
-					log.Error(err, "Failed to ip route del", "stdout", stdout, "stderr", stderr)
+				isExist, err := network.IsRouteExist(dst, gw)
+				if err != nil {
+					log.Error(err, "Failed to get dst route gateway")
 					return err
+				}
+				if isExist == true {
+					stdout, stderr, err := ovn.RunIP("route", "del", dst, "via", gw)
+					if err != nil && !strings.Contains(stderr, "RTNETLINK answers: File exists") {
+						log.Error(err, "Failed to ip route del", "stdout", stdout, "stderr", stderr)
+						return err
+					}
 				}
 			}
 		}

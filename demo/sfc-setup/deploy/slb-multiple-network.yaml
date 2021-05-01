@@ -1,0 +1,32 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: slb
+  labels:
+    app: slb
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: slb
+  template:
+    metadata:
+      labels:
+        app: slb
+      annotations:
+        k8s.v1.cni.cncf.io/networks: '[                                        
+            { "name": "ovn4nfv-k8s-plugin",                                    
+              "interface": "net1"                                              
+            }]'
+        k8s.plugin.opnfv.org/nfn-network: '{ "type": "ovn4nfv", "interface": [{"name": "virutal-net1", "interface": "net2", "defaultGateway": "false"}, {"name": "left-pnetwork", "interface": "net3", "defaultGateway": "false"}, { "name": "dync-net1", "interface": "net4", "defaultGateway": "false"}]}'
+    spec:
+      containers:
+      - name: slb
+        image: rkamudhan/netshoot:v1.0
+        imagePullPolicy: IfNotPresent
+        stdin: true
+        tty: true
+      nodeSelector:
+        kubernetes.io/hostname: minion01
+
+---

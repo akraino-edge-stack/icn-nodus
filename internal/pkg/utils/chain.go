@@ -68,9 +68,10 @@ func (r RoutingInfo) IsEmpty() bool {
 }
 
 //configurePodSelectorDeployment
-func configurePodSelectorDeployment(ln k8sv1alpha1.RoutingNetwork, sfcEntryPodLabel string, toDelete bool) ([]RoutingInfo, []PodNetworkInfo, error) {
+func configurePodSelectorDeployment(ln k8sv1alpha1.RoutingNetwork, sfcEntryPodLabel string, toDelete bool, mode string, networklabel string) ([]RoutingInfo, []PodNetworkInfo, error) {
 	var rt []RoutingInfo
 	var pni []PodNetworkInfo
+	var networkname string
 
 	// Get a config to talk to the apiserver
 	clientset, err := kube.GetKubeConfig()
@@ -88,10 +89,30 @@ func configurePodSelectorDeployment(ln k8sv1alpha1.RoutingNetwork, sfcEntryPodLa
 		return nil, nil, err
 	}
 
-	pn, err := k8sv1alpha1Clientset.ProviderNetworks("default").Get(ln.NetworkName, v1.GetOptions{})
-	if err != nil {
-		log.Error(err, "Error in getting Provider Networks")
-		return nil, nil, err
+	if mode != k8sv1alpha1.VirutalMode {
+		pn, err := k8sv1alpha1Clientset.ProviderNetworks("default").Get(ln.NetworkName, v1.GetOptions{})
+		if err != nil {
+			log.Error(err, "Error in getting Provider Networks")
+			return nil, nil, err
+		}
+
+		networkname = pn.GetName()
+	}
+
+	if mode == k8sv1alpha1.VirutalMode {
+		vn, err := k8sv1alpha1Clientset.Networks("default").List(v1.ListOptions{LabelSelector: networklabel})
+		if err != nil {
+			log.Error(err, "Error in getting Provider Networks")
+			return nil, nil, err
+		}
+
+		if len(vn.Items) != 1 {
+			err := fmt.Errorf("Virutal network is not available for the networklabel - %s", networklabel)
+			log.Error(err, "Error in kube clientset in listing the pods for namespace", "networklabel", networklabel)
+			return nil, nil, err
+		}
+
+		networkname = vn.Items[0].GetName()
 	}
 
 	pods, err := clientset.CoreV1().Pods("default").List(v1.ListOptions{LabelSelector: sfcEntryPodLabel})
@@ -103,17 +124,16 @@ func configurePodSelectorDeployment(ln k8sv1alpha1.RoutingNetwork, sfcEntryPodLa
 
 	if len(pods.Items) != 1 {
 		err := fmt.Errorf("Currently load balancing is not supported, expected SFC deployment has only 1 replica")
-		log.Error(err, "Error in kube clientset in listing the pods for namespace", "sfcEntryPodLabel")
+		log.Error(err, "Error in kube clientset in listing the pods for namespace", "sfcEntryPodLabel", sfcEntryPodLabel)
 		return nil, nil, err
 	}
 
 	podName := pods.Items[0].GetName()
-	pnName := pn.GetName()
 
 	log.Info("The value of podName", "podName", podName)
-	log.Info("The value of pnName", "pnName", pnName)
+	log.Info("The value of pnName", "networkname", networkname)
 
-	sfcEntryIP, err := ovn.GetIPAdressForPod(pnName, podName)
+	sfcEntryIP, err := ovn.GetIPAdressForPod(networkname, podName)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -161,14 +181,14 @@ func configurePodSelectorDeployment(ln k8sv1alpha1.RoutingNetwork, sfcEntryPodLa
 			var IsNetworkattached bool
 			var netinfo string
 			log.Info("The value of ", "Pod", pod.GetName(), "Node", pod.Spec.NodeName)
-			IsNetworkattached, err := pc.IsPodNetwork(pod, pnName)
+			IsNetworkattached, err := pc.IsPodNetwork(pod, networkname)
 			if !IsNetworkattached {
 				if err != nil {
-					log.Error(err, "Error getting pod network", "network", pnName)
+					log.Error(err, "Error getting pod network", "network", networkname)
 					return nil, nil, err
 				}
-				log.Info("The pod is not having the network", "pod", pod.GetName(), "network", pnName)
-				netinfo, err = pc.AddPodNetworkAnnotations(pod, pnName, toDelete)
+				log.Info("The pod is not having the network", "pod", pod.GetName(), "network", networkname)
+				netinfo, err = pc.AddPodNetworkAnnotations(pod, networkname, toDelete)
 				if err != nil {
 					log.Error(err, "Error in adding the network pod annotations")
 					return nil, nil, err
@@ -250,6 +270,8 @@ func calculateDeploymentRoutes(namespace, label string, pos int, num int, ln []k
 		routeinfo.Dst = l.Subnet
 		r.LeftNetworkRoute = append(r.LeftNetworkRoute, routeinfo)
 	}
+
+	log.Info("Information of pods leftNetworkRoute", "pod", pods.Items[0].GetName(), "r.LeftNetworkRoute", r.LeftNetworkRoute)
 	// Calcluate IP addresses for next neighbours on right sides
 	if pos == num-1 {
 		nextRightIP = rn[0].GatewayIP
@@ -284,13 +306,82 @@ func calculateDeploymentRoutes(namespace, label string, pos int, num int, ln []k
 		}
 	}
 
+	log.Info("Information of pods DynamicNetworkRoutes", "pod", pods.Items[0].GetName(), "r.DynamicNetworkRoutes", r.DynamicNetworkRoutes)
 	//Add Default Route based on Right Network
 	rt := k8sv1alpha1.Route{
 		GW:  nextRightIP,
 		Dst: "0.0.0.0",
 	}
 	r.DynamicNetworkRoutes = append(r.DynamicNetworkRoutes, rt)
+	log.Info("Information of pods DynamicNetworkRoutes with dst-0.0.0.0", "pod", pods.Items[0].GetName(), "r.DynamicNetworkRoutes", r.DynamicNetworkRoutes)
 	return
+}
+
+//ValidateNetworkChaining return ...
+func ValidateNetworkChaining(cr *k8sv1alpha1.NetworkChaining) (string, error) {
+	var mode string
+
+	left := cr.Spec.RoutingSpec.LeftNetwork
+	right := cr.Spec.RoutingSpec.RightNetwork
+
+	if (len(left) == 0) || (len(right) == 0) {
+		return "", fmt.Errorf("Error - size of left is %d and size of right %d", len(left), len(right))
+	}
+
+	chains := strings.Split(cr.Spec.RoutingSpec.NetworkChain, ",")
+	k8sv1alpha1Clientset, err := kube.GetKubev1alpha1Config()
+	if err != nil {
+		log.Error(err, "Error in getting k8s v1alpha1 clientset")
+		return "", err
+	}
+
+	sfcheadnet, err := k8sv1alpha1Clientset.Networks("default").List(v1.ListOptions{LabelSelector: chains[0]})
+	if err != nil {
+		log.Error(err, "Error in kube clientset in listing the namespaces")
+		return "", err
+	}
+
+	sfctailnet, err := k8sv1alpha1Clientset.Networks("default").List(v1.ListOptions{LabelSelector: chains[len(chains)-1]})
+	if err != nil {
+		log.Error(err, "Error in kube clientset in listing the namespaces")
+		return "", err
+	}
+
+	if (len(sfcheadnet.Items) != 0) && (len(sfctailnet.Items) != 0) {
+		mode = k8sv1alpha1.VirutalMode
+	}
+
+	return mode, nil
+}
+
+//ConfigureNetworkFromLabel return ...
+func configureNetworkFromLabel(label string) (r k8sv1alpha1.RoutingNetwork, err error) {
+	var route k8sv1alpha1.RoutingNetwork
+
+	k8sv1alpha1Clientset, err := kube.GetKubev1alpha1Config()
+	if err != nil {
+		log.Error(err, "Error in getting k8s v1alpha1 clientset")
+		return k8sv1alpha1.RoutingNetwork{}, err
+	}
+
+	net, err := k8sv1alpha1Clientset.Networks("default").List(v1.ListOptions{LabelSelector: label})
+	if err != nil {
+		log.Error(err, "Error in kube clientset in listing the namespaces")
+		return k8sv1alpha1.RoutingNetwork{}, err
+	}
+
+	if len(net.Items) != 1 {
+		err := fmt.Errorf("Virutal network is not available for the networklabel - %s", label)
+		log.Error(err, "Error in kube clientset in listing the pods for namespace", "networklabel")
+		return k8sv1alpha1.RoutingNetwork{}, err
+	}
+
+	route.NetworkName = net.Items[0].GetName()
+	ipv4Subnets := net.Items[0].Spec.Ipv4Subnets
+	route.GatewayIP = ipv4Subnets[0].ExcludeIps
+	route.Subnet = ipv4Subnets[0].Subnet
+
+	return route, nil
 }
 
 // CalculateRoutes returns the routing info
@@ -298,11 +389,24 @@ func CalculateRoutes(cr *k8sv1alpha1.NetworkChaining, cs bool) ([]PodNetworkInfo
 	//
 	var deploymentList []string
 	var networkList []string
+	var sfctaillabel, sfcheadlabel string
 
 	// TODO: Add Validation of Input to this function
 	ln := cr.Spec.RoutingSpec.LeftNetwork
 	rn := cr.Spec.RoutingSpec.RightNetwork
 	chains := strings.Split(cr.Spec.RoutingSpec.NetworkChain, ",")
+
+	mode, err := ValidateNetworkChaining(cr)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	if mode == k8sv1alpha1.VirutalMode {
+		sfcheadlabel = chains[0]
+		sfctaillabel = chains[len(chains)-1]
+		_ = sfctaillabel
+		chains = chains[1 : len(chains)-1]
+	}
 
 	i := 0
 	for _, chain := range chains {
@@ -334,7 +438,7 @@ func CalculateRoutes(cr *k8sv1alpha1.NetworkChaining, cs bool) ([]PodNetworkInfo
 		var r []RoutingInfo
 		var pni []PodNetworkInfo
 
-		r, pni, err := configurePodSelectorDeployment(leftNetworks, deploymentList[0], cs)
+		r, pni, err := configurePodSelectorDeployment(leftNetworks, deploymentList[0], cs, mode, sfcheadlabel)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -355,6 +459,14 @@ func CalculateRoutes(cr *k8sv1alpha1.NetworkChaining, cs bool) ([]PodNetworkInfo
 		log.Info("Display the rn", "NamespaceSelector.MatchLabels", rightNetworks.NamespaceSelector.MatchLabels)
 	}
 
+	if mode == k8sv1alpha1.VirutalMode {
+		r, err := configureNetworkFromLabel(sfcheadlabel)
+		if err != nil {
+			return nil, nil, err
+		}
+		ln = append(ln, r)
+	}
+
 	for i, deployment := range deploymentList {
 		r, err := calculateDeploymentRoutes(cr.Namespace, deployment, i, num, ln, rn, networkList, deploymentList)
 		if err != nil {
@@ -362,6 +474,7 @@ func CalculateRoutes(cr *k8sv1alpha1.NetworkChaining, cs bool) ([]PodNetworkInfo
 		}
 		chainRoutingInfo = append(chainRoutingInfo, r)
 	}
+
 	log.Info("Value of podsNetworkInfo ", "podsNetworkInfo ", podsNetworkInfo)
 	return podsNetworkInfo, chainRoutingInfo, nil
 }

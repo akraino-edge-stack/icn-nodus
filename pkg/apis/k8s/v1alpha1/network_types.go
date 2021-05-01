@@ -50,6 +50,12 @@ const (
 	DeleteInternalError = "DeleteInternalError"
 	//Deleted indicated the status of success
 	Deleted = "Deleted"
+	//Virutal mode
+	VirutalMode = "VirutalMode"
+	//Provider mode
+	ProviderMode = "ProviderMode"
+	//Virutal and Provider mode
+	VirutalProviderMode = "VirutalProviderMode"
 )
 
 // NetworkStatus defines the observed state of Network

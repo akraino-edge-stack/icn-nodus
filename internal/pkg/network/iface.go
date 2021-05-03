@@ -19,7 +19,6 @@ func GetGatewayInterface(dst string) (string, error) {
 	for _, route := range routes {
 		if route.Dst != nil {
 			if route.Dst.String() == dst {
-				fmt.Printf("route gw = %s\n", route.Gw.String())
 				if route.Gw.To4() == nil {
 					return "", errors.New("Found dst route but could not determine gateway")
 				}
@@ -41,7 +40,6 @@ func IsRouteExist(dst string, gw string) (bool, error) {
 	for _, route := range routes {
 		if route.Dst != nil {
 			if route.Dst.String() == dst {
-				fmt.Printf("route gw = %s\n", route.Gw.String())
 				if route.Gw.To4() == nil {
 					return false, nil
 				}

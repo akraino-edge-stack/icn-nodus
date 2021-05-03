@@ -92,9 +92,6 @@ func configurePodSelectorDeployment(ln k8sv1alpha1.RoutingNetwork, sfcEntryPodLa
 		return nil, nil, err
 	}
 
-	log.Info("The value of sfcEntryPodLabel", "sfcEntryPodLabel", sfcEntryPodLabel)
-	log.Info("The value of ln.NetworkName", "ln.NetworkName", ln.NetworkName)
-
 	k8sv1alpha1Clientset, err := kube.GetKubev1alpha1Config()
 	if err != nil {
 		log.Error(err, "Error in getting k8s v1alpha1 clientset")
@@ -142,9 +139,6 @@ func configurePodSelectorDeployment(ln k8sv1alpha1.RoutingNetwork, sfcEntryPodLa
 
 	podName := pods.Items[0].GetName()
 
-	log.Info("The value of podName", "podName", podName)
-	log.Info("The value of pnName", "networkname", networkname)
-
 	sfcEntryIP, err := ovn.GetIPAdressForPod(networkname, podName)
 	if err != nil {
 		return nil, nil, err
@@ -156,43 +150,30 @@ func configurePodSelectorDeployment(ln k8sv1alpha1.RoutingNetwork, sfcEntryPodLa
 		Dst: "0.0.0.0",
 	}
 
-	log.Info("The value of sfcEntryIP", "sfcEntryIP", sfcEntryIP)
-	log.Info("The value of namespaceSelector", "namespaceSelector.MatchLabels", ln.NamespaceSelector.MatchLabels)
 	nsLabel := labels.Set(ln.NamespaceSelector.MatchLabels)
-	log.Info("The value of nslabel", "nsLabel.AsSelector().String()", nsLabel.AsSelector().String())
-
 	nslist, err := clientset.CoreV1().Namespaces().List(v1.ListOptions{LabelSelector: nsLabel.AsSelector().String()})
 	if err != nil {
 		log.Error(err, "Error in kube clientset in listing the namespaces")
 		return nil, nil, err
 	}
 
-	//fmt.Printf("There are %d namespaces in the cluster\n", len(nslist.Items))
-	log.Info("The value of nslabel", "len(nslist.Items)", len(nslist.Items))
-
 	for _, ns := range nslist.Items {
 		if ns.GetLabels() == nil {
-			//fmt.Printf("The name of the namesp is %s and label is empty\n", ns.GetName())
 			log.Info("The namespace label is empty", "namespace", ns.GetName())
 			continue
 		}
-		//fmt.Printf("The name of the namespace is %s and label is %s\n", ns.GetName(), ns.GetLabels())
-		log.Info("The value of ", "namespace", ns.GetName(), "labels", ns.GetLabels())
+
 		set := labels.Set(ns.GetLabels())
-		//fmt.Printf("The namespace %s as Selector is %+v\n", ns.GetName(), set.AsSelector())
-		log.Info("The value of ", "namespace", ns.GetName(), "selector", set.AsSelector())
 		pods, err := clientset.CoreV1().Pods(ns.GetName()).List(v1.ListOptions{LabelSelector: set.AsSelector().String()})
 		if err != nil {
-			//fmt.Printf("List Pods of namespace[%s] error:%v", ns.GetName(), err)
 			log.Error(err, "Error in kube clientset in listing the pods for namespace", "namespace", ns.GetName())
 			return nil, nil, err
 		}
 
 		for _, pod := range pods.Items {
-			//fmt.Println(v.GetName(), v.Spec.NodeName)
 			var IsNetworkattached bool
 			var netinfo string
-			log.Info("The value of ", "Pod", pod.GetName(), "Node", pod.Spec.NodeName)
+
 			if toDelete != true {
 				annotation := pod.GetAnnotations()
 				_, ok := annotation[SFCannotationTag]
@@ -206,7 +187,6 @@ func configurePodSelectorDeployment(ln k8sv1alpha1.RoutingNetwork, sfcEntryPodLa
 					log.Error(err, "Error getting pod network", "network", networkname)
 					return nil, nil, err
 				}
-				log.Info("The pod is not having the network", "pod", pod.GetName(), "network", networkname)
 				netinfo, err = AddPodNetworkAnnotations(pod, networkname, toDelete)
 				if err != nil {
 					log.Error(err, "Error in adding the network pod annotations")
@@ -221,9 +201,6 @@ func configurePodSelectorDeployment(ln k8sv1alpha1.RoutingNetwork, sfcEntryPodLa
 				r.Name = pod.GetName()
 				r.Node = pod.Spec.NodeName
 				r.DynamicNetworkRoutes = append(r.DynamicNetworkRoutes, defaultRoute)
-				log.Info("length of r.LeftNetworkRoute", "r.LeftNetworkRoute", len(r.LeftNetworkRoute))
-				log.Info("length of r.LeftNetworkRoute", "r.LeftNetworkRoute", r.RightNetworkRoute.IsEmpty())
-				log.Info("length of r.DynamicNetworkRoutes", "r.DynamicNetworkRoutes", len(r.DynamicNetworkRoutes))
 				rt = append(rt, r)
 			} else {
 				var p PodNetworkInfo
@@ -247,7 +224,6 @@ func configurePodSelectorDeployment(ln k8sv1alpha1.RoutingNetwork, sfcEntryPodLa
 		}
 	}
 
-	log.Info("Value of rt", "rt", rt)
 	return rt, pni, nil
 }
 
@@ -299,7 +275,6 @@ func calculateDeploymentRoutes(namespace, label string, pos int, num int, ln []k
 		r.LeftNetworkRoute = append(r.LeftNetworkRoute, routeinfo)
 	}
 
-	log.Info("Information of pods leftNetworkRoute", "pod", pods.Items[0].GetName(), "r.LeftNetworkRoute", r.LeftNetworkRoute)
 	// Calcluate IP addresses for next neighbours on right sides
 	if pos == num-1 {
 		nextRightIP = rn[0].GatewayIP
@@ -311,8 +286,6 @@ func calculateDeploymentRoutes(namespace, label string, pos int, num int, ln []k
 		}
 	}
 	// Calcuate left right Route to be inserted in Pod
-	//r.LeftNetworkRoute.Dst = ln[0].Subnet
-	//r.LeftNetworkRoute.GW = nextLeftIP
 	r.RightNetworkRoute.Dst = rn[0].Subnet
 	r.RightNetworkRoute.GW = nextRightIP
 	// For each network that is not adjacent add route
@@ -334,14 +307,12 @@ func calculateDeploymentRoutes(namespace, label string, pos int, num int, ln []k
 		}
 	}
 
-	log.Info("Information of pods DynamicNetworkRoutes", "pod", pods.Items[0].GetName(), "r.DynamicNetworkRoutes", r.DynamicNetworkRoutes)
 	//Add Default Route based on Right Network
 	rt := k8sv1alpha1.Route{
 		GW:  nextRightIP,
 		Dst: "0.0.0.0",
 	}
 	r.DynamicNetworkRoutes = append(r.DynamicNetworkRoutes, rt)
-	log.Info("Information of pods DynamicNetworkRoutes with dst-0.0.0.0", "pod", pods.Items[0].GetName(), "r.DynamicNetworkRoutes", r.DynamicNetworkRoutes)
 	return
 }
 
@@ -432,12 +403,9 @@ func noSFCrequired(clientset *kubernetes.Clientset, podname string, podnamespace
 
 func compareEachLabel(a map[string]string, b map[string]string) bool {
 	var isEqual bool
+
 	for akey, aValue := range a {
 		for bkey, bValue := range b {
-			fmt.Printf("akey-%v\n", akey)
-			fmt.Printf("aValue-%v\n", aValue)
-			fmt.Printf("bkey-%v\n", bkey)
-			fmt.Printf("bValue-%v\n", bValue)
 			if akey == bkey && aValue == bValue {
 				isEqual = true
 				break
@@ -447,14 +415,11 @@ func compareEachLabel(a map[string]string, b map[string]string) bool {
 			}
 		}
 	}
-
-	fmt.Printf("isEqual-%v", isEqual)
 	return isEqual
 }
 
 //ConfigureforSFC returns
 func ConfigureforSFC(podname string, podnamespace string) (bool, []PodNetworkInfo, []RoutingInfo, error) {
-	//var nl, pl, sfcname string
 	var sfcname string
 	var nl, pl map[string]string
 
@@ -489,10 +454,7 @@ func ConfigureforSFC(podname string, podnamespace string) (bool, []PodNetworkInf
 		return false, nil, nil, nil
 	}
 
-	//pdlabel := labels.Set(pod.GetLabels()).AsSelector().String()
 	pdlabel := pod.GetLabels()
-	log.Info("check the value", "pdlabel", pdlabel)
-
 	namespace, err := clientset.CoreV1().Namespaces().Get(podnamespace, v1.GetOptions{})
 	if err != nil {
 		return false, nil, nil, fmt.Errorf("ConfigureforSFC - Error in getting the pod namespace - %s clientset get options - %v", podnamespace, err)
@@ -511,52 +473,28 @@ func ConfigureforSFC(podname string, podnamespace string) (bool, []PodNetworkInf
 		return false, nil, nil, nil
 	}
 
-	//pdnslabel := labels.Set(namespace.GetLabels()).AsSelector().String()
 	pdnslabel := namespace.GetLabels()
-	log.Info("check the value", "pdnslabel", pdnslabel)
-
 	var isSFCExist bool
 	for _, nc := range sfc.Items {
 		sfcname = nc.GetName()
-		log.Info("check the value", "sfcname", sfcname)
 		left := nc.Spec.RoutingSpec.LeftNetwork
-		log.Info("check the value", "left", left)
 		for _, l := range left {
-			//pl = labels.Set(l.PodSelector.MatchLabels).AsSelector().String()
 			pl = l.PodSelector.MatchLabels
-			log.Info("check the value", "pl", pl)
-			//nl = labels.Set(l.NamespaceSelector.MatchLabels).AsSelector().String()
 			nl = l.NamespaceSelector.MatchLabels
-			log.Info("check the value", "nl", nl)
-			log.Info("check the value", "pdlabel", pdlabel)
-			log.Info("check the value", "pdnslabel", pdnslabel)
-			//if pl == pdlabel && nl == pdnslabel {
-			//	isSFCExist = true
-			//	log.Info("check the value if 1 ", "isSFCExist", isSFCExist)
-			//	break
-			//}
 			if compareEachLabel(pl, pdlabel) && compareEachLabel(nl, pdnslabel) {
 				isSFCExist = true
-				log.Info("check the value if 1 ", "isSFCExist", isSFCExist)
 				break
 			}
 		}
-		//if pl == pdlabel && nl == pdnslabel {
-		//	isSFCExist = true
-		//	log.Info("check the value if 2 ", "isSFCExist", isSFCExist)
-		//	break
-		//}
 		if isSFCExist {
 			break
 		}
 	}
 
 	if isSFCExist == false {
-		log.Info("check the value if 3 ", "isSFCExist", isSFCExist)
 		return false, nil, nil, nil
 	}
 
-	log.Info("ConfigureforSFC - Pod SFC configuration is processing", "podname", podname)
 	cr, err := k8sv1alpha1Clientset.NetworkChainings("default").Get(sfcname, v1.GetOptions{})
 	if err != nil {
 		return false, nil, nil, fmt.Errorf("ConfigureforSFC - Error in getting the network chaining - %s k8sv1alpha1 clientset get options - %v", sfcname, err)
@@ -567,38 +505,16 @@ func ConfigureforSFC(podname string, podnamespace string) (bool, []PodNetworkInf
 		return false, nil, nil, fmt.Errorf("ConfigureforSFC - Error in calculate routes for configuring pod for SFC - %v", err)
 	}
 
-	//if len(routeList) != 0 {
-	//	err = notif.SendRouteNotif(routeList, "create")
-	//	if err != nil {
-	//		log.Error(err, "ConfigureforSFC - Error Sending route Message")
-	//		return false, err
-	//	}
-	//}
-
-	//log.Info("ConfigureforSFC - length of the podnetworkList", "len(podnetworkList)", len(podnetworkList))
-	//log.Info("ConfigureforSFC - value of the podnetworkList", "podnetworkList", podnetworkList)
-
-	//if len(podnetworkList) != 0 {
-	//	err = notif.SendPodNetworkNotif(podnetworkList, "create")
-	//	if err != nil {
-	//		log.Error(err, "Error Sending pod network Message")
-	//		return false, err
-	//	}
-	//}
-
 	log.Info("Pod SFC configuration is successful", "podname", podname)
-
 	return true, podnetworkList, routeList, nil
 }
 
 // CalculateRoutes returns the routing info
 func CalculateRoutes(cr *k8sv1alpha1.NetworkChaining, cs bool, onlyPodSelector bool) ([]PodNetworkInfo, []RoutingInfo, error) {
-	//
 	var deploymentList []string
 	var networkList []string
 	var sfctaillabel, sfcheadlabel string
 
-	// TODO: Add Validation of Input to this function
 	ln := cr.Spec.RoutingSpec.LeftNetwork
 	rn := cr.Spec.RoutingSpec.RightNetwork
 	chains := strings.Split(cr.Spec.RoutingSpec.NetworkChain, ",")
@@ -625,11 +541,6 @@ func CalculateRoutes(cr *k8sv1alpha1.NetworkChaining, cs bool, onlyPodSelector b
 		i++
 	}
 	num := len(deploymentList)
-	log.Info("Display the num", "num", num)
-	log.Info("Display the ln", "ln", ln)
-	log.Info("Display the rn", "rn", rn)
-	log.Info("Display the networklist", "networkList", networkList)
-	log.Info("Display the deploymentlist", "deploymentList", deploymentList)
 
 	var chainRoutingInfo []RoutingInfo
 	var lnRoutingInfo []RoutingInfo
@@ -637,11 +548,6 @@ func CalculateRoutes(cr *k8sv1alpha1.NetworkChaining, cs bool, onlyPodSelector b
 	//var rnRoutingInfo []RoutingInfo
 
 	for _, leftNetworks := range cr.Spec.RoutingSpec.LeftNetwork {
-		log.Info("Display the ln", "GatewayIP", leftNetworks.GatewayIP)
-		log.Info("Display the ln", "NetworkName", leftNetworks.NetworkName)
-		log.Info("Display the ln", "Subnet", leftNetworks.Subnet)
-		log.Info("Display the ln", "PodSelector.MatchLabels", leftNetworks.PodSelector.MatchLabels)
-		log.Info("Display the ln", "NamespaceSelector.MatchLabels", leftNetworks.NamespaceSelector.MatchLabels)
 		var r []RoutingInfo
 		var pni []PodNetworkInfo
 
@@ -652,8 +558,6 @@ func CalculateRoutes(cr *k8sv1alpha1.NetworkChaining, cs bool, onlyPodSelector b
 
 		lnRoutingInfo = append(lnRoutingInfo, r...)
 		podsNetworkInfo = append(podsNetworkInfo, pni...)
-		log.Info("Value of lnRoutingInfo ", "lnRoutingInfo ", lnRoutingInfo)
-		log.Info("Value of podsNetworkInfo ", "podsNetworkInfo ", podsNetworkInfo)
 	}
 
 	chainRoutingInfo = append(chainRoutingInfo, lnRoutingInfo...)
@@ -696,7 +600,6 @@ func ContainerAddInteface(containerPid int, payload *pb.PodAddNetwork) error {
 	log.Info("payload route", "payload.GetRoute()", payload.GetRoute())
 
 	podinfo := payload.GetPod()
-	//podroute := payload.GetRoute()
 	podnetconf := payload.GetNet()
 
 	var netconfs []map[string]string
@@ -954,7 +857,6 @@ func GetPidForContainer(id string) (int, error) {
 		return 0, fmt.Errorf("Container not found %s", id)
 	}
 	return cj.State.Pid, nil
-
 }
 
 const (

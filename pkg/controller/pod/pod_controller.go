@@ -93,9 +93,6 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 							}
 						}
 
-						log.Info("ConfigureforSFC - length of the podnetworkList", "len(podnetworkList)", len(pni))
-						log.Info("ConfigureforSFC - value of the podnetworkList", "podnetworkList", pni)
-
 						if len(pni) != 0 {
 							err = notif.SendPodNetworkNotif(pni, "create")
 							if err != nil {

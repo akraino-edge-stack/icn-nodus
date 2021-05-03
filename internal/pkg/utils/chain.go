@@ -25,14 +25,18 @@ import (
 	"ovn4nfv-k8s-plugin/internal/pkg/network"
 	"ovn4nfv-k8s-plugin/internal/pkg/ovn"
 	k8sv1alpha1 "ovn4nfv-k8s-plugin/pkg/apis/k8s/v1alpha1"
-	pc "ovn4nfv-k8s-plugin/pkg/controller/pod"
 	"reflect"
 	"strings"
+
+	corev1 "k8s.io/api/core/v1"
+
+	"k8s.io/client-go/kubernetes"
 
 	pb "ovn4nfv-k8s-plugin/internal/pkg/nfnNotify/proto"
 
 	"github.com/containernetworking/plugins/pkg/ns"
 	"github.com/docker/docker/client"
+	"github.com/mitchellh/mapstructure"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/json"
@@ -61,6 +65,14 @@ type PodNetworkInfo struct {
 	NetworkInfo string
 	Route       k8sv1alpha1.Route
 }
+
+const (
+	// Ovn4nfvAnnotationTag tag on already processed Pods
+	SFCannotationTag = "k8s.plugin.opnfv.org/sfc"
+	SFCcreated       = "created"
+	SFCprocessing    = "proccessing"
+	SFCNotrequired   = "notrequired"
+)
 
 //IsEmpty return true or false
 func (r RoutingInfo) IsEmpty() bool {
@@ -181,14 +193,21 @@ func configurePodSelectorDeployment(ln k8sv1alpha1.RoutingNetwork, sfcEntryPodLa
 			var IsNetworkattached bool
 			var netinfo string
 			log.Info("The value of ", "Pod", pod.GetName(), "Node", pod.Spec.NodeName)
-			IsNetworkattached, err := pc.IsPodNetwork(pod, networkname)
+			if toDelete != true {
+				annotation := pod.GetAnnotations()
+				_, ok := annotation[SFCannotationTag]
+				if ok {
+					continue
+				}
+			}
+			IsNetworkattached, err := IsPodNetwork(pod, networkname)
 			if !IsNetworkattached {
 				if err != nil {
 					log.Error(err, "Error getting pod network", "network", networkname)
 					return nil, nil, err
 				}
 				log.Info("The pod is not having the network", "pod", pod.GetName(), "network", networkname)
-				netinfo, err = pc.AddPodNetworkAnnotations(pod, networkname, toDelete)
+				netinfo, err = AddPodNetworkAnnotations(pod, networkname, toDelete)
 				if err != nil {
 					log.Error(err, "Error in adding the network pod annotations")
 					return nil, nil, err
@@ -215,6 +234,15 @@ func configurePodSelectorDeployment(ln k8sv1alpha1.RoutingNetwork, sfcEntryPodLa
 				p.NetworkInfo = netinfo
 				p.Route = defaultRoute
 				pni = append(pni, p)
+			}
+			if toDelete != true {
+				kubecli := &kube.Kube{KClient: clientset}
+				key := SFCannotationTag
+				value := SFCcreated
+				err = kubecli.SetAnnotationOnPod(&pod, key, value)
+				if err != nil {
+					log.Error(err, "Error in Setting the SFC annotation")
+				}
 			}
 		}
 	}
@@ -384,8 +412,187 @@ func configureNetworkFromLabel(label string) (r k8sv1alpha1.RoutingNetwork, err 
 	return route, nil
 }
 
+func noSFCrequired(clientset *kubernetes.Clientset, podname string, podnamespace string) error {
+	pod, err := clientset.CoreV1().Pods(podnamespace).Get(podname, v1.GetOptions{})
+	if err != nil {
+		return fmt.Errorf("noSFCrequired - Error in getting the pod - %s clientset get options - %v", podname, err)
+	}
+
+	kubecli := &kube.Kube{KClient: clientset}
+	key := SFCannotationTag
+	value := SFCNotrequired
+	err = kubecli.SetAnnotationOnPod(pod, key, value)
+	if err != nil {
+		log.Error(err, "Error in Setting the SFC annotation")
+	}
+
+	log.Info("Pod SFC configuration is not required", "podname", podname)
+	return nil
+}
+
+func compareEachLabel(a map[string]string, b map[string]string) bool {
+	var isEqual bool
+	for akey, aValue := range a {
+		for bkey, bValue := range b {
+			fmt.Printf("akey-%v\n", akey)
+			fmt.Printf("aValue-%v\n", aValue)
+			fmt.Printf("bkey-%v\n", bkey)
+			fmt.Printf("bValue-%v\n", bValue)
+			if akey == bkey && aValue == bValue {
+				isEqual = true
+				break
+			}
+			if isEqual == true {
+				break
+			}
+		}
+	}
+
+	fmt.Printf("isEqual-%v", isEqual)
+	return isEqual
+}
+
+//ConfigureforSFC returns
+func ConfigureforSFC(podname string, podnamespace string) (bool, []PodNetworkInfo, []RoutingInfo, error) {
+	//var nl, pl, sfcname string
+	var sfcname string
+	var nl, pl map[string]string
+
+	// Get a config to talk to the apiserver
+	clientset, err := kube.GetKubeConfig()
+	if err != nil {
+		log.Error(err, "Error in kube clientset")
+		return false, nil, nil, fmt.Errorf("ConfigureforSFC - Error in kube clientset - %v", err)
+	}
+
+	k8sv1alpha1Clientset, err := kube.GetKubev1alpha1Config()
+	if err != nil {
+		log.Error(err, "Error in getting k8s v1alpha1 clientset")
+		return false, nil, nil, fmt.Errorf("ConfigureforSFC - Error in k8sv1alpha clientset - %v", err)
+	}
+
+	sfc, err := k8sv1alpha1Clientset.NetworkChainings("default").List(v1.ListOptions{})
+	if err != nil {
+		return false, nil, nil, fmt.Errorf("ConfigureforSFC - Error in listing the k8sv1alpha network chainings - %v", err)
+	}
+
+	pod, err := clientset.CoreV1().Pods(podnamespace).Get(podname, v1.GetOptions{})
+	if err != nil {
+		return false, nil, nil, fmt.Errorf("ConfigureforSFC - Error in getting the pod - %s clientset get options - %v", podname, err)
+	}
+
+	if pod.GetLabels() == nil {
+		err = noSFCrequired(clientset, podname, podnamespace)
+		if err != nil {
+			log.Error(err, "error in seting SFC not required")
+		}
+		return false, nil, nil, nil
+	}
+
+	//pdlabel := labels.Set(pod.GetLabels()).AsSelector().String()
+	pdlabel := pod.GetLabels()
+	log.Info("check the value", "pdlabel", pdlabel)
+
+	namespace, err := clientset.CoreV1().Namespaces().Get(podnamespace, v1.GetOptions{})
+	if err != nil {
+		return false, nil, nil, fmt.Errorf("ConfigureforSFC - Error in getting the pod namespace - %s clientset get options - %v", podnamespace, err)
+	}
+
+	if namespace.GetLabels() == nil {
+		err = noSFCrequired(clientset, podname, podnamespace)
+		if err != nil {
+			log.Error(err, "ConfigureforSFC - error in seting SFC not required")
+		}
+		return false, nil, nil, nil
+	}
+
+	if len(sfc.Items) == 0 {
+		log.Info("ConfigureforSFC - No SFC created", "podname", podname)
+		return false, nil, nil, nil
+	}
+
+	//pdnslabel := labels.Set(namespace.GetLabels()).AsSelector().String()
+	pdnslabel := namespace.GetLabels()
+	log.Info("check the value", "pdnslabel", pdnslabel)
+
+	var isSFCExist bool
+	for _, nc := range sfc.Items {
+		sfcname = nc.GetName()
+		log.Info("check the value", "sfcname", sfcname)
+		left := nc.Spec.RoutingSpec.LeftNetwork
+		log.Info("check the value", "left", left)
+		for _, l := range left {
+			//pl = labels.Set(l.PodSelector.MatchLabels).AsSelector().String()
+			pl = l.PodSelector.MatchLabels
+			log.Info("check the value", "pl", pl)
+			//nl = labels.Set(l.NamespaceSelector.MatchLabels).AsSelector().String()
+			nl = l.NamespaceSelector.MatchLabels
+			log.Info("check the value", "nl", nl)
+			log.Info("check the value", "pdlabel", pdlabel)
+			log.Info("check the value", "pdnslabel", pdnslabel)
+			//if pl == pdlabel && nl == pdnslabel {
+			//	isSFCExist = true
+			//	log.Info("check the value if 1 ", "isSFCExist", isSFCExist)
+			//	break
+			//}
+			if compareEachLabel(pl, pdlabel) && compareEachLabel(nl, pdnslabel) {
+				isSFCExist = true
+				log.Info("check the value if 1 ", "isSFCExist", isSFCExist)
+				break
+			}
+		}
+		//if pl == pdlabel && nl == pdnslabel {
+		//	isSFCExist = true
+		//	log.Info("check the value if 2 ", "isSFCExist", isSFCExist)
+		//	break
+		//}
+		if isSFCExist {
+			break
+		}
+	}
+
+	if isSFCExist == false {
+		log.Info("check the value if 3 ", "isSFCExist", isSFCExist)
+		return false, nil, nil, nil
+	}
+
+	log.Info("ConfigureforSFC - Pod SFC configuration is processing", "podname", podname)
+	cr, err := k8sv1alpha1Clientset.NetworkChainings("default").Get(sfcname, v1.GetOptions{})
+	if err != nil {
+		return false, nil, nil, fmt.Errorf("ConfigureforSFC - Error in getting the network chaining - %s k8sv1alpha1 clientset get options - %v", sfcname, err)
+	}
+
+	podnetworkList, routeList, err := CalculateRoutes(cr, false, true)
+	if err != nil {
+		return false, nil, nil, fmt.Errorf("ConfigureforSFC - Error in calculate routes for configuring pod for SFC - %v", err)
+	}
+
+	//if len(routeList) != 0 {
+	//	err = notif.SendRouteNotif(routeList, "create")
+	//	if err != nil {
+	//		log.Error(err, "ConfigureforSFC - Error Sending route Message")
+	//		return false, err
+	//	}
+	//}
+
+	//log.Info("ConfigureforSFC - length of the podnetworkList", "len(podnetworkList)", len(podnetworkList))
+	//log.Info("ConfigureforSFC - value of the podnetworkList", "podnetworkList", podnetworkList)
+
+	//if len(podnetworkList) != 0 {
+	//	err = notif.SendPodNetworkNotif(podnetworkList, "create")
+	//	if err != nil {
+	//		log.Error(err, "Error Sending pod network Message")
+	//		return false, err
+	//	}
+	//}
+
+	log.Info("Pod SFC configuration is successful", "podname", podname)
+
+	return true, podnetworkList, routeList, nil
+}
+
 // CalculateRoutes returns the routing info
-func CalculateRoutes(cr *k8sv1alpha1.NetworkChaining, cs bool) ([]PodNetworkInfo, []RoutingInfo, error) {
+func CalculateRoutes(cr *k8sv1alpha1.NetworkChaining, cs bool, onlyPodSelector bool) ([]PodNetworkInfo, []RoutingInfo, error) {
 	//
 	var deploymentList []string
 	var networkList []string
@@ -467,12 +674,14 @@ func CalculateRoutes(cr *k8sv1alpha1.NetworkChaining, cs bool) ([]PodNetworkInfo
 		ln = append(ln, r)
 	}
 
-	for i, deployment := range deploymentList {
-		r, err := calculateDeploymentRoutes(cr.Namespace, deployment, i, num, ln, rn, networkList, deploymentList)
-		if err != nil {
-			return nil, nil, err
+	if onlyPodSelector != true {
+		for i, deployment := range deploymentList {
+			r, err := calculateDeploymentRoutes(cr.Namespace, deployment, i, num, ln, rn, networkList, deploymentList)
+			if err != nil {
+				return nil, nil, err
+			}
+			chainRoutingInfo = append(chainRoutingInfo, r)
 		}
-		chainRoutingInfo = append(chainRoutingInfo, r)
 	}
 
 	log.Info("Value of podsNetworkInfo ", "podsNetworkInfo ", podsNetworkInfo)
@@ -746,4 +955,179 @@ func GetPidForContainer(id string) (int, error) {
 	}
 	return cj.State.Pid, nil
 
+}
+
+const (
+	nfnNetAnnotation = "k8s.plugin.opnfv.org/nfn-network"
+)
+
+type nfnNet struct {
+	Type      string                   "json:\"type\""
+	Interface []map[string]interface{} "json:\"interface\""
+}
+
+//IsPodNetwork return ...
+func IsPodNetwork(pod corev1.Pod, networkname string) (bool, error) {
+	log.Info("checking the pod network %s on pod %s", networkname, pod.GetName())
+	annotations := pod.GetAnnotations()
+	annotationsValue, result := annotations[nfnNetAnnotation]
+	if !result {
+		return false, nil
+	}
+
+	var nfn nfnNet
+	err := json.Unmarshal([]byte(annotationsValue), &nfn)
+	if err != nil {
+		log.Error(err, "Invalid nfn annotaion", "annotation", annotationsValue)
+		return false, err
+	}
+
+	if nfn.Type != "ovn4nfv" {
+		// to action required
+		return false, nil
+	}
+
+	var net ovn.NetInterface
+	for _, v := range nfn.Interface {
+		err := mapstructure.Decode(v, &net)
+		if err != nil {
+			log.Error(err, "mapstruct error", "network", v)
+			return false, err
+		}
+
+		if net.Name == networkname {
+			return true, nil
+		}
+	}
+
+	return false, nil
+}
+
+func buildNfnAnnotations(pod corev1.Pod, ifname, networkname string, toDelete bool) (string, error) {
+	var IsExtraInterfaces bool
+
+	annotations := pod.GetAnnotations()
+	_, result := annotations[ovn.Ovn4nfvAnnotationTag]
+	if result {
+		IsExtraInterfaces = true
+	} else {
+		// no ovnInterfaces annotations, create a new one
+		return "", nil
+	}
+
+	nfnInterface := ovn.NetInterface{
+		Name:      networkname,
+		Interface: ifname,
+	}
+
+	//code from here
+	var nfnInterfacemap map[string]interface{}
+	var nfnInterfaces []map[string]interface{}
+
+	rawByte, err := json.Marshal(nfnInterface)
+	if err != nil {
+		//handle error handle properly
+		return "", err
+	}
+
+	err = json.Unmarshal(rawByte, &nfnInterfacemap)
+	if err != nil {
+		return "", err
+	}
+
+	nfnInterfaces = append(nfnInterfaces, nfnInterfacemap)
+	nfn := &nfnNet{
+		Type:      "ovn4nfv",
+		Interface: nfnInterfaces,
+	}
+
+	//already ovnInterface annotations is there
+	ovnCtl, err := ovn.GetOvnController()
+	if err != nil {
+		return "", err
+	}
+
+	key, value := ovnCtl.AddLogicalPorts(&pod, nfn.Interface, IsExtraInterfaces)
+	if len(value) == 0 {
+		log.Info("Extra Annotations value is nil: key - %v | value - %v", key, value)
+		return "", fmt.Errorf("requested annotation value from the AddLogicalPorts() can't be empty")
+	}
+
+	if len(value) > 0 {
+		log.Info("Extra Annotations values key - %v | value - %v", key, value)
+	}
+
+	if !toDelete {
+		k, err := kube.GetKubeConfig()
+		if err != nil {
+			log.Error(err, "Error in kube clientset")
+			return "", fmt.Errorf("Error in getting kube clientset - %v", err)
+		}
+
+		kubecli := &kube.Kube{KClient: k}
+		err = kubecli.AppendAnnotationOnPod(&pod, key, value)
+		if err != nil {
+			return "", fmt.Errorf("error in the appending annotation in pod -%v", err)
+		}
+	}
+	//netinformation already appended into the pod annotation
+	appendednetinfo := strings.ReplaceAll(value, "\\", "")
+
+	return appendednetinfo, nil
+}
+
+//AddPodNetworkAnnotations returns ...
+func AddPodNetworkAnnotations(pod corev1.Pod, networkname string, toDelete bool) (string, error) {
+	log.Info("checking the pod network %s on pod %s", networkname, pod.GetName())
+	annotations := pod.GetAnnotations()
+	sfcIfname := ovn.GetSFCNetworkIfname()
+	inet := sfcIfname()
+	annotationsValue, result := annotations[nfnNetAnnotation]
+	if !result {
+		// no nfn-network annotations, create a new one
+		networkInfo, err := buildNfnAnnotations(pod, inet, networkname, toDelete)
+		if err != nil {
+			return "", err
+		}
+		return networkInfo, nil
+	}
+
+	// nfn-network annotations exist, but have to find the interface names to
+	// avoid the conflict with the inteface name
+	var nfn nfnNet
+	err := json.Unmarshal([]byte(annotationsValue), &nfn)
+	if err != nil {
+		log.Error(err, "Invalid nfn annotaion", "annotation", annotationsValue)
+		return "", err
+	}
+
+	//Todo for external controller
+	//if nfn.Type != "ovn4nfv" {
+	// no nfn-network annotations for the type ovn4nfv, create a new one
+	//	return "", nil
+	//}
+
+	// nfn-network annotations exist and type is ovn4nfv
+	// check the additional network interfaces names.
+	var net ovn.NetInterface
+
+	for _, v := range nfn.Interface {
+		err := mapstructure.Decode(v, &net)
+		if err != nil {
+			log.Error(err, "mapstruct error", "network", v)
+			return "", err
+		}
+
+		if net.Interface == inet {
+			inet = sfcIfname()
+		}
+	}
+
+	// set pod annotation with nfn-intefaces
+	// In this case, we already have annotation.
+	networkInfo, err := buildNfnAnnotations(pod, inet, networkname, toDelete)
+	if err != nil {
+		return "", err
+	}
+	return networkInfo, nil
 }

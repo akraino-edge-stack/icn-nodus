@@ -6,11 +6,13 @@ import (
 	"fmt"
 	"ovn4nfv-k8s-plugin/internal/pkg/kube"
 	"ovn4nfv-k8s-plugin/internal/pkg/ovn"
-	"strings"
 
-	"github.com/mitchellh/mapstructure"
+	notif "ovn4nfv-k8s-plugin/internal/pkg/nfnNotify"
+	chaining "ovn4nfv-k8s-plugin/internal/pkg/utils"
+
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -60,14 +62,51 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	// Define Predicates On Create and Update function
 	p := predicate.Funcs{
 		UpdateFunc: func(e event.UpdateEvent) bool {
-			annotaion := e.MetaNew.GetAnnotations()
+			annotation := e.MetaNew.GetAnnotations()
 			// The object doesn't contain annotation ,nfnNetworkAnnotation so the event will be
 			// ignored.
-			if _, ok := annotaion[nfnNetworkAnnotation]; !ok {
-				return false
-			}
+			//if _, ok := annotation[nfnNetworkAnnotation]; !ok {
+			//	return false
+			//}
 			// If pod is already processed by OVN don't add event
-			if _, ok := annotaion[ovn.Ovn4nfvAnnotationTag]; ok {
+			if _, ok := annotation[ovn.Ovn4nfvAnnotationTag]; ok {
+				obj, ok := e.ObjectNew.(*corev1.Pod)
+				if !ok {
+					return false
+				}
+
+				if obj.Status.Phase == corev1.PodRunning {
+					log.V(1).Info("Pod Status Phase", "Pod name", obj.GetName(), "obj.Status.Phase", obj.Status.Phase)
+					value, ok := annotation[chaining.SFCannotationTag]
+					if !ok {
+						result, pni, ri, err := chaining.ConfigureforSFC(obj.GetName(), obj.GetNamespace())
+						if err != nil {
+							log.Error(err, "Error in configureforSFC")
+						}
+						if result == false && err == nil {
+							log.Info("No Configuring required for the pod", "Podname", obj.GetName())
+						}
+						if len(ri) != 0 {
+							err = notif.SendRouteNotif(ri, "create")
+							if err != nil {
+								log.Error(err, "ConfigureforSFC - Error Sending route Message")
+							}
+						}
+
+						log.Info("ConfigureforSFC - length of the podnetworkList", "len(podnetworkList)", len(pni))
+						log.Info("ConfigureforSFC - value of the podnetworkList", "podnetworkList", pni)
+
+						if len(pni) != 0 {
+							err = notif.SendPodNetworkNotif(pni, "create")
+							if err != nil {
+								log.Error(err, "Error Sending pod network Message")
+							}
+						}
+
+						return false
+					}
+					log.Info("SFC already configured for the pod", "Podname", obj.GetName(), "sfc annotation value", value)
+				}
 				return false
 			}
 			return true
@@ -161,6 +200,12 @@ func (r *ReconcilePod) Reconcile(request reconcile.Request) (reconcile.Result, e
 		// Requeue the object
 		return reconcile.Result{}, err
 	}
+
+	err = r.checkforsfc(instance)
+	if err != nil {
+		// Requeue the object
+		return reconcile.Result{}, err
+	}
 	reqLogger.Info("Exit Reconciling Pod")
 	return reconcile.Result{}, nil
 }
@@ -174,6 +219,24 @@ func (r *ReconcilePod) setPodAnnotation(pod *corev1.Pod, key, value string) erro
 		log.Error(err, "Updating pod failed", "pod", pod, "key", key, "value", value)
 		return err
 	}
+	return nil
+}
+
+func (r *ReconcilePod) checkforsfc(pod *corev1.Pod) error {
+
+	// Get a config to talk to the apiserver
+	k, err := kube.GetKubeConfig()
+	if err != nil {
+		log.Error(err, "Error in kube clientset")
+		return err
+	}
+
+	p, err := k.CoreV1().Pods(pod.GetNamespace()).Get(pod.GetName(), v1.GetOptions{})
+	if err != nil {
+		return err
+	}
+
+	log.Info("Status of the pod", "Pod name", p.GetName(), "status", p.Status.Phase)
 	return nil
 }
 
@@ -235,170 +298,4 @@ func (r *ReconcilePod) readPodAnnotation(pod *corev1.Pod) (*nfnNetwork, error) {
 		return nil, err
 	}
 	return &nfn, nil
-}
-
-//IsPodNetwork return ...
-func IsPodNetwork(pod corev1.Pod, networkname string) (bool, error) {
-	log.Info("checking the pod network %s on pod %s", networkname, pod.GetName())
-	annotations := pod.GetAnnotations()
-	annotationsValue, result := annotations[nfnNetworkAnnotation]
-	if !result {
-		return false, nil
-	}
-
-	var nfn nfnNetwork
-	err := json.Unmarshal([]byte(annotationsValue), &nfn)
-	if err != nil {
-		log.Error(err, "Invalid nfn annotaion", "annotation", annotationsValue)
-		return false, err
-	}
-
-	if nfn.Type != "ovn4nfv" {
-		// to action required
-		return false, nil
-	}
-
-	var net ovn.NetInterface
-	for _, v := range nfn.Interface {
-		err := mapstructure.Decode(v, &net)
-		if err != nil {
-			log.Error(err, "mapstruct error", "network", v)
-			return false, err
-		}
-
-		if net.Name == networkname {
-			return true, nil
-		}
-	}
-
-	return false, nil
-}
-
-func buildNfnAnnotations(pod corev1.Pod, ifname, networkname string, toDelete bool) (string, error) {
-	var IsExtraInterfaces bool
-
-	annotations := pod.GetAnnotations()
-	_, result := annotations[ovn.Ovn4nfvAnnotationTag]
-	if result {
-		IsExtraInterfaces = true
-	} else {
-		// no ovnInterfaces annotations, create a new one
-		return "", nil
-	}
-
-	nfnInterface := ovn.NetInterface{
-		Name:      networkname,
-		Interface: ifname,
-	}
-
-	//code from here
-	var nfnInterfacemap map[string]interface{}
-	var nfnInterfaces []map[string]interface{}
-
-	rawByte, err := json.Marshal(nfnInterface)
-	if err != nil {
-		//handle error handle properly
-		return "", err
-	}
-
-	err = json.Unmarshal(rawByte, &nfnInterfacemap)
-	if err != nil {
-		return "", err
-	}
-
-	nfnInterfaces = append(nfnInterfaces, nfnInterfacemap)
-	nfn := &nfnNetwork{
-		Type:      "ovn4nfv",
-		Interface: nfnInterfaces,
-	}
-
-	//already ovnInterface annotations is there
-	ovnCtl, err := ovn.GetOvnController()
-	if err != nil {
-		return "", err
-	}
-
-	key, value := ovnCtl.AddLogicalPorts(&pod, nfn.Interface, IsExtraInterfaces)
-	if len(value) == 0 {
-		log.Info("Extra Annotations value is nil: key - %v | value - %v", key, value)
-		return "", fmt.Errorf("requested annotation value from the AddLogicalPorts() can't be empty")
-	}
-
-	if len(value) > 0 {
-		log.Info("Extra Annotations values key - %v | value - %v", key, value)
-	}
-
-	if !toDelete {
-		k, err := kube.GetKubeConfig()
-		if err != nil {
-			log.Error(err, "Error in kube clientset")
-			return "", fmt.Errorf("Error in getting kube clientset - %v", err)
-		}
-
-		kubecli := &kube.Kube{KClient: k}
-		err = kubecli.AppendAnnotationOnPod(&pod, key, value)
-		if err != nil {
-			return "", fmt.Errorf("error in the appending annotation in pod -%v", err)
-		}
-	}
-	//netinformation already appended into the pod annotation
-	appendednetinfo := strings.ReplaceAll(value, "\\", "")
-
-	return appendednetinfo, nil
-}
-
-//AddPodNetworkAnnotations returns ...
-func AddPodNetworkAnnotations(pod corev1.Pod, networkname string, toDelete bool) (string, error) {
-	log.Info("checking the pod network %s on pod %s", networkname, pod.GetName())
-	annotations := pod.GetAnnotations()
-	sfcIfname := ovn.GetSFCNetworkIfname()
-	inet := sfcIfname()
-	annotationsValue, result := annotations[nfnNetworkAnnotation]
-	if !result {
-		// no nfn-network annotations, create a new one
-		networkInfo, err := buildNfnAnnotations(pod, inet, networkname, toDelete)
-		if err != nil {
-			return "", err
-		}
-		return networkInfo, nil
-	}
-
-	// nfn-network annotations exist, but have to find the interface names to
-	// avoid the conflict with the inteface name
-	var nfn nfnNetwork
-	err := json.Unmarshal([]byte(annotationsValue), &nfn)
-	if err != nil {
-		log.Error(err, "Invalid nfn annotaion", "annotation", annotationsValue)
-		return "", err
-	}
-
-	//Todo for external controller
-	//if nfn.Type != "ovn4nfv" {
-	// no nfn-network annotations for the type ovn4nfv, create a new one
-	//	return "", nil
-	//}
-
-	// nfn-network annotations exist and type is ovn4nfv
-	// check the additional network interfaces names.
-	var net ovn.NetInterface
-
-	for _, v := range nfn.Interface {
-		err := mapstructure.Decode(v, &net)
-		if err != nil {
-			log.Error(err, "mapstruct error", "network", v)
-			return "", err
-		}
-
-		if net.Interface == inet {
-			inet = sfcIfname()
-		}
-	}
-
-	// set pod annotation with nfn-intefaces
-	// In this case, we already have annotation.
-	networkInfo, err := buildNfnAnnotations(pod, inet, networkname, toDelete)
-	if err != nil {
-		return "", err
-	}
-	return networkInfo, nil
 }

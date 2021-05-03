@@ -174,7 +174,7 @@ func (r *ReconcileNetworkChaining) createChain(cr *k8sv1alpha1.NetworkChaining, 
 
 	switch {
 	case cr.Spec.ChainType == "Routing":
-		podnetworkList, routeList, err := chaining.CalculateRoutes(cr, false)
+		podnetworkList, routeList, err := chaining.CalculateRoutes(cr, false, false)
 		if err != nil {
 			return err
 		}
@@ -222,7 +222,7 @@ func (r *ReconcileNetworkChaining) deleteChain(cr *k8sv1alpha1.NetworkChaining, 
 
 	switch {
 	case cr.Spec.ChainType == "Routing":
-		podnetworkList, routeList, err := chaining.CalculateRoutes(cr, true)
+		podnetworkList, routeList, err := chaining.CalculateRoutes(cr, true, false)
 		if err != nil {
 			return err
 		}

@@ -52,7 +52,7 @@ type RoutingInfo struct {
 	Id                   string              // Container ID for pod
 	Node                 string              // Hostname where Pod is scheduled
 	LeftNetworkRoute     []k8sv1alpha1.Route // TODO: Update to support multiple networks
-	RightNetworkRoute    k8sv1alpha1.Route   // TODO: Update to support multiple networks
+	RightNetworkRoute    []k8sv1alpha1.Route // TODO: Update to support multiple networks
 	DynamicNetworkRoutes []k8sv1alpha1.Route
 }
 
@@ -70,8 +70,10 @@ const (
 	// Ovn4nfvAnnotationTag tag on already processed Pods
 	SFCannotationTag = "k8s.plugin.opnfv.org/sfc"
 	SFCcreated       = "created"
-	SFCprocessing    = "proccessing"
+	SFCprocessing    = "processing"
 	SFCNotrequired   = "notrequired"
+	SFCHead          = "sfchead"
+	SFCTail          = "sfctail"
 )
 
 //IsEmpty return true or false
@@ -80,10 +82,11 @@ func (r RoutingInfo) IsEmpty() bool {
 }
 
 //configurePodSelectorDeployment
-func configurePodSelectorDeployment(ln k8sv1alpha1.RoutingNetwork, sfcEntryPodLabel string, toDelete bool, mode string, networklabel string) ([]RoutingInfo, []PodNetworkInfo, error) {
+func configurePodSelectorDeployment(ln k8sv1alpha1.RoutingNetwork, sfcEntryPodLabel string, toDelete bool, mode string, networklabel string, sfcposition string, dst []string) ([]RoutingInfo, []PodNetworkInfo, error) {
 	var rt []RoutingInfo
 	var pni []PodNetworkInfo
 	var networkname string
+	var defaultRoute k8sv1alpha1.Route
 
 	// Get a config to talk to the apiserver
 	clientset, err := kube.GetKubeConfig()
@@ -144,10 +147,19 @@ func configurePodSelectorDeployment(ln k8sv1alpha1.RoutingNetwork, sfcEntryPodLa
 		return nil, nil, err
 	}
 
-	//Add Default Route based on Right Network
-	defaultRoute := k8sv1alpha1.Route{
-		GW:  sfcEntryIP,
-		Dst: "0.0.0.0",
+	if sfcposition == SFCHead {
+		subnet := dst[0]
+		//Add Default Route based on Right Network
+		defaultRoute = k8sv1alpha1.Route{
+			GW:  sfcEntryIP,
+			Dst: subnet,
+		}
+	}
+
+	if sfcposition == SFCTail {
+		for _, d := range dst {
+			log.Info("list the sfc tail route", "dst", d, "gw", sfcEntryIP)
+		}
 	}
 
 	nsLabel := labels.Set(ln.NamespaceSelector.MatchLabels)
@@ -157,13 +169,17 @@ func configurePodSelectorDeployment(ln k8sv1alpha1.RoutingNetwork, sfcEntryPodLa
 		return nil, nil, err
 	}
 
+	log.Info("Value of the nslabel", "nslabel", nsLabel)
+	log.Info("Value of the nslabel", "nslist", nslist)
 	for _, ns := range nslist.Items {
 		if ns.GetLabels() == nil {
 			log.Info("The namespace label is empty", "namespace", ns.GetName())
 			continue
 		}
 
+		log.Info("Value of the ns.GetLabels", "ns.GetLabels()", ns.GetLabels())
 		set := labels.Set(ns.GetLabels())
+		log.Info("Value of the nslabel", "set", set)
 		pods, err := clientset.CoreV1().Pods(ns.GetName()).List(v1.ListOptions{LabelSelector: set.AsSelector().String()})
 		if err != nil {
 			log.Error(err, "Error in kube clientset in listing the pods for namespace", "namespace", ns.GetName())
@@ -173,6 +189,8 @@ func configurePodSelectorDeployment(ln k8sv1alpha1.RoutingNetwork, sfcEntryPodLa
 		for _, pod := range pods.Items {
 			var IsNetworkattached bool
 			var netinfo string
+
+			log.Info("Value of the pod", "pod", pod.GetName())
 
 			if toDelete != true {
 				annotation := pod.GetAnnotations()
@@ -200,7 +218,9 @@ func configurePodSelectorDeployment(ln k8sv1alpha1.RoutingNetwork, sfcEntryPodLa
 				r.Namespace = pod.GetNamespace()
 				r.Name = pod.GetName()
 				r.Node = pod.Spec.NodeName
-				r.DynamicNetworkRoutes = append(r.DynamicNetworkRoutes, defaultRoute)
+				if sfcposition == SFCHead {
+					r.DynamicNetworkRoutes = append(r.DynamicNetworkRoutes, defaultRoute)
+				}
 				rt = append(rt, r)
 			} else {
 				var p PodNetworkInfo
@@ -209,7 +229,9 @@ func configurePodSelectorDeployment(ln k8sv1alpha1.RoutingNetwork, sfcEntryPodLa
 				p.Name = pod.GetName()
 				p.Node = pod.Spec.NodeName
 				p.NetworkInfo = netinfo
-				p.Route = defaultRoute
+				if sfcposition == SFCHead {
+					p.Route = defaultRoute
+				}
 				pni = append(pni, p)
 			}
 			if toDelete != true {
@@ -276,18 +298,36 @@ func calculateDeploymentRoutes(namespace, label string, pos int, num int, ln []k
 	}
 
 	// Calcluate IP addresses for next neighbours on right sides
-	if pos == num-1 {
-		nextRightIP = rn[0].GatewayIP
-	} else {
-		name := strings.Split(deploymentList[pos+1], "=")
-		nextRightIP, err = ovn.GetIPAdressForPod(networkList[pos], name[1])
-		if err != nil {
-			return RoutingInfo{}, err
+	for _, right := range rn {
+		var routeinfo k8sv1alpha1.Route
+		if pos == num-1 {
+			nextRightIP = right.GatewayIP
+		} else {
+			name := strings.Split(deploymentList[pos+1], "=")
+			nextRightIP, err = ovn.GetIPAdressForPod(networkList[pos], name[1])
+			if err != nil {
+				return RoutingInfo{}, err
+			}
 		}
+		routeinfo.Dst = right.Subnet
+		routeinfo.GW = nextRightIP
+		r.RightNetworkRoute = append(r.RightNetworkRoute, routeinfo)
 	}
+
+	// Calcluate IP addresses for next neighbours on right sides
+	//if pos == num-1 {
+	//	nextRightIP = rn[0].GatewayIP
+	//} else {
+	//	name := strings.Split(deploymentList[pos+1], "=")
+	//	nextRightIP, err = ovn.GetIPAdressForPod(networkList[pos], name[1])
+	//	if err != nil {
+	//		return RoutingInfo{}, err
+	//	}
+	//}
 	// Calcuate left right Route to be inserted in Pod
-	r.RightNetworkRoute.Dst = rn[0].Subnet
-	r.RightNetworkRoute.GW = nextRightIP
+	//r.RightNetworkRoute.Dst = rn[0].Subnet
+	//r.RightNetworkRoute.GW = nextRightIP
+
 	// For each network that is not adjacent add route
 	for i := 0; i < len(networkList); i++ {
 		if i == pos || i == pos-1 {
@@ -509,6 +549,11 @@ func ConfigureforSFC(podname string, podnamespace string) (bool, []PodNetworkInf
 	return true, podnetworkList, routeList, nil
 }
 
+func calculateDstforTail(cr *k8sv1alpha1.NetworkChaining) ([]string, error) {
+
+	return nil, nil
+}
+
 // CalculateRoutes returns the routing info
 func CalculateRoutes(cr *k8sv1alpha1.NetworkChaining, cs bool, onlyPodSelector bool) ([]PodNetworkInfo, []RoutingInfo, error) {
 	var deploymentList []string
@@ -544,14 +589,19 @@ func CalculateRoutes(cr *k8sv1alpha1.NetworkChaining, cs bool, onlyPodSelector b
 
 	var chainRoutingInfo []RoutingInfo
 	var lnRoutingInfo []RoutingInfo
+	var rnRoutingInfo []RoutingInfo
 	var podsNetworkInfo []PodNetworkInfo
+	var dst []string
 	//var rnRoutingInfo []RoutingInfo
 
 	for _, leftNetworks := range cr.Spec.RoutingSpec.LeftNetwork {
 		var r []RoutingInfo
 		var pni []PodNetworkInfo
 
-		r, pni, err := configurePodSelectorDeployment(leftNetworks, deploymentList[0], cs, mode, sfcheadlabel)
+		//For the sfc head dst will be default
+		dst = append(dst, "0.0.0.0")
+
+		r, pni, err := configurePodSelectorDeployment(leftNetworks, deploymentList[0], cs, mode, sfcheadlabel, SFCHead, dst)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -562,21 +612,44 @@ func CalculateRoutes(cr *k8sv1alpha1.NetworkChaining, cs bool, onlyPodSelector b
 
 	chainRoutingInfo = append(chainRoutingInfo, lnRoutingInfo...)
 
+	if mode == k8sv1alpha1.VirutalMode {
+		l, err := configureNetworkFromLabel(sfcheadlabel)
+		if err != nil {
+			return nil, nil, err
+		}
+		ln = append(ln, l)
+
+		r, err := configureNetworkFromLabel(sfctaillabel)
+		if err != nil {
+			return nil, nil, err
+		}
+		rn = append(rn, r)
+	}
+
 	for _, rightNetworks := range cr.Spec.RoutingSpec.RightNetwork {
 		log.Info("Display the rn", "GatewayIP", rightNetworks.GatewayIP)
 		log.Info("Display the rn", "NetworkName", rightNetworks.NetworkName)
 		log.Info("Display the rn", "Subnet", rightNetworks.Subnet)
 		log.Info("Display the rn", "PodSelector.MatchLabels", rightNetworks.PodSelector.MatchLabels)
 		log.Info("Display the rn", "NamespaceSelector.MatchLabels", rightNetworks.NamespaceSelector.MatchLabels)
-	}
+		var r []RoutingInfo
+		var pni []PodNetworkInfo
 
-	if mode == k8sv1alpha1.VirutalMode {
-		r, err := configureNetworkFromLabel(sfcheadlabel)
+		//For the sfc tail dst will be all right network subnet
+		for _, net := range rn {
+			dst = append(dst, net.Subnet)
+		}
+
+		r, pni, err := configurePodSelectorDeployment(rightNetworks, deploymentList[num-1], cs, mode, sfctaillabel, SFCTail, dst)
 		if err != nil {
 			return nil, nil, err
 		}
-		ln = append(ln, r)
+
+		rnRoutingInfo = append(rnRoutingInfo, r...)
+		podsNetworkInfo = append(podsNetworkInfo, pni...)
 	}
+
+	chainRoutingInfo = append(chainRoutingInfo, lnRoutingInfo...)
 
 	if onlyPodSelector != true {
 		for i, deployment := range deploymentList {

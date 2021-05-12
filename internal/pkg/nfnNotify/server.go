@@ -312,13 +312,20 @@ func SendRouteNotif(chainRoutingInfo []chaining.RoutingInfo, msgType string) err
 			ins.Route = append(ins.Route, rt)
 		}
 
-		if !r.RightNetworkRoute.IsEmpty() {
+		for _, rn := range r.RightNetworkRoute {
 			rt := &pb.RouteData{
-				Dst: r.RightNetworkRoute.Dst,
-				Gw:  r.RightNetworkRoute.GW,
+				Dst: rn.Dst,
+				Gw:  rn.GW,
 			}
 			ins.Route = append(ins.Route, rt)
 		}
+		//if !r.RightNetworkRoute.IsEmpty() {
+		//	rt := &pb.RouteData{
+		//		Dst: r.RightNetworkRoute.Dst,
+		//		Gw:  r.RightNetworkRoute.GW,
+		//	}
+		//	ins.Route = append(ins.Route, rt)
+		//}
 
 		for _, d := range r.DynamicNetworkRoutes {
 			if !d.IsEmpty() {
@@ -368,13 +375,21 @@ func SendDeleteRouteNotif(chainRoutingInfo []chaining.RoutingInfo, msgType strin
 			rve.Route = append(rve.Route, rt)
 		}
 
-		if !r.RightNetworkRoute.IsEmpty() {
+		for _, rn := range r.RightNetworkRoute {
 			rt := &pb.RouteData{
-				Dst: r.RightNetworkRoute.Dst,
-				Gw:  r.RightNetworkRoute.GW,
+				Dst: rn.Dst,
+				Gw:  rn.GW,
 			}
 			rve.Route = append(rve.Route, rt)
 		}
+
+		//if !r.RightNetworkRoute.IsEmpty() {
+		//	rt := &pb.RouteData{
+		//		Dst: r.RightNetworkRoute.Dst,
+		//		Gw:  r.RightNetworkRoute.GW,
+		//	}
+		//	rve.Route = append(rve.Route, rt)
+		//}
 
 		for _, d := range r.DynamicNetworkRoutes {
 			if !d.IsEmpty() {

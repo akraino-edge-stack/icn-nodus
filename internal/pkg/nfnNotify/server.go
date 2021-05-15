@@ -290,9 +290,9 @@ func sendMsg(msg pb.Notification, labels string, option string, nodeReq string) 
 func SendRouteNotif(chainRoutingInfo []chaining.RoutingInfo, msgType string) error {
 	var msg pb.Notification
 	var err error
-	var ins pb.ContainerRouteInsert
 
 	for _, r := range chainRoutingInfo {
+		var ins pb.ContainerRouteInsert
 		ins.ContainerId = r.Id
 		ins.Route = nil
 
@@ -361,9 +361,9 @@ func SendRouteNotif(chainRoutingInfo []chaining.RoutingInfo, msgType string) err
 func SendDeleteRouteNotif(chainRoutingInfo []chaining.RoutingInfo, msgType string) error {
 	var msg pb.Notification
 	var err error
-	var rve pb.ContainerRouteRemove
 
 	for _, r := range chainRoutingInfo {
+		var rve pb.ContainerRouteRemove
 		rve.ContainerId = r.Id
 		rve.Route = nil
 
@@ -424,9 +424,9 @@ func SendDeleteRouteNotif(chainRoutingInfo []chaining.RoutingInfo, msgType strin
 func SendPodNetworkNotif(pni []chaining.PodNetworkInfo, msgType string) error {
 	var msg pb.Notification
 	var err error
-	var add pb.PodAddNetwork
 
 	for _, p := range pni {
+		var add pb.PodAddNetwork
 		add.Pod = &pb.PodInfo{
 			Namespace: p.Namespace,
 			Name:      p.Name,
@@ -435,10 +435,20 @@ func SendPodNetworkNotif(pni []chaining.PodNetworkInfo, msgType string) error {
 		add.Net = &pb.NetConf{
 			Data: p.NetworkInfo,
 		}
-		add.Route = &pb.RouteData{
-			Dst: p.Route.Dst,
-			Gw:  p.Route.GW,
+
+		for _, d := range p.Route {
+			if !d.IsEmpty() {
+				rt := &pb.RouteData{
+					Dst: d.Dst,
+					Gw:  d.GW,
+				}
+				add.Route = append(add.Route, rt)
+			}
 		}
+		//add.Route = &pb.RouteData{
+		//	Dst: p.Route.Dst,
+		//	Gw:  p.Route.GW,
+		//}
 
 		if msgType == "create" {
 			msg = pb.Notification{
@@ -464,9 +474,9 @@ func SendPodNetworkNotif(pni []chaining.PodNetworkInfo, msgType string) error {
 func SendDeletePodNetworkNotif(pni []chaining.PodNetworkInfo, msgType string) error {
 	var msg pb.Notification
 	var err error
-	var rve pb.PodDelNetwork
 
 	for _, p := range pni {
+		var rve pb.PodDelNetwork
 		rve.Pod = &pb.PodInfo{
 			Namespace: p.Namespace,
 			Name:      p.Name,
@@ -475,10 +485,20 @@ func SendDeletePodNetworkNotif(pni []chaining.PodNetworkInfo, msgType string) er
 		rve.Net = &pb.NetConf{
 			Data: p.NetworkInfo,
 		}
-		rve.Route = &pb.RouteData{
-			Dst: p.Route.Dst,
-			Gw:  p.Route.GW,
+
+		for _, d := range p.Route {
+			if !d.IsEmpty() {
+				rt := &pb.RouteData{
+					Dst: d.Dst,
+					Gw:  d.GW,
+				}
+				rve.Route = append(rve.Route, rt)
+			}
 		}
+		//rve.Route = &pb.RouteData{
+		//	Dst: p.Route.Dst,
+		//	Gw:  p.Route.GW,
+		//}
 
 		if msgType == "delete" {
 			msg = pb.Notification{

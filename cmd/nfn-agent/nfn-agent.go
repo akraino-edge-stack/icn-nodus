@@ -300,7 +300,7 @@ func handleNotif(msg *pb.Notification) {
 			}
 
 			var route []*pb.RouteData
-			route = append(route, payload.PodAddNetwork.GetRoute())
+			route = append(route, payload.PodAddNetwork.GetRoute()...)
 			log.Info("route information from msg", "route", route)
 			err = chaining.ContainerAddRoute(pid, route)
 			if err != nil {
@@ -328,7 +328,7 @@ func handleNotif(msg *pb.Notification) {
 			}
 
 			var route []*pb.RouteData
-			route = append(route, payload.PodDelNetwork.GetRoute())
+			route = append(route, payload.PodDelNetwork.GetRoute()...)
 			log.Info("route information from msg", "route", route)
 			err = chaining.ContainerDelRoute(pid, route)
 			if err != nil {

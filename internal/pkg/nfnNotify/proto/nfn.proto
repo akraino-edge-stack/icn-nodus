@@ -78,14 +78,14 @@ message PodAddNetwork {
     string container_id = 1;
     PodInfo pod = 2;
     NetConf net = 3;
-    RouteData route = 4;
+    repeated RouteData route = 4;
 }
 
 message PodDelNetwork {
     string container_id = 1;
     PodInfo pod = 2;
     NetConf net = 3;
-    RouteData route = 4;
+    repeated RouteData route = 4;
 }
 
 message InSync {

@@ -1,6 +1,6 @@
-# Nodus
+# Nodus - Network Controller
 
-![nodus_logo](https://github.com/akraino-edge-stack/icn-ovn4nfv-k8s-network-controller/blob/master/images/nodus_logo.png) 
+![nodus_logo](https://github.com/akraino-edge-stack/icn-ovn4nfv-k8s-network-controller/blob/master/images/logo/nodus_logo.png) 
 
 This plugin addresses the below requirements, for networking
 workloads as well typical application workloads

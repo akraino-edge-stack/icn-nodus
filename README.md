@@ -1,6 +1,6 @@
 # Nodus - Network Controller
 
-![nodus_logo](https://github.com/akraino-edge-stack/icn-ovn4nfv-k8s-network-controller/blob/master/images/logo/nodus_logo.png) 
+![nodus_logo](https://github.com/akraino-edge-stack/icn-ovn4nfv-k8s-network-controller/blob/master/images/logo/nodus_logo.png)
 
 Nodus is Network controller in Kubernetes that address multiple network use case as below
 - Multi ovn network support
@@ -12,7 +12,7 @@ Nodus is Network controller in Kubernetes that address multiple network use case
 - SRIOV Overlay networking (WIP)
 - OVN load balancer (WIP)
 
-Nodus is latin word for "knot". Nodus convergence multiple kubernetes networking use cases in a single network controller.
+Nodus is latin word for "knot". Nodus converge multiple kubernetes networking use cases in a single network controller.
 
 ## How it works
 

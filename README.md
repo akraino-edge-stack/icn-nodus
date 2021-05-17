@@ -1,7 +1,5 @@
-# Nodus - Network Controller
-
 ![nodus_logo](https://github.com/akraino-edge-stack/icn-ovn4nfv-k8s-network-controller/blob/master/images/logo/nodus_logo.png)
-
+# Nodus - Network Controller
 Nodus is Network controller in Kubernetes that address multiple network use case as below
 - Multi ovn network support
 - Multi-interface ovn support

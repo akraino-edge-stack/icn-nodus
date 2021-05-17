@@ -2,8 +2,7 @@
 
 ![nodus_logo](https://github.com/akraino-edge-stack/icn-ovn4nfv-k8s-network-controller/blob/master/images/logo/nodus_logo.png) 
 
-This plugin addresses the below requirements, for networking
-workloads as well typical application workloads
+Nodus is Network controller in Kubernetes that address multiple network use case as below
 - Multi ovn network support
 - Multi-interface ovn support
 - Multi-IP address support
@@ -12,6 +11,8 @@ workloads as well typical application workloads
 - Service Function chaining(SFC) support in Kubernetes
 - SRIOV Overlay networking (WIP)
 - OVN load balancer (WIP)
+
+Nodus is latin word for "knot". Nodus convergence multiple kubernetes networking use cases in a single network controller.
 
 ## How it works
 

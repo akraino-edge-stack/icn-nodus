@@ -16,8 +16,8 @@ type NetworkChainingSpec struct {
 }
 
 type RouteSpec struct {
-	LeftNetwork  []RoutingNetwork `json:"leftNetwork"`  // Info on Network on the left side
-	RightNetwork []RoutingNetwork `json:"rightNetwork"` // Info on Network on the right side
+	LeftNetwork  []RoutingNetwork `json:"left"`         // Info on Network on the left side
+	RightNetwork []RoutingNetwork `json:"right"`        // Info on Network on the right side
 	NetworkChain string           `json:"networkChain"` // NetworkChain is a comma seprated list with format DeploymentName, middle Network Name, DeploymentName, ...
 	Namespace    string           `json:"namespace"`    // Kubernetes namespace
 }

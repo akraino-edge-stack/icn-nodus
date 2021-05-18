@@ -8,7 +8,7 @@ spec:
   routingSpec:
     namespace: "default"
     networkChain: "net=virutal-net1,app=slb,dync-net1,app=ngfw,dync-net2,app=sdewan,net=virutal-net2"
-    leftNetwork:
+    left:
     - networkName: "left-pnetwork"
       gatewayIp: "172.30.10.2"
       subnet: "172.30.10.0/24"
@@ -18,7 +18,7 @@ spec:
       namespaceSelector:
         matchLabels:
           sfc: head
-    rightNetwork:
+    right:
     - networkName: "right-pnetwork"
       gatewayIp: "172.30.20.2"
       subnet: "172.30.20.0/24"

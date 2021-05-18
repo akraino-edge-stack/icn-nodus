@@ -1,0 +1,30 @@
+apiVersion: k8s.plugin.opnfv.org/v1alpha1
+kind: NetworkChaining
+metadata:
+  name: scenarios-1
+spec:
+  # Add fields here
+  chainType: "routing"
+   routingSpec:
+    namespace: "default"
+    networkChain: "app=slb,net=dync-net1,app=ngfw,net=dync-net2,app=sdewan"
+    left:
+      - podSelector:
+        matchLabels:
+          app: nginx
+      namespaceSelector:
+        matchLabels:
+          app: nginx
+     networkrepresentator:
+         gatewayip: "<ipaddress>"
+         subnet: "<ipaddress>"
+    right:
+      - podSelector:
+        matchLabels:
+          app: busybox
+        namespaceSelector:
+        matchLabels:
+          app: busybox
+      networkrepresentator:
+         gatewayip: "<ipaddress>"
+         subnet: "<ipaddress>"

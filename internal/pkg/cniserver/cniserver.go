@@ -15,7 +15,6 @@ import (
 
 	"ovn4nfv-k8s-plugin/internal/pkg/config"
 
-	"github.com/containernetworking/cni/pkg/types"
 	"github.com/gorilla/mux"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	utilwait "k8s.io/apimachinery/pkg/util/wait"
@@ -39,7 +38,7 @@ type CNIServerRequest struct {
 	SandboxID    string
 	Netns        string
 	IfName       string
-	CNIConf      *types.NetConf
+	CNIConf      *config.NetConf
 }
 
 type cniServerRequestFunc func(request *CNIServerRequest, k8sclient kubernetes.Interface) ([]byte, error)

@@ -71,6 +71,12 @@ type KubernetesConfig struct {
 	Kubeconfig string `gcfg:"kubeconfig"`
 }
 
+// NetConf adds ovn4nfv plugin-specific fields to types.NetConf
+type NetConf struct {
+	types.NetConf
+	NFNNetwork string `json:"nfn-network",omitempty`
+}
+
 // Config is used to read the structured config file and to cache config in testcases
 type config struct {
 	Default    DefaultConfig
@@ -289,14 +295,14 @@ func NewClientset(conf *KubernetesConfig) (*kubernetes.Clientset, error) {
 	return kubernetes.NewForConfig(kconfig)
 }
 
-func ConfigureNetConf(bytes []byte) (*types.NetConf, error) {
-	conf := &types.NetConf{}
+func ConfigureNetConf(bytes []byte) (*NetConf, error) {
+	conf := &NetConf{}
 	if err := json.Unmarshal(bytes, conf); err != nil {
 		return nil, fmt.Errorf("failed to load netconf: %v", err)
 	}
 
 	if conf.RawPrevResult != nil {
-		if err := version.ParsePrevResult(conf); err != nil {
+		if err := version.ParsePrevResult(&conf.NetConf); err != nil {
 			return nil, err
 		}
 	}

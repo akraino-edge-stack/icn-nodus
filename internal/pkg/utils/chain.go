@@ -720,7 +720,7 @@ func ContainerAddInteface(containerPid int, payload *pb.PodAddNetwork) error {
 		CNIConf:      nil,
 	}
 
-	result := cnishimreq.AddMultipleInterfaces(podnetconf.Data, podinfo.Namespace, podinfo.Name)
+	result := cnishimreq.AddMultipleInterfaces("", podnetconf.Data, podinfo.Namespace, podinfo.Name)
 	if result == nil {
 		return fmt.Errorf("result is nil from cni server for adding interface in the existing pod")
 	}

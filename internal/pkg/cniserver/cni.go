@@ -22,8 +22,33 @@ import (
 )
 
 const (
+	nfnNetworkAnnotationTag = "k8s.plugin.opnfv.org/nfn-network"
 	ovn4nfvAnnotationTag = "k8s.plugin.opnfv.org/ovnInterfaces"
 )
+
+type nfnNetwork struct {
+       Type      string `json:"type"`
+       Interface []struct {
+               Interface      string `json:"interface"`
+               Name           string `json:"name"`
+               DefaultGateway string `json:"defaultGateway"`
+               IPAddress      string `json:"ipAddress"`
+       } `json:"interface"`
+}
+
+func parseNfnNetworkObject(nfnnetwork string) (*nfnNetwork, error) {
+       var nfnNet nfnNetwork
+
+       if nfnnetwork == "" {
+               return nil, fmt.Errorf("parseNfnNetworkObject:error")
+       }
+
+       if err := json.Unmarshal([]byte(nfnnetwork), &nfnNet); err != nil {
+               return nil, fmt.Errorf("parseNfnNetworkObject: failed to load nfn network err: %v | nfn network: %v", err, nfnnetwork)
+       }
+
+       return &nfnNet, nil
+}
 
 func parseOvnNetworkObject(ovnnetwork string) ([]map[string]string, error) {
 	var ovnNet []map[string]string
@@ -91,9 +116,18 @@ func isNotFoundError(err error) bool {
 	return ok && statusErr.Status().Code == http.StatusNotFound
 }
 
-func (cr *CNIServerRequest) AddMultipleInterfaces(ovnAnnotation, namespace, podName string) types.Result {
+func (cr *CNIServerRequest) AddMultipleInterfaces(nfnAnnotation, ovnAnnotation, namespace, podName string) types.Result {
 	klog.Infof("ovn4nfvk8s-cni: addMultipleInterfaces ovn annotation %v namespace %v podName %v", ovnAnnotation, namespace, podName)
-	var ovnAnnotatedMap []map[string]string
+	var nfnNetworks *nfnNetwork
+	if cr.CNIConf.NFNNetwork != "" {
+		var err error
+		nfnNetworks, err = parseNfnNetworkObject(nfnAnnotation)
+		if err != nil {
+			klog.Infof("addMultipleInterfaces : Error Parsing Nfn Network Annotation %v %v", nfnNetworks, err)
+			klog.Errorf("addMultipleInterfaces : Error Parsing Nfn Network Annotation %v %v", nfnNetworks, err)
+			return nil
+		}
+	}
 	ovnAnnotatedMap, err := parseOvnNetworkObject(ovnAnnotation)
 	if err != nil {
 		klog.Infof("addLogicalPort : Error Parsing Ovn Network List %v %v", ovnAnnotatedMap, err)
@@ -144,6 +178,24 @@ func (cr *CNIServerRequest) AddMultipleInterfaces(ovnAnnotation, namespace, podN
 
 		if interfaceName == "*" && cr.IfName != "eth0" {
 			defaultGateway = "false"
+		}
+
+		if cr.CNIConf.NFNNetwork != "" {
+			var interfaceName string
+			for _, nfnInterface := range nfnNetworks.Interface {
+				if cr.CNIConf.NFNNetwork == nfnInterface.Name {
+					interfaceName = nfnInterface.Interface
+					break
+				}
+			}
+			if interfaceName == "" {
+				klog.Errorf("addMultipleInterfaces: error finding nfn network")
+				return nil
+			}
+			if ovnNet["interface"] != interfaceName {
+				klog.Infof("addMultipleInterfaces: skipping interface %v (requested %v)", ovnNet["interface"], interfaceName);
+				continue
+			}
 		}
 
 		klog.Infof("addMultipleInterfaces: ipAddress-%v ovn4nfv-interface-%v cni-ifname-%v", ipAddress, interfaceName, cr.IfName)
@@ -277,13 +329,18 @@ func (cr *CNIServerRequest) cmdAdd(kclient kubernetes.Interface) ([]byte, error)
 		return nil, fmt.Errorf("failed to get pod annotation - %v", err)
 	}
 
-	klog.Infof("ovn4nfvk8s-cni: cmdAdd Annotation Found ")
+	klog.Infof("ovn4nfvk8s-cni: cmdAdd Annotations Found")
+	nfnAnnotation, ok := annotation[nfnNetworkAnnotationTag]
+	if !ok {
+		return nil, fmt.Errorf("Error while obtatining %v pod annotation", nfnNetworkAnnotationTag)
+	}
+	klog.Infof("ovn4nfvk8s-cni: cmdAdd Annotation Found is %v", nfnAnnotation)
 	ovnAnnotation, ok := annotation[ovn4nfvAnnotationTag]
 	if !ok {
-		return nil, fmt.Errorf("Error while obtaining pod annotations")
+		return nil, fmt.Errorf("Error while obtatining %v pod annotation", ovn4nfvAnnotationTag)
 	}
 	klog.Infof("ovn4nfvk8s-cni: cmdAdd Annotation Found is %v", ovnAnnotation)
-	result := cr.AddMultipleInterfaces(ovnAnnotation, namespace, podname)
+	result := cr.AddMultipleInterfaces(nfnAnnotation, ovnAnnotation, namespace, podname)
 	//Add Routes to the pod if annotation found for routes
 	ovnRouteAnnotation, ok := annotation["ovnNetworkRoutes"]
 	if ok {

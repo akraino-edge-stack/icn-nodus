@@ -349,7 +349,7 @@ func (cr *CNIServerRequest) DeleteMultipleInterfaces(ovnAnnotation, namespace, p
 
 		interfaceName := ovnNet["interface"]
 		if interfaceName == "" {
-			klog.Errorf("addMultipleInterfaces: interface can't be null")
+			klog.Errorf("deleteMultipleInterfaces: interface can't be null")
 			return nil
 		}
 

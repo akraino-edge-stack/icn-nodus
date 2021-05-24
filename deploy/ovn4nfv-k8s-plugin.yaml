@@ -66,10 +66,10 @@ spec:
                     type: object
                   type: array
               required:
-              - leftNetwork
+              - left
               - namespace
               - networkChain
-              - rightNetwork
+              - right
               type: object
           required:
           - chainType
@@ -509,7 +509,7 @@ spec:
       serviceAccountName: k8s-nfn-sa
       containers:
         - name: nfn-operator
-          image: docker.io/rkamudhan/ovn4nfv-k8s-plugin:v2.3.0.1
+          image: docker.io/integratedcloudnative/ovn4nfv-k8s-plugin:v3.0.0
           command: ["/usr/local/bin/entrypoint", "operator"]
           imagePullPolicy: IfNotPresent
           envFrom:
@@ -581,7 +581,7 @@ spec:
       serviceAccountName: k8s-nfn-sa
       containers:
       - name: ovn4nfv
-        image: docker.io/rkamudhan/ovn4nfv-k8s-plugin:v2.3.0.1
+        image: docker.io/integratedcloudnative/ovn4nfv-k8s-plugin:v3.0.0
         command: ["/usr/local/bin/entrypoint", "cni"]
         imagePullPolicy: IfNotPresent
         resources:
@@ -655,7 +655,7 @@ spec:
       serviceAccountName: k8s-nfn-sa
       containers:
       - name: nfn-agent
-        image: docker.io/rkamudhan/ovn4nfv-k8s-plugin:v2.3.0.1
+        image: docker.io/integratedcloudnative/ovn4nfv-k8s-plugin:v3.0.0
         command: ["/usr/local/bin/entrypoint", "agent"]
         imagePullPolicy: IfNotPresent
         resources:

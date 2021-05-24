@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "217e2e8f_1f9f9158",
+        "filename": "deploy/ovn4nfv-k8s-plugin.yaml",
+        "patchSetId": 1
+      },
+      "lineNbr": 56,
+      "author": {
+        "id": 438
+      },
+      "writtenOn": "2021-05-24T20:51:31Z",
+      "side": 1,
+      "message": "I assume these need to change also - e.g. to \u0027right:\u0027",
+      "revId": "d0ce46ba0129a9f2e498a3a5184afde93034f4d7",
+      "serverId": "4cada01b-0314-4fe0-84a1-f9ddc89863f9",
+      "unresolved": true
+    }
+  ]
+}

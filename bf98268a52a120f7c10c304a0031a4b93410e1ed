@@ -1,0 +1,27 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "06f926c9_d4e9547e",
+        "filename": "internal/pkg/cniserver/cni.go",
+        "patchSetId": 1
+      },
+      "lineNbr": 25,
+      "author": {
+        "id": 239
+      },
+      "writtenOn": "2021-05-25T19:02:44Z",
+      "side": 1,
+      "message": "There is duplication from the pod controller for this value. Is that possible to fix it. Long time, I was thinkin to create a nfn-type.go file and move all the structure and variable there. \n\nI also think, it will be time consuming for this patch, we could merge this patch. Later point, we find all the duplication and type to move to a package. This will avoid cyclic dependency issue as well.",
+      "range": {
+        "startLine": 25,
+        "startChar": 0,
+        "endLine": 25,
+        "endChar": 61
+      },
+      "revId": "bf98268a52a120f7c10c304a0031a4b93410e1ed",
+      "serverId": "4cada01b-0314-4fe0-84a1-f9ddc89863f9",
+      "unresolved": true
+    }
+  ]
+}

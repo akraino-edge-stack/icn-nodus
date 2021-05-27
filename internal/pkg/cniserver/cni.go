@@ -23,31 +23,31 @@ import (
 
 const (
 	nfnNetworkAnnotationTag = "k8s.plugin.opnfv.org/nfn-network"
-	ovn4nfvAnnotationTag = "k8s.plugin.opnfv.org/ovnInterfaces"
+	ovn4nfvAnnotationTag    = "k8s.plugin.opnfv.org/ovnInterfaces"
 )
 
 type nfnNetwork struct {
-       Type      string `json:"type"`
-       Interface []struct {
-               Interface      string `json:"interface"`
-               Name           string `json:"name"`
-               DefaultGateway string `json:"defaultGateway"`
-               IPAddress      string `json:"ipAddress"`
-       } `json:"interface"`
+	Type      string `json:"type"`
+	Interface []struct {
+		Interface      string `json:"interface"`
+		Name           string `json:"name"`
+		DefaultGateway string `json:"defaultGateway"`
+		IPAddress      string `json:"ipAddress"`
+	} `json:"interface"`
 }
 
 func parseNfnNetworkObject(nfnnetwork string) (*nfnNetwork, error) {
-       var nfnNet nfnNetwork
+	var nfnNet nfnNetwork
 
-       if nfnnetwork == "" {
-               return nil, fmt.Errorf("parseNfnNetworkObject:error")
-       }
+	if nfnnetwork == "" {
+		return nil, fmt.Errorf("parseNfnNetworkObject:error")
+	}
 
-       if err := json.Unmarshal([]byte(nfnnetwork), &nfnNet); err != nil {
-               return nil, fmt.Errorf("parseNfnNetworkObject: failed to load nfn network err: %v | nfn network: %v", err, nfnnetwork)
-       }
+	if err := json.Unmarshal([]byte(nfnnetwork), &nfnNet); err != nil {
+		return nil, fmt.Errorf("parseNfnNetworkObject: failed to load nfn network err: %v | nfn network: %v", err, nfnnetwork)
+	}
 
-       return &nfnNet, nil
+	return &nfnNet, nil
 }
 
 func parseOvnNetworkObject(ovnnetwork string) ([]map[string]string, error) {
@@ -119,7 +119,12 @@ func isNotFoundError(err error) bool {
 func (cr *CNIServerRequest) AddMultipleInterfaces(nfnAnnotation, ovnAnnotation, namespace, podName string) types.Result {
 	klog.Infof("ovn4nfvk8s-cni: addMultipleInterfaces ovn annotation %v namespace %v podName %v", ovnAnnotation, namespace, podName)
 	var nfnNetworks *nfnNetwork
-	if cr.CNIConf.NFNNetwork != "" {
+	var networkname string
+
+	if cr.CNIConf != nil {
+		networkname = cr.CNIConf.NFNNetwork
+	}
+	if networkname != "" {
 		var err error
 		nfnNetworks, err = parseNfnNetworkObject(nfnAnnotation)
 		if err != nil {
@@ -128,6 +133,7 @@ func (cr *CNIServerRequest) AddMultipleInterfaces(nfnAnnotation, ovnAnnotation, 
 			return nil
 		}
 	}
+
 	ovnAnnotatedMap, err := parseOvnNetworkObject(ovnAnnotation)
 	if err != nil {
 		klog.Infof("addLogicalPort : Error Parsing Ovn Network List %v %v", ovnAnnotatedMap, err)
@@ -180,10 +186,10 @@ func (cr *CNIServerRequest) AddMultipleInterfaces(nfnAnnotation, ovnAnnotation, 
 			defaultGateway = "false"
 		}
 
-		if cr.CNIConf.NFNNetwork != "" {
+		if networkname != "" {
 			var interfaceName string
 			for _, nfnInterface := range nfnNetworks.Interface {
-				if cr.CNIConf.NFNNetwork == nfnInterface.Name {
+				if networkname == nfnInterface.Name {
 					interfaceName = nfnInterface.Interface
 					break
 				}
@@ -193,7 +199,7 @@ func (cr *CNIServerRequest) AddMultipleInterfaces(nfnAnnotation, ovnAnnotation, 
 				return nil
 			}
 			if ovnNet["interface"] != interfaceName {
-				klog.Infof("addMultipleInterfaces: skipping interface %v (requested %v)", ovnNet["interface"], interfaceName);
+				klog.Infof("addMultipleInterfaces: skipping interface %v (requested %v)", ovnNet["interface"], interfaceName)
 				continue
 			}
 		}

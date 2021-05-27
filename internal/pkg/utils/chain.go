@@ -779,13 +779,7 @@ func ContainerDelRoute(containerPid int, route []*pb.RouteData) error {
 	}
 
 	kubecli := &kube.Kube{KClient: k}
-	_, err = kubecli.GetControlPlaneServiceIPRange()
-	if err != nil {
-		log.Error(err, "Error in getting svc cidr range")
-		return err
-	}
-
-	kn, err := kubecli.GetAnotherControlPlaneServiceIPRange()
+	kn, err := kubecli.GetControlPlaneServiceIPRange()
 	if err != nil {
 		log.Error(err, "Error in getting svc cidr range")
 		return err
@@ -873,13 +867,7 @@ func ContainerAddRoute(containerPid int, route []*pb.RouteData) error {
 	}
 
 	kubecli := &kube.Kube{KClient: k}
-	_, err = kubecli.GetControlPlaneServiceIPRange()
-	if err != nil {
-		log.Error(err, "Error in getting svc cidr range")
-		return err
-	}
-
-	kn, err := kubecli.GetAnotherControlPlaneServiceIPRange()
+	kn, err := kubecli.GetControlPlaneServiceIPRange()
 	if err != nil {
 		log.Error(err, "Error in getting svc cidr range")
 		return err

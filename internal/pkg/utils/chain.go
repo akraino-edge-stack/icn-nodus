@@ -158,6 +158,7 @@ func configurePodSelectorDeployment(ln k8sv1alpha1.RoutingNetwork, sfcEntryPodLa
 	}
 
 	nsLabel := labels.Set(ln.NamespaceSelector.MatchLabels)
+	podLabel := labels.Set(ln.PodSelector.MatchLabels)
 	nslist, err := clientset.CoreV1().Namespaces().List(v1.ListOptions{LabelSelector: nsLabel.AsSelector().String()})
 	if err != nil {
 		log.Error(err, "Error in kube clientset in listing the namespaces")
@@ -175,7 +176,7 @@ func configurePodSelectorDeployment(ln k8sv1alpha1.RoutingNetwork, sfcEntryPodLa
 		log.Info("Value of the ns.GetLabels", "ns.GetLabels()", ns.GetLabels())
 		set := labels.Set(ns.GetLabels())
 		log.Info("Value of the nslabel", "set", set)
-		pods, err := clientset.CoreV1().Pods(ns.GetName()).List(v1.ListOptions{LabelSelector: set.AsSelector().String()})
+		pods, err := clientset.CoreV1().Pods(ns.GetName()).List(v1.ListOptions{LabelSelector: podLabel.AsSelector().String()})
 		if err != nil {
 			log.Error(err, "Error in kube clientset in listing the pods for namespace", "namespace", ns.GetName())
 			return nil, nil, err

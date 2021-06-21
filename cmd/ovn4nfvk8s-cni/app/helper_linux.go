@@ -51,7 +51,7 @@ func CreateNodeOVSInternalPort(nodeintfipaddr, nodeintfmacaddr, node string) err
 	}
 
 	ovsArgs := []string{
-		"add-port", "br-int", nodeOVSInternalIntfName, "--", "set",
+		"--", "--may-exist", "add-port", "br-int", nodeOVSInternalIntfName, "--", "set",
 		"interface", nodeOVSInternalIntfName, "type=internal",
 		fmt.Sprintf("mac_in_use=%s", strings.ReplaceAll(hwAddr.String(), ":", "\\:")),
 		fmt.Sprintf("mac=%s", strings.ReplaceAll(hwAddr.String(), ":", "\\:")),

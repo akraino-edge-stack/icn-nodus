@@ -566,10 +566,41 @@ func CalculateDstforTail(networklist []string) ([]string, error) {
 	return dst, nil
 }
 
+// DerivedNetworkFromNetworklist returns the network list
+func DerivedNetworkFromNetworklist(networklabellist []string) ([]string, error) {
+	var networklist []string
+
+	// Get a config to talk to the apiserver
+	k8sv1alpha1Clientset, err := kube.GetKubev1alpha1Config()
+	if err != nil {
+		log.Error(err, "Error in getting k8s v1alpha1 clientset")
+		return nil, err
+	}
+
+	for _, networklabel := range networklabellist {
+
+		vn, err := k8sv1alpha1Clientset.Networks("default").List(v1.ListOptions{LabelSelector: networklabel})
+		if err != nil {
+			log.Error(err, "Error in getting Provider Networks")
+			return nil, err
+		}
+
+		if len(vn.Items) != 1 {
+			err := fmt.Errorf("Virutal network is not available for the networklabel - %s", networklabel)
+			log.Error(err, "Error in kube clientset in listing the pods for namespace", "networklabel", networklabel)
+			return nil, err
+		}
+
+		networklist = append(networklist, vn.Items[0].GetName())
+	}
+
+	return networklist, nil
+}
+
 // CalculateRoutes returns the routing info
 func CalculateRoutes(cr *k8sv1alpha1.NetworkChaining, cs bool, onlyPodSelector bool) ([]PodNetworkInfo, []RoutingInfo, error) {
 	var deploymentList []string
-	var networkList []string
+	var networklabelList []string
 	var sfctaillabel, sfcheadlabel string
 
 	ln := cr.Spec.RoutingSpec.LeftNetwork
@@ -593,11 +624,16 @@ func CalculateRoutes(cr *k8sv1alpha1.NetworkChaining, cs bool, onlyPodSelector b
 		if i%2 == 0 {
 			deploymentList = append(deploymentList, chain)
 		} else {
-			networkList = append(networkList, chain)
+			networklabelList = append(networklabelList, chain)
 		}
 		i++
 	}
 	num := len(deploymentList)
+
+	networkList, err := DerivedNetworkFromNetworklist(networklabelList)
+	if err != nil {
+		return nil, nil, err
+	}
 
 	var chainRoutingInfo []RoutingInfo
 	var lnRoutingInfo []RoutingInfo

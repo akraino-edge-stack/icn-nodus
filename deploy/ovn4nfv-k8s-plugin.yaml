@@ -472,9 +472,13 @@ metadata:
   name: ovn-controller-network
   namespace: kube-system
 data:
-  OVN_SUBNET: "10.154.142.0/18"
-  OVN_GATEWAYIP: "10.154.142.1/18"
-
+  ovn_subnet: "10.154.142.0/18"
+  ovn_gatewayip: "10.154.142.1/18"
+  sfc-net-conf.json: |
+    {
+      "Network": "192.168.0.1/18",
+      "SubnetLen": 20
+    }
 ---
 
 apiVersion: apps/v1
@@ -512,9 +516,17 @@ spec:
           image: docker.io/integratedcloudnative/ovn4nfv-k8s-plugin:v3.0.0
           command: ["/usr/local/bin/entrypoint", "operator"]
           imagePullPolicy: IfNotPresent
-          envFrom:
-          - configMapRef:
-              name: ovn-controller-network
+          env:
+            - name: OVN_SUBNET
+              valueFrom:
+                configMapKeyRef:
+                  name: ovn-controller-network
+                  key: ovn_subnet
+            - name: OVN_GATEWAYIP
+              valueFrom:
+                configMapKeyRef:
+                  name: ovn-controller-network
+                  key: ovn_gatewayip
           ports:
           - containerPort: 50000
             protocol: TCP

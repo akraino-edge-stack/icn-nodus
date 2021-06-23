@@ -5,8 +5,8 @@ require (
 	github.com/NYTimes/gziphandler v1.1.1 // indirect
 	github.com/ajstarks/svgo v0.0.0-20191124160048-bd5c74aaa11c // indirect
 	github.com/containernetworking/cni v0.7.1
-	github.com/containernetworking/plugins v0.8.1
-	github.com/coreos/go-iptables v0.4.2
+	github.com/containernetworking/plugins v0.8.6
+	github.com/coreos/go-iptables v0.4.5
 	github.com/creack/pty v1.1.9 // indirect
 	github.com/docker/distribution v2.7.1+incompatible // indirect
 	github.com/docker/docker v0.7.3-0.20190327010347-be7ac8be2ae0
@@ -15,6 +15,7 @@ require (
 	github.com/elazarl/goproxy v0.0.0-20191011121108-aa519ddbe484 // indirect
 	github.com/elazarl/goproxy/ext v0.0.0-20191011121108-aa519ddbe484 // indirect
 	github.com/emicklei/go-restful v2.11.1+incompatible // indirect
+	github.com/flannel-io/flannel v0.14.0
 	github.com/fogleman/gg v1.3.0 // indirect
 	github.com/go-logr/logr v0.1.0
 	github.com/go-openapi/spec v0.19.5
@@ -62,8 +63,8 @@ require (
 	gopkg.in/gcfg.v1 v1.2.3
 	gopkg.in/warnings.v0 v0.1.2 // indirect
 	honnef.co/go/tools v0.0.0-20190523083050-ea95bdfd59fc // indirect
-	k8s.io/api v0.17.9
-	k8s.io/apimachinery v0.17.9
+	k8s.io/api v0.19.5
+	k8s.io/apimachinery v0.19.5
 	//k8s.io/apimachinery v0.0.0-20190612125636-6a5db36e93ad
 	k8s.io/client-go v11.0.1-0.20190409021438-1a26190bd76a+incompatible
 	k8s.io/code-generator v0.17.0 // indirect

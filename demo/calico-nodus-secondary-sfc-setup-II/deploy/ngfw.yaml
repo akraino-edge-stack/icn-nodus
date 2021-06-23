@@ -1,0 +1,30 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ngfw
+  labels:
+    app: ngfw
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ngfw
+  template:
+    metadata:
+      labels:
+        app: ngfw
+      annotations:
+        k8s.v1.cni.cncf.io/networks: '[                                        
+            { "name": "ovn4nfv-k8s-plugin",                                    
+              "interface": "net1"                                              
+            }]'
+        k8s.plugin.opnfv.org/nfn-network: '{ "type": "ovn4nfv", "interface": [{ "name": "virutal-net1", "interface": "net2", "defaultGateway": "false"}, { "name": "virutal-net2", "interface": "net3", "defaultGateway": "false"}]}'
+
+    spec:
+      containers:
+      - name: ngfw
+        image: rkamudhan/netshoot:v1.0
+        imagePullPolicy: IfNotPresent
+        stdin: true
+        tty: true
+---

@@ -1,0 +1,30 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx-right-deployment
+  namespace: sfc-tail
+  labels:
+    sfc: tail
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      sfc: tail
+  template:
+    metadata:
+      labels:
+        sfc: tail
+
+    spec:
+      containers:
+      - name: nginx
+        image: rkamudhan/netshoot:v1.0
+        imagePullPolicy: IfNotPresent
+        stdin: true
+        tty: true
+        ports:
+        - containerPort: 80
+        securityContext:
+          privileged: true
+          capabilities:
+            add: ["NET_ADMIN"]

@@ -1,0 +1,30 @@
+apiVersion: k8s.plugin.opnfv.org/v1alpha1
+kind: NetworkChaining
+metadata:
+  name: example-networkchaining
+spec:
+  # Add fields here
+  chainType: "Routing"
+  routingSpec:
+    namespace: "default"
+    networkChain: "net=virutal-net0,app=slb,net=virutal-net1,app=ngfw,net=virutal-net2,app=sdewan,net=virutal-net3"
+    left:
+    - networkName: "left-pnetwork"
+      gatewayIp: "172.30.10.2"
+      subnet: "172.30.10.0/24"
+      podSelector:
+        matchLabels:
+          sfc: head
+      namespaceSelector:
+        matchLabels:
+          sfc: head
+    right:
+    - networkName: "right-pnetwork"
+      gatewayIp: "172.30.20.2"
+      subnet: "172.30.20.0/24"
+      podSelector:
+        matchLabels:
+          sfc: tail
+      namespaceSelector:
+        matchLabels:
+          sfc: tail

@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"reflect"
+	"strconv"
 	"strings"
 
 	"github.com/akraino-edge-stack/icn-nodus/internal/pkg/cniserver"
@@ -384,6 +385,73 @@ func calculateDeploymentRoutes(namespace, label string, pos int, num int, ln []k
 	}
 	r.DynamicNetworkRoutes = append(r.DynamicNetworkRoutes, rt)
 	return
+}
+
+func CheckForOnlyNFLabel(cr *k8sv1alpha1.NetworkChaining) (bool, string, error) {
+	var updatedChain string
+	var hasNetlabels bool
+	virutalnetwork := "virutal-net"
+
+	chains := strings.Split(cr.Spec.RoutingSpec.NetworkChain, ",")
+
+	for _, label := range chains {
+		//fmt.Printf("%v\n", label)
+		//fmt.Printf("%v ", label[:3])
+		//fmt.Printf("%v\n", strings.Compare("net", label[:3]))
+		if strings.Compare("net", label[:3]) == 0 {
+			hasNetlabels = true
+			break
+		}
+	}
+
+	if hasNetlabels == true {
+		log.Info("No need to update chain", "hasNetlabels", hasNetlabels)
+		return false, "", nil
+	}
+
+	//fmt.Printf("Value of the onlyNFlabels = %v\n", onlyNFlabels)
+	log.Info("Value of the hasNetlabels", "hasNetlabels", hasNetlabels)
+	netlabelPrefix := "net"
+	//var netlabel string
+
+	if hasNetlabels != true {
+		for i, nflabel := range chains {
+			if i == 0 {
+				//fmt.Printf("if 0 - %v\n", nflabel)
+				netlabelinPrefix := fmt.Sprintf("%s=%s%s", netlabelPrefix, virutalnetwork, strconv.Itoa(i))
+				//updatedChain = append(updatedChain, fmt.Sprintf("%s,%s", netlabelinPrefix, nflabel))
+				updatedChain = fmt.Sprintf("%s,%s", netlabelinPrefix, nflabel)
+				netlabelinSuffix := fmt.Sprintf("%s=%s%s", netlabelPrefix, virutalnetwork, strconv.Itoa(i+1))
+				//updatedChain = append(updatedChain, netlabelinSuffix)
+				updatedChain = fmt.Sprintf("%s,%s", updatedChain, netlabelinSuffix)
+				continue
+			}
+			//fmt.Printf("%v\n", nflabel)
+			netlabel := fmt.Sprintf("%s=%s%s", netlabelPrefix, virutalnetwork, strconv.Itoa(i+1))
+			//updatedChain = append(updatedChain, fmt.Sprintf(",%s,%s", nflabel, netlabel))
+			updatedChain = fmt.Sprintf("%s,%s,%s", updatedChain, nflabel, netlabel)
+
+		}
+	}
+
+	//fmt.Printf("%v\n", updatedChain)
+	if len(updatedChain) != 0 {
+		log.Info("Value of updatedChain", "updatedChain", updatedChain)
+	}
+
+	if (hasNetlabels != true) && (len(updatedChain) == 0) {
+		log.Info("Error in updating sfc chain - length of the updated chain can't be zero", "updatedChain", updatedChain)
+		return false, "", fmt.Errorf("Error in updating sfc chain")
+	}
+
+	if (hasNetlabels != true) && (len(updatedChain) != 0) {
+		log.Info("No net labels exist in the chain and new chain upddated return nil", "updatedChain", updatedChain)
+		return true, updatedChain, nil
+	}
+
+	log.Info("None of the condition met for updating the chain", "updatedChain", updatedChain)
+	return false, "", fmt.Errorf("None of the condition met for updating the chain")
+
 }
 
 //ValidateNetworkChaining return ...
@@ -834,6 +902,17 @@ func CalculateRoutes(cr *k8sv1alpha1.NetworkChaining, cs bool, onlyPodSelector b
 	var deploymentList []string
 	var networklabelList []string
 	var sfctaillabel, sfcheadlabel string
+
+	updateStatus, UpdatedChain, err := CheckForOnlyNFLabel(cr)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	if updateStatus == true {
+		cr.Spec.RoutingSpec.NetworkChain = UpdatedChain
+	}
+
+	log.Info("Value of networkchain", "cr.Spec.RoutingSpec.NetworkChain", cr.Spec.RoutingSpec.NetworkChain)
 
 	ln := cr.Spec.RoutingSpec.LeftNetwork
 	rn := cr.Spec.RoutingSpec.RightNetwork

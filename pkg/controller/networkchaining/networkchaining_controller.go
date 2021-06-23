@@ -220,6 +220,17 @@ func (r *ReconcileNetworkChaining) createChain(cr *k8sv1alpha1.NetworkChaining, 
 			return err
 		}
 
+		updateStatus, UpdatedChain, err := chaining.CheckForOnlyNFLabel(cr)
+		if err != nil {
+			reqLogger.Error(err, "Error updating the chain")
+		}
+
+		if updateStatus == true {
+			cr.Spec.RoutingSpec.NetworkChain = UpdatedChain
+		}
+
+		log.Info("Value of networkchain in chain creation", "cr.Spec.RoutingSpec.NetworkChain", cr.Spec.RoutingSpec.NetworkChain)
+
 		podnetworkList, routeList, err := chaining.CalculateRoutes(cr, false, false)
 		if err != nil {
 			return err
@@ -269,6 +280,16 @@ func (r *ReconcileNetworkChaining) deleteChain(cr *k8sv1alpha1.NetworkChaining, 
 
 	switch {
 	case cr.Spec.ChainType == "Routing":
+		updateStatus, UpdatedChain, err := chaining.CheckForOnlyNFLabel(cr)
+		if err != nil {
+			reqLogger.Error(err, "Error updating the chain")
+		}
+
+		if updateStatus == true {
+			cr.Spec.RoutingSpec.NetworkChain = UpdatedChain
+		}
+
+		log.Info("Value of networkchain in chain deletion", "cr.Spec.RoutingSpec.NetworkChain", cr.Spec.RoutingSpec.NetworkChain)
 		podnetworkList, routeList, err := chaining.CalculateRoutes(cr, true, false)
 		if err != nil {
 			return err

@@ -1,0 +1,85 @@
+apiVersion: k8s.plugin.opnfv.org/v1alpha1
+kind: ProviderNetwork
+metadata:
+  name: left-pnetwork
+spec:
+  cniType: ovn4nfv
+  ipv4Subnets:
+  - subnet: 172.30.10.0/24
+    name: subnet1
+    gateway: 172.30.10.1/24
+    excludeIps: 172.30.10.2
+  providerNetType: VLAN
+  vlan:
+    vlanId: "100"
+    providerInterfaceName: eth1
+    logicalInterfaceName: eth1.100
+    vlanNodeSelector: specific
+    nodeLabelList:
+    - kubernetes.io/os=linux
+
+---
+
+apiVersion: k8s.plugin.opnfv.org/v1alpha1
+kind: ProviderNetwork
+metadata:
+  name: right-pnetwork
+spec:
+  cniType: ovn4nfv
+  ipv4Subnets:
+  - subnet: 172.30.20.0/24
+    name: subnet1
+    gateway: 172.30.20.1/24
+    excludeIps: 172.30.20.2
+  providerNetType: VLAN
+  vlan:
+    vlanId: "200"
+    providerInterfaceName: eth1
+    logicalInterfaceName: eth1.200
+    vlanNodeSelector: specific
+    nodeLabelList:
+    - kubernetes.io/os=linux
+
+---
+
+apiVersion: k8s.plugin.opnfv.org/v1alpha1
+kind: ProviderNetwork
+metadata:
+  name: left2-pnetwork
+spec:
+  cniType: ovn4nfv
+  ipv4Subnets:
+  - subnet: 172.30.50.0/24
+    name: subnet1
+    gateway: 172.30.50.1/24
+    excludeIps: 172.30.50.2
+  providerNetType: VLAN
+  vlan:
+    vlanId: "300"
+    providerInterfaceName: eth1
+    logicalInterfaceName: eth1.300
+    vlanNodeSelector: specific
+    nodeLabelList:
+    - kubernetes.io/os=linux
+
+---
+
+apiVersion: k8s.plugin.opnfv.org/v1alpha1
+kind: ProviderNetwork
+metadata:
+  name: right2-pnetwork
+spec:
+  cniType: ovn4nfv
+  ipv4Subnets:
+  - subnet: 172.30.60.0/24
+    name: subnet1
+    gateway: 172.30.60.1/24
+    excludeIps: 172.30.60.2
+  providerNetType: VLAN
+  vlan:
+    vlanId: "400"
+    providerInterfaceName: eth1
+    logicalInterfaceName: eth1.400
+    vlanNodeSelector: specific
+    nodeLabelList:
+    - kubernetes.io/os=linux

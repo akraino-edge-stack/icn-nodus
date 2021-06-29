@@ -19,7 +19,7 @@ limitations under the License.
 package scheme
 
 import (
-	k8sv1alpha1 "icn-nodus/pkg/apis/k8s/v1alpha1"
+	k8sv1alpha1 "github.com/akraino-edge-stack/icn-nodus/pkg/apis/k8s/v1alpha1"
 
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"

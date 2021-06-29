@@ -6,8 +6,8 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 
-	cni "icn-nodus/internal/pkg/cnishim"
-	"icn-nodus/internal/pkg/config"
+	cni "github.com/akraino-edge-stack/icn-nodus/internal/pkg/cnishim"
+	"github.com/akraino-edge-stack/icn-nodus/internal/pkg/config"
 
 	"github.com/containernetworking/cni/pkg/skel"
 	"github.com/containernetworking/cni/pkg/types"

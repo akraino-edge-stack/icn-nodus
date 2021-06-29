@@ -9,10 +9,10 @@ import (
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 
-	notif "icn-nodus/internal/pkg/nfnNotify"
-	"icn-nodus/internal/pkg/ovn"
-	"icn-nodus/pkg/apis"
-	"icn-nodus/pkg/controller"
+	notif "github.com/akraino-edge-stack/icn-nodus/internal/pkg/nfnNotify"
+	"github.com/akraino-edge-stack/icn-nodus/internal/pkg/ovn"
+	"github.com/akraino-edge-stack/icn-nodus/pkg/apis"
+	"github.com/akraino-edge-stack/icn-nodus/pkg/controller"
 
 	"github.com/spf13/pflag"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"

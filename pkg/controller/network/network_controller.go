@@ -3,10 +3,13 @@ package network
 import (
 	"context"
 	"fmt"
-	"icn-nodus/internal/pkg/ovn"
-	k8sv1alpha1 "icn-nodus/pkg/apis/k8s/v1alpha1"
-	"icn-nodus/pkg/utils"
 	"reflect"
+
+	"github.com/akraino-edge-stack/icn-nodus/pkg/utils"
+
+	k8sv1alpha1 "github.com/akraino-edge-stack/icn-nodus/pkg/apis/k8s/v1alpha1"
+
+	"github.com/akraino-edge-stack/icn-nodus/internal/pkg/ovn"
 
 	"github.com/go-logr/logr"
 	"k8s.io/apimachinery/pkg/api/errors"

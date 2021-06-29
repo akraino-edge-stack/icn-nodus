@@ -19,9 +19,9 @@ limitations under the License.
 package fake
 
 import (
-	clientset "icn-nodus/pkg/generated/clientset/versioned"
-	k8sv1alpha1 "icn-nodus/pkg/generated/clientset/versioned/typed/k8s/v1alpha1"
-	fakek8sv1alpha1 "icn-nodus/pkg/generated/clientset/versioned/typed/k8s/v1alpha1/fake"
+	clientset "github.com/akraino-edge-stack/icn-nodus/pkg/generated/clientset/versioned"
+	k8sv1alpha1 "github.com/akraino-edge-stack/icn-nodus/pkg/generated/clientset/versioned/typed/k8s/v1alpha1"
+	fakek8sv1alpha1 "github.com/akraino-edge-stack/icn-nodus/pkg/generated/clientset/versioned/typed/k8s/v1alpha1/fake"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"

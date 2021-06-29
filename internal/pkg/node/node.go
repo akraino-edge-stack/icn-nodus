@@ -1,7 +1,7 @@
 package node
 
 import (
-	"icn-nodus/internal/pkg/ovn"
+	"github.com/akraino-edge-stack/icn-nodus/internal/pkg/ovn"
 
 	logf "sigs.k8s.io/controller-runtime/pkg/runtime/log"
 )

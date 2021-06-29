@@ -19,16 +19,17 @@ package main
 import (
 	"context"
 	"fmt"
-	cs "icn-nodus/internal/pkg/cniserver"
-	pb "icn-nodus/internal/pkg/nfnNotify/proto"
-	"icn-nodus/internal/pkg/ovn"
-	chaining "icn-nodus/internal/pkg/utils"
 	"io"
 	"os"
 	"os/signal"
 	"strings"
 	"syscall"
 	"time"
+
+	cs "github.com/akraino-edge-stack/icn-nodus/internal/pkg/cniserver"
+	pb "github.com/akraino-edge-stack/icn-nodus/internal/pkg/nfnNotify/proto"
+	"github.com/akraino-edge-stack/icn-nodus/internal/pkg/ovn"
+	chaining "github.com/akraino-edge-stack/icn-nodus/internal/pkg/utils"
 
 	"google.golang.org/grpc"
 	"k8s.io/client-go/kubernetes"
@@ -38,7 +39,7 @@ import (
 
 	//"google.golang.org/grpc/keepalive"
 
-	"icn-nodus/cmd/ovn4nfvk8s-cni/app"
+	"github.com/akraino-edge-stack/icn-nodus/cmd/ovn4nfvk8s-cni/app"
 
 	"google.golang.org/grpc/status"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"

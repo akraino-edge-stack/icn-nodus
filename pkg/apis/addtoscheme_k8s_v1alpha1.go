@@ -1,7 +1,7 @@
 package apis
 
 import (
-	"icn-nodus/pkg/apis/k8s/v1alpha1"
+	"github.com/akraino-edge-stack/icn-nodus/pkg/apis/k8s/v1alpha1"
 )
 
 func init() {

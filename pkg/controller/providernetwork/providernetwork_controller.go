@@ -3,11 +3,12 @@ package providernetwork
 import (
 	"context"
 	"fmt"
-	notif "icn-nodus/internal/pkg/nfnNotify"
-	"icn-nodus/internal/pkg/ovn"
-	k8sv1alpha1 "icn-nodus/pkg/apis/k8s/v1alpha1"
-	"icn-nodus/pkg/utils"
 	"reflect"
+
+	notif "github.com/akraino-edge-stack/icn-nodus/internal/pkg/nfnNotify"
+	"github.com/akraino-edge-stack/icn-nodus/internal/pkg/ovn"
+	k8sv1alpha1 "github.com/akraino-edge-stack/icn-nodus/pkg/apis/k8s/v1alpha1"
+	"github.com/akraino-edge-stack/icn-nodus/pkg/utils"
 
 	"github.com/go-logr/logr"
 	"k8s.io/apimachinery/pkg/api/errors"

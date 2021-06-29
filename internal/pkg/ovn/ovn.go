@@ -2,12 +2,14 @@ package ovn
 
 import (
 	"fmt"
-	"icn-nodus/internal/pkg/config"
-	k8sv1alpha1 "icn-nodus/pkg/apis/k8s/v1alpha1"
 	"math/rand"
 	"os"
 	"strings"
 	"time"
+
+	k8sv1alpha1 "github.com/akraino-edge-stack/icn-nodus/pkg/apis/k8s/v1alpha1"
+
+	"github.com/akraino-edge-stack/icn-nodus/internal/pkg/config"
 
 	"github.com/mitchellh/mapstructure"
 	kapi "k8s.io/api/core/v1"

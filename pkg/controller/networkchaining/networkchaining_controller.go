@@ -19,11 +19,15 @@ package networkchaining
 import (
 	"context"
 	"fmt"
-	notif "icn-nodus/internal/pkg/nfnNotify"
-	chaining "icn-nodus/internal/pkg/utils"
-	k8sv1alpha1 "icn-nodus/pkg/apis/k8s/v1alpha1"
-	"icn-nodus/pkg/utils"
 	"reflect"
+
+	"github.com/akraino-edge-stack/icn-nodus/pkg/utils"
+
+	k8sv1alpha1 "github.com/akraino-edge-stack/icn-nodus/pkg/apis/k8s/v1alpha1"
+
+	chaining "github.com/akraino-edge-stack/icn-nodus/internal/pkg/utils"
+
+	notif "github.com/akraino-edge-stack/icn-nodus/internal/pkg/nfnNotify"
 
 	"github.com/go-logr/logr"
 	"k8s.io/apimachinery/pkg/api/errors"

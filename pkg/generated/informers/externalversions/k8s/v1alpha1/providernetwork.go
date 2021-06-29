@@ -19,10 +19,10 @@ limitations under the License.
 package v1alpha1
 
 import (
-	k8sv1alpha1 "icn-nodus/pkg/apis/k8s/v1alpha1"
-	versioned "icn-nodus/pkg/generated/clientset/versioned"
-	internalinterfaces "icn-nodus/pkg/generated/informers/externalversions/internalinterfaces"
-	v1alpha1 "icn-nodus/pkg/generated/listers/k8s/v1alpha1"
+	k8sv1alpha1 "github.com/akraino-edge-stack/icn-nodus/pkg/apis/k8s/v1alpha1"
+	versioned "github.com/akraino-edge-stack/icn-nodus/pkg/generated/clientset/versioned"
+	internalinterfaces "github.com/akraino-edge-stack/icn-nodus/pkg/generated/informers/externalversions/internalinterfaces"
+	v1alpha1 "github.com/akraino-edge-stack/icn-nodus/pkg/generated/listers/k8s/v1alpha1"
 	time "time"
 
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"

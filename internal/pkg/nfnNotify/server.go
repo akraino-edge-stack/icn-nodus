@@ -18,13 +18,15 @@ package nfn
 
 import (
 	"fmt"
-	pb "icn-nodus/internal/pkg/nfnNotify/proto"
-	"icn-nodus/internal/pkg/node"
-	chaining "icn-nodus/internal/pkg/utils"
-	v1alpha1 "icn-nodus/pkg/apis/k8s/v1alpha1"
-	clientset "icn-nodus/pkg/generated/clientset/versioned"
 	"net"
 	"strings"
+
+	"github.com/akraino-edge-stack/icn-nodus/internal/pkg/node"
+	chaining "github.com/akraino-edge-stack/icn-nodus/internal/pkg/utils"
+	v1alpha1 "github.com/akraino-edge-stack/icn-nodus/pkg/apis/k8s/v1alpha1"
+	clientset "github.com/akraino-edge-stack/icn-nodus/pkg/generated/clientset/versioned"
+
+	pb "github.com/akraino-edge-stack/icn-nodus/internal/pkg/nfnNotify/proto"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"

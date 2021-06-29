@@ -4,13 +4,14 @@ package app
 
 import (
 	"fmt"
-	"icn-nodus/internal/pkg/config"
-	"icn-nodus/internal/pkg/network"
-	"icn-nodus/internal/pkg/ovn"
 	"net"
 	"os/exec"
 	"strconv"
 	"strings"
+
+	"github.com/akraino-edge-stack/icn-nodus/internal/pkg/config"
+	"github.com/akraino-edge-stack/icn-nodus/internal/pkg/network"
+	"github.com/akraino-edge-stack/icn-nodus/internal/pkg/ovn"
 
 	"github.com/containernetworking/cni/pkg/types/current"
 	"github.com/containernetworking/plugins/pkg/ip"

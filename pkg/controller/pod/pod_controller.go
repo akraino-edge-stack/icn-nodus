@@ -4,11 +4,14 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"icn-nodus/internal/pkg/kube"
-	"icn-nodus/internal/pkg/ovn"
 
-	notif "icn-nodus/internal/pkg/nfnNotify"
-	chaining "icn-nodus/internal/pkg/utils"
+	"github.com/akraino-edge-stack/icn-nodus/internal/pkg/ovn"
+
+	"github.com/akraino-edge-stack/icn-nodus/internal/pkg/kube"
+
+	chaining "github.com/akraino-edge-stack/icn-nodus/internal/pkg/utils"
+
+	notif "github.com/akraino-edge-stack/icn-nodus/internal/pkg/nfnNotify"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"

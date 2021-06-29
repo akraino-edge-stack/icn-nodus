@@ -17,7 +17,7 @@
 package controller
 
 import (
-	"icn-nodus/pkg/controller/networkchaining"
+	"github.com/akraino-edge-stack/icn-nodus/pkg/controller/networkchaining"
 )
 
 func init() {

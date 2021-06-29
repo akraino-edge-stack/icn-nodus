@@ -4,13 +4,14 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"icn-nodus/internal/pkg/cniserver"
-	"icn-nodus/internal/pkg/config"
 	"io/ioutil"
 	"net"
 	"net/http"
 	"os"
 	"strings"
+
+	"github.com/akraino-edge-stack/icn-nodus/internal/pkg/cniserver"
+	"github.com/akraino-edge-stack/icn-nodus/internal/pkg/config"
 
 	"github.com/containernetworking/cni/pkg/skel"
 	"github.com/containernetworking/cni/pkg/types"

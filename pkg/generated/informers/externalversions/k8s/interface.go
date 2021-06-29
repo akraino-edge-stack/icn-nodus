@@ -19,8 +19,8 @@ limitations under the License.
 package k8s
 
 import (
-	internalinterfaces "ovn4nfv-k8s-plugin/pkg/generated/informers/externalversions/internalinterfaces"
-	v1alpha1 "ovn4nfv-k8s-plugin/pkg/generated/informers/externalversions/k8s/v1alpha1"
+	internalinterfaces "github.com/akraino-edge-stack/icn-nodus/pkg/generated/informers/externalversions/internalinterfaces"
+	v1alpha1 "github.com/akraino-edge-stack/icn-nodus/pkg/generated/informers/externalversions/k8s/v1alpha1"
 )
 
 // Interface provides access to each of this group's versions.

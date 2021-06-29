@@ -19,8 +19,8 @@ limitations under the License.
 package v1alpha1
 
 import (
-	v1alpha1 "icn-nodus/pkg/apis/k8s/v1alpha1"
-	"icn-nodus/pkg/generated/clientset/versioned/scheme"
+	v1alpha1 "github.com/akraino-edge-stack/icn-nodus/pkg/apis/k8s/v1alpha1"
+	"github.com/akraino-edge-stack/icn-nodus/pkg/generated/clientset/versioned/scheme"
 
 	rest "k8s.io/client-go/rest"
 )

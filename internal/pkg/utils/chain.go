@@ -19,20 +19,21 @@ package nfn
 import (
 	"context"
 	"fmt"
-	"icn-nodus/internal/pkg/cniserver"
-	"icn-nodus/internal/pkg/config"
-	"icn-nodus/internal/pkg/kube"
-	"icn-nodus/internal/pkg/network"
-	"icn-nodus/internal/pkg/ovn"
-	k8sv1alpha1 "icn-nodus/pkg/apis/k8s/v1alpha1"
 	"reflect"
 	"strings"
+
+	"github.com/akraino-edge-stack/icn-nodus/internal/pkg/cniserver"
+	"github.com/akraino-edge-stack/icn-nodus/internal/pkg/config"
+	"github.com/akraino-edge-stack/icn-nodus/internal/pkg/kube"
+	"github.com/akraino-edge-stack/icn-nodus/internal/pkg/network"
+	"github.com/akraino-edge-stack/icn-nodus/internal/pkg/ovn"
+	k8sv1alpha1 "github.com/akraino-edge-stack/icn-nodus/pkg/apis/k8s/v1alpha1"
 
 	corev1 "k8s.io/api/core/v1"
 
 	"k8s.io/client-go/kubernetes"
 
-	pb "icn-nodus/internal/pkg/nfnNotify/proto"
+	pb "github.com/akraino-edge-stack/icn-nodus/internal/pkg/nfnNotify/proto"
 
 	"github.com/containernetworking/plugins/pkg/ns"
 	"github.com/docker/docker/client"

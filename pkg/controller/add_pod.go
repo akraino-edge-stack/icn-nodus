@@ -1,7 +1,7 @@
 package controller
 
 import (
-	"icn-nodus/pkg/controller/pod"
+	"github.com/akraino-edge-stack/icn-nodus/pkg/controller/pod"
 )
 
 func init() {

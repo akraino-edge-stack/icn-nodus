@@ -1,7 +1,7 @@
 package node
 
 import (
-	"ovn4nfv-k8s-plugin/internal/pkg/ovn"
+	"icn-nodus/internal/pkg/ovn"
 
 	logf "sigs.k8s.io/controller-runtime/pkg/runtime/log"
 )

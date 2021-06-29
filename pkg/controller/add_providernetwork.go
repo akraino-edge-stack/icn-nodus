@@ -1,7 +1,7 @@
 package controller
 
 import (
-	"ovn4nfv-k8s-plugin/pkg/controller/providernetwork"
+	"icn-nodus/pkg/controller/providernetwork"
 )
 
 func init() {

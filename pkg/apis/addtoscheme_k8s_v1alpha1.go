@@ -1,7 +1,7 @@
 package apis
 
 import (
-	"ovn4nfv-k8s-plugin/pkg/apis/k8s/v1alpha1"
+	"icn-nodus/pkg/apis/k8s/v1alpha1"
 )
 
 func init() {

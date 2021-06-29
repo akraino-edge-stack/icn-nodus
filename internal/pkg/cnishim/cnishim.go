@@ -4,12 +4,12 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"icn-nodus/internal/pkg/cniserver"
+	"icn-nodus/internal/pkg/config"
 	"io/ioutil"
 	"net"
 	"net/http"
 	"os"
-	"ovn4nfv-k8s-plugin/internal/pkg/cniserver"
-	"ovn4nfv-k8s-plugin/internal/pkg/config"
 	"strings"
 
 	"github.com/containernetworking/cni/pkg/skel"
@@ -86,7 +86,7 @@ func (ep *Endpoint) CmdAdd(args *skel.CmdArgs) error {
 	}
 	logrus.Infof("ovn4nfvk8s-cni: cmdAdd configure net conf details -%+v", conf)
 	req := cniEndpointRequest(args)
-        logrus.Infof("ovn4nfvk8s-cni: cmdAdd CNIEndpoint Request:%+v",req)
+	logrus.Infof("ovn4nfvk8s-cni: cmdAdd CNIEndpoint Request:%+v", req)
 	reponsebody, err := ep.sendCNIServerReq(req)
 	if err != nil {
 		return err

@@ -17,7 +17,7 @@
 package controller
 
 import (
-	"ovn4nfv-k8s-plugin/pkg/controller/networkchaining"
+	"icn-nodus/pkg/controller/networkchaining"
 )
 
 func init() {

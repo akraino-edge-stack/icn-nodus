@@ -4,11 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"ovn4nfv-k8s-plugin/internal/pkg/kube"
-	"ovn4nfv-k8s-plugin/internal/pkg/ovn"
+	"icn-nodus/internal/pkg/kube"
+	"icn-nodus/internal/pkg/ovn"
 
-	notif "ovn4nfv-k8s-plugin/internal/pkg/nfnNotify"
-	chaining "ovn4nfv-k8s-plugin/internal/pkg/utils"
+	notif "icn-nodus/internal/pkg/nfnNotify"
+	chaining "icn-nodus/internal/pkg/utils"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"

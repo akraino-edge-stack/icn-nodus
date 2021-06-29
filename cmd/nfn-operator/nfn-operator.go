@@ -9,11 +9,12 @@ import (
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 
+	notif "icn-nodus/internal/pkg/nfnNotify"
+	"icn-nodus/internal/pkg/ovn"
+	"icn-nodus/pkg/apis"
+	"icn-nodus/pkg/controller"
+
 	"github.com/spf13/pflag"
-	notif "ovn4nfv-k8s-plugin/internal/pkg/nfnNotify"
-	"ovn4nfv-k8s-plugin/internal/pkg/ovn"
-	"ovn4nfv-k8s-plugin/pkg/apis"
-	"ovn4nfv-k8s-plugin/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	"sigs.k8s.io/controller-runtime/pkg/manager"

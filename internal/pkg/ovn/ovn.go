@@ -2,10 +2,10 @@ package ovn
 
 import (
 	"fmt"
+	"icn-nodus/internal/pkg/config"
+	k8sv1alpha1 "icn-nodus/pkg/apis/k8s/v1alpha1"
 	"math/rand"
 	"os"
-	"ovn4nfv-k8s-plugin/internal/pkg/config"
-	k8sv1alpha1 "ovn4nfv-k8s-plugin/pkg/apis/k8s/v1alpha1"
 	"strings"
 	"time"
 

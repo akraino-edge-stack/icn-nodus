@@ -18,12 +18,12 @@ package nfn
 
 import (
 	"fmt"
+	pb "icn-nodus/internal/pkg/nfnNotify/proto"
+	"icn-nodus/internal/pkg/node"
+	chaining "icn-nodus/internal/pkg/utils"
+	v1alpha1 "icn-nodus/pkg/apis/k8s/v1alpha1"
+	clientset "icn-nodus/pkg/generated/clientset/versioned"
 	"net"
-	pb "ovn4nfv-k8s-plugin/internal/pkg/nfnNotify/proto"
-	"ovn4nfv-k8s-plugin/internal/pkg/node"
-	chaining "ovn4nfv-k8s-plugin/internal/pkg/utils"
-	v1alpha1 "ovn4nfv-k8s-plugin/pkg/apis/k8s/v1alpha1"
-	clientset "ovn4nfv-k8s-plugin/pkg/generated/clientset/versioned"
 	"strings"
 
 	"google.golang.org/grpc"

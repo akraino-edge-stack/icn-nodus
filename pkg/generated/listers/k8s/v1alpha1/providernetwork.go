@@ -19,7 +19,7 @@ limitations under the License.
 package v1alpha1
 
 import (
-	v1alpha1 "ovn4nfv-k8s-plugin/pkg/apis/k8s/v1alpha1"
+	v1alpha1 "icn-nodus/pkg/apis/k8s/v1alpha1"
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"

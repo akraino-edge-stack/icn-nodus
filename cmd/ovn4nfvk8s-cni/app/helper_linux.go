@@ -4,11 +4,11 @@ package app
 
 import (
 	"fmt"
+	"icn-nodus/internal/pkg/config"
+	"icn-nodus/internal/pkg/network"
+	"icn-nodus/internal/pkg/ovn"
 	"net"
 	"os/exec"
-	"ovn4nfv-k8s-plugin/internal/pkg/config"
-	"ovn4nfv-k8s-plugin/internal/pkg/network"
-	"ovn4nfv-k8s-plugin/internal/pkg/ovn"
 	"strconv"
 	"strings"
 

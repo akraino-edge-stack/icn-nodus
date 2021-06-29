@@ -11,9 +11,9 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/klog"
 
-	"ovn4nfv-k8s-plugin/cmd/ovn4nfvk8s-cni/app"
-	"ovn4nfv-k8s-plugin/internal/pkg/config"
-	"ovn4nfv-k8s-plugin/internal/pkg/kube"
+	"icn-nodus/cmd/ovn4nfvk8s-cni/app"
+	"icn-nodus/internal/pkg/config"
+	"icn-nodus/internal/pkg/kube"
 
 	"github.com/containernetworking/cni/pkg/types"
 	"github.com/containernetworking/cni/pkg/types/current"

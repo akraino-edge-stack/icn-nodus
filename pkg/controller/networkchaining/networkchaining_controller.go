@@ -19,10 +19,10 @@ package networkchaining
 import (
 	"context"
 	"fmt"
-	notif "ovn4nfv-k8s-plugin/internal/pkg/nfnNotify"
-	chaining "ovn4nfv-k8s-plugin/internal/pkg/utils"
-	k8sv1alpha1 "ovn4nfv-k8s-plugin/pkg/apis/k8s/v1alpha1"
-	"ovn4nfv-k8s-plugin/pkg/utils"
+	notif "icn-nodus/internal/pkg/nfnNotify"
+	chaining "icn-nodus/internal/pkg/utils"
+	k8sv1alpha1 "icn-nodus/pkg/apis/k8s/v1alpha1"
+	"icn-nodus/pkg/utils"
 	"reflect"
 
 	"github.com/go-logr/logr"

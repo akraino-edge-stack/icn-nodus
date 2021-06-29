@@ -1,7 +1,7 @@
 package controller
 
 import (
-	"ovn4nfv-k8s-plugin/pkg/controller/pod"
+	"icn-nodus/pkg/controller/pod"
 )
 
 func init() {

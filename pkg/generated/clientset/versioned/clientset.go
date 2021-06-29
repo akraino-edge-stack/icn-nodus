@@ -20,7 +20,7 @@ package versioned
 
 import (
 	"fmt"
-	k8sv1alpha1 "ovn4nfv-k8s-plugin/pkg/generated/clientset/versioned/typed/k8s/v1alpha1"
+	k8sv1alpha1 "icn-nodus/pkg/generated/clientset/versioned/typed/k8s/v1alpha1"
 
 	discovery "k8s.io/client-go/discovery"
 	rest "k8s.io/client-go/rest"

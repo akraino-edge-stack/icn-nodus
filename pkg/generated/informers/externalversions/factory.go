@@ -19,9 +19,9 @@ limitations under the License.
 package externalversions
 
 import (
-	versioned "ovn4nfv-k8s-plugin/pkg/generated/clientset/versioned"
-	internalinterfaces "ovn4nfv-k8s-plugin/pkg/generated/informers/externalversions/internalinterfaces"
-	k8s "ovn4nfv-k8s-plugin/pkg/generated/informers/externalversions/k8s"
+	versioned "icn-nodus/pkg/generated/clientset/versioned"
+	internalinterfaces "icn-nodus/pkg/generated/informers/externalversions/internalinterfaces"
+	k8s "icn-nodus/pkg/generated/informers/externalversions/k8s"
 	reflect "reflect"
 	sync "sync"
 	time "time"

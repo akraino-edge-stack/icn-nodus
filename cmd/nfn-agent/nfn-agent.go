@@ -19,13 +19,13 @@ package main
 import (
 	"context"
 	"fmt"
+	cs "icn-nodus/internal/pkg/cniserver"
+	pb "icn-nodus/internal/pkg/nfnNotify/proto"
+	"icn-nodus/internal/pkg/ovn"
+	chaining "icn-nodus/internal/pkg/utils"
 	"io"
 	"os"
 	"os/signal"
-	cs "ovn4nfv-k8s-plugin/internal/pkg/cniserver"
-	pb "ovn4nfv-k8s-plugin/internal/pkg/nfnNotify/proto"
-	"ovn4nfv-k8s-plugin/internal/pkg/ovn"
-	chaining "ovn4nfv-k8s-plugin/internal/pkg/utils"
 	"strings"
 	"syscall"
 	"time"
@@ -38,7 +38,7 @@ import (
 
 	//"google.golang.org/grpc/keepalive"
 
-	"ovn4nfv-k8s-plugin/cmd/ovn4nfvk8s-cni/app"
+	"icn-nodus/cmd/ovn4nfvk8s-cni/app"
 
 	"google.golang.org/grpc/status"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"

@@ -1,4 +1,4 @@
-module ovn4nfv-k8s-plugin
+module icn-nodus
 
 require (
 	dmitri.shuralyov.com/gpu/mtl v0.0.0-20191203043605-d42048ed14fd // indirect

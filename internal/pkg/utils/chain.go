@@ -19,12 +19,12 @@ package nfn
 import (
 	"context"
 	"fmt"
-	"ovn4nfv-k8s-plugin/internal/pkg/cniserver"
-	"ovn4nfv-k8s-plugin/internal/pkg/config"
-	"ovn4nfv-k8s-plugin/internal/pkg/kube"
-	"ovn4nfv-k8s-plugin/internal/pkg/network"
-	"ovn4nfv-k8s-plugin/internal/pkg/ovn"
-	k8sv1alpha1 "ovn4nfv-k8s-plugin/pkg/apis/k8s/v1alpha1"
+	"icn-nodus/internal/pkg/cniserver"
+	"icn-nodus/internal/pkg/config"
+	"icn-nodus/internal/pkg/kube"
+	"icn-nodus/internal/pkg/network"
+	"icn-nodus/internal/pkg/ovn"
+	k8sv1alpha1 "icn-nodus/pkg/apis/k8s/v1alpha1"
 	"reflect"
 	"strings"
 
@@ -32,7 +32,7 @@ import (
 
 	"k8s.io/client-go/kubernetes"
 
-	pb "ovn4nfv-k8s-plugin/internal/pkg/nfnNotify/proto"
+	pb "icn-nodus/internal/pkg/nfnNotify/proto"
 
 	"github.com/containernetworking/plugins/pkg/ns"
 	"github.com/docker/docker/client"

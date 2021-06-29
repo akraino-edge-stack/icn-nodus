@@ -13,7 +13,7 @@ import (
 
 	"k8s.io/klog"
 
-	"ovn4nfv-k8s-plugin/internal/pkg/config"
+	"icn-nodus/internal/pkg/config"
 
 	"github.com/gorilla/mux"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"

@@ -8,7 +8,7 @@ import (
 	"github.com/prometheus/common/log"
 	"github.com/sirupsen/logrus"
 
-	k8sv1alpha1 "ovn4nfv-k8s-plugin/pkg/generated/clientset/versioned/typed/k8s/v1alpha1"
+	k8sv1alpha1 "icn-nodus/pkg/generated/clientset/versioned/typed/k8s/v1alpha1"
 
 	kapi "k8s.io/api/core/v1"
 	kapisnetworking "k8s.io/api/networking/v1"

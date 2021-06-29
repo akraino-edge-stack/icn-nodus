@@ -1,7 +1,7 @@
 package controller
 
 import (
-	"ovn4nfv-k8s-plugin/pkg/controller/network"
+	"icn-nodus/pkg/controller/network"
 )
 
 func init() {

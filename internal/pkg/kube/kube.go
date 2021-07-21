@@ -16,6 +16,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/util/retry"
 	kubeadmtypes "sigs.k8s.io/cluster-api/bootstrap/kubeadm/types/v1beta1"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
@@ -24,6 +25,7 @@ import (
 
 const kubeconfigmap = "kubeadm-config"
 const kubesystemNamespace = "kube-system"
+const nodusKubeConfigFile = "/etc/cni/net.d/ovn4nfv-k8s.d/ovn4nfv-k8s.kubeconfig"
 
 // Interface represents the exported methods for dealing with getting/setting
 // kubernetes resources
@@ -73,6 +75,25 @@ func GetKubeConfig() (*kubernetes.Clientset, error) {
 	// Get a config to talk to the apiserver
 	cfg, err := config.GetConfig()
 	if err != nil {
+		return nil, err
+	}
+
+	k, err = kubernetes.NewForConfig(cfg)
+	if err != nil {
+		log.Error(err, "Error building Kuberenetes clientset")
+		return nil, err
+	}
+
+	return k, nil
+}
+
+// GetKubeConfigfromFile return kubernetes Clientset
+func GetKubeConfigfromFile() (*kubernetes.Clientset, error) {
+	var k *kubernetes.Clientset
+
+	cfg, err := clientcmd.BuildConfigFromFlags("", nodusKubeConfigFile)
+	if err != nil {
+		log.Errorf("Error in getting the context for the kubeconfig - %v : %v", nodusKubeConfigFile, err)
 		return nil, err
 	}
 

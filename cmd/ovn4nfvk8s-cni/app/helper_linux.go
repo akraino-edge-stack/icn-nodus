@@ -12,6 +12,7 @@ import (
 	"github.com/akraino-edge-stack/icn-nodus/internal/pkg/config"
 	"github.com/akraino-edge-stack/icn-nodus/internal/pkg/network"
 	"github.com/akraino-edge-stack/icn-nodus/internal/pkg/ovn"
+        "github.com/akraino-edge-stack/icn-nodus/internal/pkg/kube"
 
 	"github.com/containernetworking/cni/pkg/types/current"
 	"github.com/containernetworking/plugins/pkg/ip"
@@ -103,18 +104,33 @@ func setupInterface(netns ns.NetNS, containerID, ifName, macAddress, ipAddress, 
 	hostIface := &current.Interface{}
 	contIface := &current.Interface{}
 	var hostNet string
+	var serviceSubnet string
+	var podSubnet string
+	var err error
 
-	if defaultGateway == "false" && isDefaultGW == true && ifName == "eth0" {
-		var err error
-		hostNet, err = network.GetHostNetwork()
+	hostNet, err = network.GetHostNetwork()
+	if err != nil {
+		log.Error(err, "Failed to get host network")
+		return nil, nil, fmt.Errorf("failed to get host network: %v", err)
+	}
+
+	if defaultGateway == "true" {
+		k, err := kube.GetKubeConfig()
 		if err != nil {
-			log.Error(err, "Failed to get host network")
-			return nil, nil, fmt.Errorf("failed to get host network: %v", err)
+			return nil, nil, fmt.Errorf("Error in kubeclientset:%v", err)
 		}
+
+		kubecli := &kube.Kube{KClient: k}
+		kn, err := kubecli.GetControlPlaneServiceIPRange()
+		if err != nil {
+			return nil, nil, fmt.Errorf("Error in getting svc cidr range")
+		}
+		serviceSubnet = kn.ServiceSubnet
+		podSubnet = kn.PodSubnet
 	}
 
 	var oldHostVethName string
-	err := netns.Do(func(hostNS ns.NetNS) error {
+	err = netns.Do(func(hostNS ns.NetNS) error {
 		// create the veth pair in the container and move host end into host netns
 		hostVeth, containerVeth, err := ip.SetupVeth(ifName, mtu, hostNS)
 		if err != nil {
@@ -150,13 +166,33 @@ func setupInterface(netns ns.NetNS, containerID, ifName, macAddress, ipAddress, 
 		}
 
 		if defaultGateway == "true" {
-			gw := net.ParseIP(gatewayIP)
-			if gw == nil {
-				return fmt.Errorf("parse ip of gateway failed")
-			}
-			err = ip.AddRoute(nil, gw, link)
+			podGW, err := network.GetDefaultGateway()
 			if err != nil {
-				logrus.Errorf("ip.AddRoute failed %v gw %v link %v", err, gw, link)
+				log.Error(err, "Failed to get pod default gateway")
+				return err
+			}
+
+			stdout, stderr, err := ovn.RunIP("route", "add", hostNet, "via", podGW)
+			if err != nil && !strings.Contains(stderr, "RTNETLINK answers: File exists") {
+				log.Error(err, "Failed to ip route add", "stdout", stdout, "stderr", stderr)
+				return err
+			}
+
+			stdout, stderr, err = ovn.RunIP("route", "add", serviceSubnet, "via", podGW)
+			if err != nil && !strings.Contains(stderr, "RTNETLINK answers: File exists") {
+				log.Error(err, "Failed to ip route add", "stdout", stdout, "stderr", stderr)
+				return err
+			}
+
+			stdout, stderr, err = ovn.RunIP("route", "add", podSubnet, "via", podGW)
+			if err != nil && !strings.Contains(stderr, "RTNETLINK answers: File exists") {
+				log.Error(err, "Failed to ip route add", "stdout", stdout, "stderr", stderr)
+				return err
+			}
+
+			stdout, stderr, err = ovn.RunIP("route", "replace", "default", "via", gatewayIP)
+			if err != nil {
+				log.Error(err, "Failed to ip route replace", "stdout", stdout, "stderr", stderr)
 				return err
 			}
 		}

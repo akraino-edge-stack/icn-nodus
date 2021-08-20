@@ -10,9 +10,9 @@ import (
 	"strings"
 
 	"github.com/akraino-edge-stack/icn-nodus/internal/pkg/config"
+	"github.com/akraino-edge-stack/icn-nodus/internal/pkg/kube"
 	"github.com/akraino-edge-stack/icn-nodus/internal/pkg/network"
 	"github.com/akraino-edge-stack/icn-nodus/internal/pkg/ovn"
-        "github.com/akraino-edge-stack/icn-nodus/internal/pkg/kube"
 
 	"github.com/containernetworking/cni/pkg/types/current"
 	"github.com/containernetworking/plugins/pkg/ip"
@@ -165,7 +165,19 @@ func setupInterface(netns ns.NetNS, containerID, ifName, macAddress, ipAddress, 
 			return fmt.Errorf("failed to add IP addr %s to %s: %v", ipAddress, contIface.Name, err)
 		}
 
-		if defaultGateway == "true" {
+		if defaultGateway == "true" && ifName == "eth0" {
+			gw := net.ParseIP(gatewayIP)
+			if gw == nil {
+				return fmt.Errorf("parse ip of gateway failed")
+			}
+			err = ip.AddRoute(nil, gw, link)
+			if err != nil {
+				logrus.Errorf("ip.AddRoute failed %v gw %v link %v", err, gw, link)
+				return err
+			}
+		}
+
+		if defaultGateway == "true" && ifName != "eth0" {
 			podGW, err := network.GetDefaultGateway()
 			if err != nil {
 				log.Error(err, "Failed to get pod default gateway")

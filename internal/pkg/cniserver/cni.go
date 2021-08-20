@@ -124,7 +124,7 @@ func (cr *CNIServerRequest) AddMultipleInterfaces(nfnAnnotation, ovnAnnotation, 
 	if cr.CNIConf != nil {
 		networkname = cr.CNIConf.NFNNetwork
 	}
-	if networkname != "" {
+	if len(networkname) != 0 && len(nfnAnnotation) != 0 {
 		var err error
 		nfnNetworks, err = parseNfnNetworkObject(nfnAnnotation)
 		if err != nil {
@@ -338,14 +338,22 @@ func (cr *CNIServerRequest) cmdAdd(kclient kubernetes.Interface) ([]byte, error)
 	klog.Infof("ovn4nfvk8s-cni: cmdAdd Annotations Found")
 	nfnAnnotation, ok := annotation[nfnNetworkAnnotationTag]
 	if !ok {
-		return nil, fmt.Errorf("Error while obtatining %v pod annotation", nfnNetworkAnnotationTag)
+		klog.Infof("%v pod annotation doesn't exist", nfnNetworkAnnotationTag)
 	}
-	klog.Infof("ovn4nfvk8s-cni: cmdAdd Annotation Found is %v", nfnAnnotation)
+
+	if len(nfnAnnotation) != 0 {
+		klog.Infof("ovn4nfvk8s-cni: cmdAdd Annotation Found is %v", nfnAnnotation)
+	}
+
 	ovnAnnotation, ok := annotation[ovn4nfvAnnotationTag]
 	if !ok {
-		return nil, fmt.Errorf("Error while obtatining %v pod annotation", ovn4nfvAnnotationTag)
+		return nil, fmt.Errorf("Error while obtaining %v pod annotation", ovn4nfvAnnotationTag)
 	}
-	klog.Infof("ovn4nfvk8s-cni: cmdAdd Annotation Found is %v", ovnAnnotation)
+
+	if len(ovnAnnotation) != 0 {
+		klog.Infof("ovn4nfvk8s-cni: cmdAdd Annotation Found is %v", ovnAnnotation)
+	}
+
 	result := cr.AddMultipleInterfaces(nfnAnnotation, ovnAnnotation, namespace, podname)
 	//Add Routes to the pod if annotation found for routes
 	ovnRouteAnnotation, ok := annotation["ovnNetworkRoutes"]

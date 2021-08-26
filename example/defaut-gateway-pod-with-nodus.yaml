@@ -1,0 +1,25 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dg
+  labels:
+    app: dg
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: dg
+  template:
+    metadata:
+      labels:
+        app: dg
+      annotations:
+        k8s.plugin.opnfv.org/nfn-network: '{ "type": "ovn4nfv", "interface": [{"name": "ovn-port-net", "interface": "net2", "defaultGateway": "false"}, {"name": "ovn-priv-net", "interface": "net3", "defaultGateway": "true", "gwipaddress": "172.16.44.201"}]}'
+    spec:
+      containers:
+      - name: dg
+        image: rkamudhan/netshoot:v1.0
+        imagePullPolicy: IfNotPresent
+        stdin: true
+        tty: true
+---

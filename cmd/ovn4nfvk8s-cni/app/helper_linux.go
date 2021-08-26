@@ -22,6 +22,8 @@ import (
 	"github.com/vishvananda/netlink"
 )
 
+const primaryiface = "eth0"
+
 func renameLink(curName, newName string) error {
 	link, err := netlink.LinkByName(curName)
 	if err != nil {
@@ -100,6 +102,88 @@ func CreateNodeOVSInternalPort(nodeintfipaddr, nodeintfmacaddr, node string) err
 	return nil
 }
 
+//GetPrimaryInterface return the eth0 link if it is created in the container ns
+func GetPrimaryInterface() (netlink.Link, error) {
+
+	link, err := netlink.LinkByName(primaryiface)
+	if err != nil {
+		return nil, err
+	}
+
+	return link, err
+}
+
+func setGateway(link netlink.Link, gatewayIP string) error {
+	gw := net.ParseIP(gatewayIP)
+	if gw == nil {
+		return fmt.Errorf("parse ip of gateway failed")
+	}
+	err := ip.AddRoute(nil, gw, link)
+	if err != nil {
+		logrus.Errorf("ip.AddRoute failed %v gw %v link %v", err, gw, link)
+		return err
+	}
+
+	return nil
+}
+
+func setpodGWRoutes(hostNet, serviceSubnet, podSubnet, gatewayIP string) error {
+	podGW, err := network.GetDefaultGateway()
+	if err != nil {
+		log.Error(err, "Failed to get pod default gateway")
+		return err
+	}
+
+	stdout, stderr, err := ovn.RunIP("route", "add", hostNet, "via", podGW)
+	if err != nil && !strings.Contains(stderr, "RTNETLINK answers: File exists") {
+		log.Error(err, "Failed to ip route add", "stdout", stdout, "stderr", stderr)
+		return err
+	}
+
+	stdout, stderr, err = ovn.RunIP("route", "add", serviceSubnet, "via", podGW)
+	if err != nil && !strings.Contains(stderr, "RTNETLINK answers: File exists") {
+		log.Error(err, "Failed to ip route add", "stdout", stdout, "stderr", stderr)
+		return err
+	}
+
+	stdout, stderr, err = ovn.RunIP("route", "add", podSubnet, "via", podGW)
+	if err != nil && !strings.Contains(stderr, "RTNETLINK answers: File exists") {
+		log.Error(err, "Failed to ip route add", "stdout", stdout, "stderr", stderr)
+		return err
+	}
+
+	stdout, stderr, err = ovn.RunIP("route", "replace", "default", "via", gatewayIP)
+	if err != nil {
+		log.Error(err, "Failed to ip route replace", "stdout", stdout, "stderr", stderr)
+		return err
+	}
+
+	return nil
+}
+
+func setExtraRoutes(hostNet, serviceSubnet, podSubnet, gatewayIP string) error {
+
+	stdout, stderr, err := ovn.RunIP("route", "add", hostNet, "via", gatewayIP)
+	if err != nil && !strings.Contains(stderr, "RTNETLINK answers: File exists") {
+		log.Error(err, "Failed to ip route add", "stdout", stdout, "stderr", stderr)
+		return err
+	}
+
+	stdout, stderr, err = ovn.RunIP("route", "add", serviceSubnet, "via", gatewayIP)
+	if err != nil && !strings.Contains(stderr, "RTNETLINK answers: File exists") {
+		log.Error(err, "Failed to ip route add", "stdout", stdout, "stderr", stderr)
+		return err
+	}
+
+	stdout, stderr, err = ovn.RunIP("route", "add", podSubnet, "via", gatewayIP)
+	if err != nil && !strings.Contains(stderr, "RTNETLINK answers: File exists") {
+		log.Error(err, "Failed to ip route add", "stdout", stdout, "stderr", stderr)
+		return err
+	}
+
+	return nil
+}
+
 func setupInterface(netns ns.NetNS, containerID, ifName, macAddress, ipAddress, gatewayIP, defaultGateway string, idx, mtu int, isDefaultGW bool) (*current.Interface, *current.Interface, error) {
 	hostIface := &current.Interface{}
 	contIface := &current.Interface{}
@@ -114,20 +198,18 @@ func setupInterface(netns ns.NetNS, containerID, ifName, macAddress, ipAddress, 
 		return nil, nil, fmt.Errorf("failed to get host network: %v", err)
 	}
 
-	if defaultGateway == "true" {
-		k, err := kube.GetKubeConfig()
-		if err != nil {
-			return nil, nil, fmt.Errorf("Error in kubeclientset:%v", err)
-		}
-
-		kubecli := &kube.Kube{KClient: k}
-		kn, err := kubecli.GetControlPlaneServiceIPRange()
-		if err != nil {
-			return nil, nil, fmt.Errorf("Error in getting svc cidr range")
-		}
-		serviceSubnet = kn.ServiceSubnet
-		podSubnet = kn.PodSubnet
+	k, err := kube.GetKubeConfig()
+	if err != nil {
+		return nil, nil, fmt.Errorf("Error in kubeclientset:%v", err)
 	}
+
+	kubecli := &kube.Kube{KClient: k}
+	kn, err := kubecli.GetControlPlaneServiceIPRange()
+	if err != nil {
+		return nil, nil, fmt.Errorf("Error in getting svc cidr range")
+	}
+	serviceSubnet = kn.ServiceSubnet
+	podSubnet = kn.PodSubnet
 
 	var oldHostVethName string
 	err = netns.Do(func(hostNS ns.NetNS) error {
@@ -165,55 +247,38 @@ func setupInterface(netns ns.NetNS, containerID, ifName, macAddress, ipAddress, 
 			return fmt.Errorf("failed to add IP addr %s to %s: %v", ipAddress, contIface.Name, err)
 		}
 
+		log.Infof("Value of defaultGateway- %v and ifname- %v", defaultGateway, ifName)
 		if defaultGateway == "true" && ifName == "eth0" {
-			gw := net.ParseIP(gatewayIP)
-			if gw == nil {
-				return fmt.Errorf("parse ip of gateway failed")
-			}
-			err = ip.AddRoute(nil, gw, link)
+			err := setGateway(link, gatewayIP)
 			if err != nil {
-				logrus.Errorf("ip.AddRoute failed %v gw %v link %v", err, gw, link)
 				return err
 			}
 		}
 
 		if defaultGateway == "true" && ifName != "eth0" {
-			podGW, err := network.GetDefaultGateway()
+			_, err = GetPrimaryInterface()
 			if err != nil {
-				log.Error(err, "Failed to get pod default gateway")
-				return err
-			}
-
-			stdout, stderr, err := ovn.RunIP("route", "add", hostNet, "via", podGW)
-			if err != nil && !strings.Contains(stderr, "RTNETLINK answers: File exists") {
-				log.Error(err, "Failed to ip route add", "stdout", stdout, "stderr", stderr)
-				return err
-			}
-
-			stdout, stderr, err = ovn.RunIP("route", "add", serviceSubnet, "via", podGW)
-			if err != nil && !strings.Contains(stderr, "RTNETLINK answers: File exists") {
-				log.Error(err, "Failed to ip route add", "stdout", stdout, "stderr", stderr)
-				return err
-			}
-
-			stdout, stderr, err = ovn.RunIP("route", "add", podSubnet, "via", podGW)
-			if err != nil && !strings.Contains(stderr, "RTNETLINK answers: File exists") {
-				log.Error(err, "Failed to ip route add", "stdout", stdout, "stderr", stderr)
-				return err
-			}
-
-			stdout, stderr, err = ovn.RunIP("route", "replace", "default", "via", gatewayIP)
-			if err != nil {
-				log.Error(err, "Failed to ip route replace", "stdout", stdout, "stderr", stderr)
-				return err
+				if strings.Contains(err.Error(), "Link not found") {
+					err := setGateway(link, gatewayIP)
+					if err != nil {
+						return err
+					}
+				} else {
+					log.Error(err, "Error in getting the eth0 link in container ns")
+					return err
+				}
+			} else {
+				err := setpodGWRoutes(hostNet, serviceSubnet, podSubnet, gatewayIP)
+				if err != nil {
+					return err
+				}
 			}
 		}
 
 		if defaultGateway == "false" && isDefaultGW == true && ifName == "eth0" {
-			stdout, stderr, err := ovn.RunIP("route", "add", hostNet, "via", gatewayIP)
-			if err != nil && !strings.Contains(stderr, "RTNETLINK answers: File exists") {
-				logrus.Errorf("Failed to ip route add stout %s, stderr %s, err %v", stdout, stderr, err)
-				return fmt.Errorf("Failed to ip route add stout %s, stderr %s, err %v", stdout, stderr, err)
+			err = setExtraRoutes(hostNet, serviceSubnet, podSubnet, gatewayIP)
+			if err != nil {
+				return err
 			}
 		}
 

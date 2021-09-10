@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/akraino-edge-stack/icn-nodus/pkg/controller/networkpolicy"
+
 	"github.com/akraino-edge-stack/icn-nodus/internal/pkg/ovn"
 
 	"github.com/akraino-edge-stack/icn-nodus/internal/pkg/kube"
@@ -27,6 +29,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	logf "sigs.k8s.io/controller-runtime/pkg/runtime/log"
 	"sigs.k8s.io/controller-runtime/pkg/source"
+
 )
 
 var log = logf.Log.WithName("controller_pod")
@@ -81,6 +84,18 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 
 				if obj.Status.Phase == corev1.PodRunning {
 					log.V(1).Info("Pod Status Phase", "Pod name", obj.GetName(), "obj.Status.Phase", obj.Status.Phase)
+
+					// If pod was not previously processed the network policies should be refreshed to reflect the changes
+					if _, exists := annotation[networkpolicy.NodusNetworkPolicyAnnotationTag]; !exists {
+						if err := networkpolicy.RefreshNetworkPolicies(&mgr); err != nil {
+							log.Error(err, "Error updating network policies")
+							return false
+						} else {
+							rp := r.(*ReconcilePod)
+							rp.setPodAnnotation(obj, networkpolicy.NodusNetworkPolicyAnnotationTag, "true")
+						}
+					}
+
 					value, ok := annotation[chaining.SFCannotationTag]
 					if !ok {
 						result, pni, ri, err := chaining.ConfigureforSFC(obj.GetName(), obj.GetNamespace())
@@ -110,6 +125,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 				}
 				return false
 			}
+
 			return true
 		},
 		CreateFunc: func(e event.CreateEvent) bool {
@@ -128,6 +144,10 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 			if _, ok := annotaion[nfnNetworkAnnotation]; !ok {
 				return false
 			}*/
+			if err := networkpolicy.RefreshNetworkPolicies(&mgr); err != nil {
+				log.Error(err, "Error updating network policies")
+				return false
+			}
 			return true
 		},
 	}

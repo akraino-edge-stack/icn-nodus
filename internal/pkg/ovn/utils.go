@@ -3,9 +3,11 @@ package ovn
 import (
 	"bytes"
 	"fmt"
+	"hash/fnv"
 	kexec "k8s.io/utils/exec"
 	"os"
 	"reflect"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -145,4 +147,16 @@ func RunOVSVsctl(args ...string) (string, string, error) {
 	cmdArgs = append(cmdArgs, args...)
 	stdout, stderr, err := run(runner.vsctlPath, cmdArgs...)
 	return strings.Trim(strings.TrimSpace(stdout.String()), "\""), stderr.String(), err
+}
+
+// Hash takes string input and outputs hash value for that string as string
+func Hash(s string) string {
+	hash := fnv.New64a()
+	if _, err := hash.Write([]byte(s)); err == nil {
+		output := strconv.FormatUint(hash.Sum64(), 10)
+		return output
+	} else {
+		log.Error(err, "Hashing failure")
+	}
+    return ""
 }

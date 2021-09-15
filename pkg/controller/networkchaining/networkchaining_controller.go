@@ -161,6 +161,43 @@ const (
 	nfnNetworkChainFinalizer = "nfnCleanUpNetworkChain"
 )
 
+func (r *ReconcileNetworkChaining) checkChain(cr *k8sv1alpha1.NetworkChaining) error {
+	podStatus, err := chaining.CheckSFCPodLabelStatus(cr)
+	if err != nil {
+		return err
+	}
+
+	if podStatus != true {
+		cr.Status.State = k8sv1alpha1.Pending
+	} else {
+		cr.Status.State = k8sv1alpha1.Creating
+	}
+
+	err = r.client.Status().Update(context.TODO(), cr)
+	if err != nil {
+		return err
+	}
+
+	if cr.Status.State == k8sv1alpha1.Pending {
+		for {
+			ps, err := chaining.CheckSFCPodLabelStatus(cr)
+			if err != nil {
+				return err
+			}
+			if ps {
+				cr.Status.State = k8sv1alpha1.Creating
+				err = r.client.Status().Update(context.TODO(), cr)
+				if err != nil {
+					return err
+				}
+				break
+			}
+		}
+	}
+
+	return nil
+}
+
 func (r *ReconcileNetworkChaining) createChain(cr *k8sv1alpha1.NetworkChaining, reqLogger logr.Logger) error {
 	log.V(1).Info("Entering the createchain")
 
@@ -178,10 +215,16 @@ func (r *ReconcileNetworkChaining) createChain(cr *k8sv1alpha1.NetworkChaining, 
 
 	switch {
 	case cr.Spec.ChainType == "Routing":
+		err := r.checkChain(cr)
+		if err != nil {
+			return err
+		}
+
 		podnetworkList, routeList, err := chaining.CalculateRoutes(cr, false, false)
 		if err != nil {
 			return err
 		}
+
 		err = notif.SendRouteNotif(routeList, "create")
 		if err != nil {
 			cr.Status.State = k8sv1alpha1.CreateInternalError

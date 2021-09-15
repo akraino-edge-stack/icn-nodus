@@ -183,7 +183,27 @@ func configurePodSelectorDeployment(ln k8sv1alpha1.RoutingNetwork, sfcEntryPodLa
 			return nil, nil, err
 		}
 
-		for _, pod := range pods.Items {
+		if len(pods.Items) == 0 {
+			log.Info("no pods are avaiable in the namespace", "namespace label", ns.GetName(), "pod label", podLabel.AsSelector().String())
+			continue
+		}
+
+		var pl *corev1.PodList
+		var ps bool
+		if len(pods.Items) >= 1 {
+			for {
+				pl, ps, err = checkSFCPodSelectorStatus(ns.GetName(), podLabel.AsSelector().String())
+				if err != nil {
+					return nil, nil, err
+				}
+				if ps {
+					break
+				}
+			}
+		}
+
+		//Get the updated pod spec
+		for _, pod := range pl.Items {
 			var IsNetworkattached bool
 			var netinfo string
 
@@ -191,9 +211,12 @@ func configurePodSelectorDeployment(ln k8sv1alpha1.RoutingNetwork, sfcEntryPodLa
 
 			if toDelete != true {
 				annotation := pod.GetAnnotations()
-				_, ok := annotation[SFCannotationTag]
+				sfcValue, ok := annotation[SFCannotationTag]
 				if ok {
-					continue
+					log.Info("Status of the SFC creation", "pod", pod.GetName(), "sfcValue", sfcValue)
+					if sfcValue == SFCcreated {
+						continue
+					}
 				}
 			}
 			IsNetworkattached, err := IsPodNetwork(pod, networkname)
@@ -211,6 +234,7 @@ func configurePodSelectorDeployment(ln k8sv1alpha1.RoutingNetwork, sfcEntryPodLa
 			if IsNetworkattached {
 				// Get the containerID of the first container
 				var r RoutingInfo
+				log.Info("Value of the pod container status", "pod container ID", pod.Status.ContainerStatuses[0].ContainerID, "pod container ready state", pod.Status.ContainerStatuses[0].Ready)
 				r.Id = strings.TrimPrefix(pod.Status.ContainerStatuses[0].ContainerID, "docker://")
 				r.Namespace = pod.GetNamespace()
 				r.Name = pod.GetName()
@@ -219,6 +243,7 @@ func configurePodSelectorDeployment(ln k8sv1alpha1.RoutingNetwork, sfcEntryPodLa
 				rt = append(rt, r)
 			} else {
 				var p PodNetworkInfo
+				log.Info("Value of the pod container status", "pod container ID", pod.Status.ContainerStatuses[0].ContainerID, "pod container ready state", pod.Status.ContainerStatuses[0].Ready)
 				p.Id = strings.TrimPrefix(pod.Status.ContainerStatuses[0].ContainerID, "docker://")
 				p.Namespace = pod.GetNamespace()
 				p.Name = pod.GetName()
@@ -596,6 +621,129 @@ func DerivedNetworkFromNetworklist(networklabellist []string) ([]string, error) 
 	}
 
 	return networklist, nil
+}
+
+func checkSFCPodSelectorStatus(nslabel, podlabel string) (*corev1.PodList, bool, error) {
+	var isPodRunning bool
+
+	clientset, err := kube.GetKubeConfig()
+	if err != nil {
+		log.Error(err, "Error in kube clientset")
+		return nil, false, err
+	}
+
+	pods, err := clientset.CoreV1().Pods(nslabel).List(v1.ListOptions{LabelSelector: podlabel})
+	if err != nil {
+		log.Error(err, "Error in kube clientset in listing the pods for default namespace with label", "podlabel", podlabel)
+		return nil, false, err
+	}
+
+	for i, pod := range pods.Items {
+		pdState, err := clientset.CoreV1().Pods(pod.GetNamespace()).Get(pod.GetName(), v1.GetOptions{})
+		if err != nil {
+			log.Error(err, "Error in kube clientset in getting the pod state for default namespace with label", "podlabel", podlabel, "pdState", pdState)
+			return nil, false, err
+		}
+
+		log.Info("State of PodSelector pods", "index", i, "podName", pod.GetName(), "Status", pdState.Status.Phase)
+
+		if pdState.Status.Phase == corev1.PodRunning {
+			if len(pod.Status.ContainerStatuses) != 0 {
+				if pod.Status.ContainerStatuses[0].Ready == true {
+					log.Info("State of PodSelector pods", "index", i, "podName", pod.GetName(), "Status", pdState.Status.Phase, "", pod.Status.ContainerStatuses[0].ContainerID, "container Ready", pod.Status.ContainerStatuses[0].Ready)
+					isPodRunning = true
+				} else {
+					isPodRunning = false
+					log.Info("Exit the loop - PodSelector pods", "index", i, "podName", pod.GetName(), "Status", pdState.Status.Phase, "", pod.Status.ContainerStatuses[0].ContainerID, "container Ready", pod.Status.ContainerStatuses[0].Ready)
+					break
+				}
+			} else {
+				isPodRunning = false
+				log.Info("Exit the loop, PodSelector pods", "index", i, "podName", pod.GetName(), "Status", pdState.Status.Phase, "container status", pod.Status.ContainerStatuses)
+				break
+			}
+		} else {
+			isPodRunning = false
+			log.Info("Exit the loop, PodSelector pods are not in running state", "index", i, "podName", pod.GetName(), "Status", pdState.Status.Phase)
+			break
+		}
+	}
+
+	log.Info("PodSelector Pods status", "Running State", isPodRunning)
+
+	if isPodRunning != true {
+		return nil, isPodRunning, nil
+	}
+
+	return pods, isPodRunning, nil
+}
+
+// CheckSFCPodLabelStatus returns true, if all the pods in the SFC are up and running
+func CheckSFCPodLabelStatus(cr *k8sv1alpha1.NetworkChaining) (bool, error) {
+	var deploymentList []string
+	var isPodRunning bool
+
+	chains := strings.Split(cr.Spec.RoutingSpec.NetworkChain, ",")
+
+	mode, err := ValidateNetworkChaining(cr)
+	if err != nil {
+		return false, err
+	}
+
+	if mode == k8sv1alpha1.VirutalMode {
+		chains = chains[1 : len(chains)-1]
+	}
+
+	i := 0
+	for _, chain := range chains {
+		if i%2 == 0 {
+			deploymentList = append(deploymentList, chain)
+		}
+		i++
+	}
+
+	for j, sfcpodlabel := range deploymentList {
+		// Get a config to talk to the apiserver
+		clientset, err := kube.GetKubeConfig()
+		if err != nil {
+			log.Error(err, "Error in kube clientset")
+			return false, err
+		}
+
+		pods, err := clientset.CoreV1().Pods("default").List(v1.ListOptions{LabelSelector: sfcpodlabel})
+		if err != nil {
+			log.Error(err, "Error in kube clientset in listing the pods for default namespace with label", "sfcpodlabel", sfcpodlabel)
+			return false, err
+		}
+
+		if len(pods.Items) != 1 {
+			err := fmt.Errorf("Currently load balancing is not supported, expected SFC deployment has only 1 replica")
+			log.Error(err, "Error in kube clientset in listing the pods for namespace", "sfcpodlabel", sfcpodlabel)
+			return false, err
+		}
+
+		podName := pods.Items[0].GetName()
+
+		pdState, err := clientset.CoreV1().Pods("default").Get(podName, v1.GetOptions{})
+		if err != nil {
+			log.Error(err, "Error in kube clientset in getting the pod state for default namespace with label", "sfcpodlabel", sfcpodlabel, "pdState", pdState)
+			return false, err
+		}
+
+		log.Info("State of the Pod", "index", j, "podName", podName, "Status", pdState.Status.Phase)
+
+		if pdState.Status.Phase == corev1.PodRunning {
+			isPodRunning = true
+		} else {
+			isPodRunning = false
+			log.Info("Exit the loop, sfc pods are not in running state", "index", j, "podName", podName, "Status", pdState.Status.Phase)
+			break
+		}
+	}
+
+	log.Info("SFC Pods status", "Running State", isPodRunning)
+
+	return isPodRunning, nil
 }
 
 // CalculateRoutes returns the routing info

@@ -44,11 +44,15 @@ type DnsSpec struct {
 const (
 	//Created indicates the status of success
 	Created = "Created"
+	//Pending indicates the sfc status is pending
+	Pending = "Pending"
+	//Creating indicates the sfc status is Creating
+	Creating = "Creating"
 	//CreateInternalError indicates create internal irrecoverable Error
 	CreateInternalError = "CreateInternalError"
 	//DeleteInternalError indicates delete internal irrecoverable Error
 	DeleteInternalError = "DeleteInternalError"
-	//Deleted indicated the status of success
+	//Deleted indicated the sfc is deleted
 	Deleted = "Deleted"
 	//Virutal mode
 	VirutalMode = "VirutalMode"

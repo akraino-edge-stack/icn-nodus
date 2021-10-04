@@ -1,0 +1,136 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "1c4d76a1_346f5c80",
+        "filename": "demo/calico-nodus-secondary-sfc-setup-II/deploy/ngfw.yaml",
+        "patchSetId": 4
+      },
+      "lineNbr": 17,
+      "author": {
+        "id": 239
+      },
+      "writtenOn": "2021-10-04T19:50:53Z",
+      "side": 1,
+      "message": "Remove the whitespace",
+      "range": {
+        "startLine": 17,
+        "startChar": 39,
+        "endLine": 17,
+        "endChar": 79
+      },
+      "revId": "18f41fb938e26bf36929d92bd7f4343009d42f80",
+      "serverId": "4cada01b-0314-4fe0-84a1-f9ddc89863f9",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "7496c547_98cd2b00",
+        "filename": "demo/calico-nodus-secondary-sfc-setup-II/deploy/sdewan-multiple-network.yaml",
+        "patchSetId": 4
+      },
+      "lineNbr": 17,
+      "author": {
+        "id": 239
+      },
+      "writtenOn": "2021-10-04T19:50:53Z",
+      "side": 1,
+      "message": "Remove the whitespace",
+      "range": {
+        "startLine": 17,
+        "startChar": 39,
+        "endLine": 17,
+        "endChar": 79
+      },
+      "revId": "18f41fb938e26bf36929d92bd7f4343009d42f80",
+      "serverId": "4cada01b-0314-4fe0-84a1-f9ddc89863f9",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "7a0122a8_6a06f121",
+        "filename": "demo/calico-nodus-secondary-sfc-setup-II/deploy/sfc-virutal-network.yaml",
+        "patchSetId": 4
+      },
+      "lineNbr": 2,
+      "author": {
+        "id": 239
+      },
+      "writtenOn": "2021-10-04T19:50:53Z",
+      "side": 1,
+      "message": "It is all provider network. Name of the file should be changed",
+      "range": {
+        "startLine": 2,
+        "startChar": 0,
+        "endLine": 2,
+        "endChar": 21
+      },
+      "revId": "18f41fb938e26bf36929d92bd7f4343009d42f80",
+      "serverId": "4cada01b-0314-4fe0-84a1-f9ddc89863f9",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "bb25f8de_25d40238",
+        "filename": "demo/calico-nodus-secondary-sfc-setup-II/deploy/slb-multiple-network.yaml",
+        "patchSetId": 4
+      },
+      "lineNbr": 17,
+      "author": {
+        "id": 239
+      },
+      "writtenOn": "2021-10-04T19:50:53Z",
+      "side": 1,
+      "message": "Remove the whitespace",
+      "revId": "18f41fb938e26bf36929d92bd7f4343009d42f80",
+      "serverId": "4cada01b-0314-4fe0-84a1-f9ddc89863f9",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "9f045cd9_7d8e8aed",
+        "filename": "demo/calico-nodus-secondary-sfc-setup-II/ovn4nfv-pod-network/ovn4nfv-k8s-plugin.yml",
+        "patchSetId": 4
+      },
+      "lineNbr": 1,
+      "author": {
+        "id": 239
+      },
+      "writtenOn": "2021-10-04T19:50:53Z",
+      "side": 1,
+      "message": "Remove this file",
+      "range": {
+        "startLine": 1,
+        "startChar": 0,
+        "endLine": 1,
+        "endChar": 3
+      },
+      "revId": "18f41fb938e26bf36929d92bd7f4343009d42f80",
+      "serverId": "4cada01b-0314-4fe0-84a1-f9ddc89863f9",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "57736f9e_a42bc4c2",
+        "filename": "internal/pkg/network/subnet.go",
+        "patchSetId": 4
+      },
+      "lineNbr": 124,
+      "author": {
+        "id": 239
+      },
+      "writtenOn": "2021-10-04T19:50:53Z",
+      "side": 1,
+      "message": "Remove the unwanted logs",
+      "range": {
+        "startLine": 119,
+        "startChar": 1,
+        "endLine": 124,
+        "endChar": 4
+      },
+      "revId": "18f41fb938e26bf36929d92bd7f4343009d42f80",
+      "serverId": "4cada01b-0314-4fe0-84a1-f9ddc89863f9",
+      "unresolved": true
+    }
+  ]
+}

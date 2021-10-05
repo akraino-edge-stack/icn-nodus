@@ -57,7 +57,7 @@ ssh into the TM2 vm and run the following command to attach TM2 to the right pro
     $ ip link set dev eth1.200 up
     $ ip addr add 172.30.20.2/24 dev eth1.200
 ```
-Run the following commands to create virutal router
+Run the following commands to create virtual router
 ```
    $ ip route add 172.30.10.0/24 via 172.30.20.3
    $ ip route add 172.30.33.0/24 via 172.30.20.3

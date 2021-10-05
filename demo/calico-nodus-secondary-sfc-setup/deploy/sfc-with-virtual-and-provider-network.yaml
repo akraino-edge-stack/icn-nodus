@@ -7,7 +7,7 @@ spec:
   chainType: "Routing"
   routingSpec:
     namespace: "default"
-    networkChain: "net=virutal-net1,app=slb,net=dync-net1,app=ngfw,net=dync-net2,app=sdewan,net=virutal-net2"
+    networkChain: "net=virtual-net1,app=slb,net=dync-net1,app=ngfw,net=dync-net2,app=sdewan,net=virtual-net2"
     left:
     - networkName: "left-pnetwork"
       gatewayIp: "172.30.10.2"

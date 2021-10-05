@@ -54,12 +54,12 @@ const (
 	DeleteInternalError = "DeleteInternalError"
 	//Deleted indicated the sfc is deleted
 	Deleted = "Deleted"
-	//Virutal mode
-	VirutalMode = "VirutalMode"
+	//Virtual mode
+	VirtualMode = "VirtualMode"
 	//Provider mode
 	ProviderMode = "ProviderMode"
-	//Virutal and Provider mode
-	VirutalProviderMode = "VirutalProviderMode"
+	//Virtual and Provider mode
+	VirtualProviderMode = "VirtualProviderMode"
 )
 
 // NetworkStatus defines the observed state of Network

@@ -63,7 +63,7 @@ In this example, we customize the ovn network as follows.
 data:
   ovn_subnet: "10.154.142.0/18"
   ovn_gatewayip: "10.154.142.1/18"
-  virutal-net-conf.json: |
+  virtual-net-conf.json: |
     {
       "Network": "172.30.16.0/22",
       "SubnetLen": 24
@@ -104,7 +104,7 @@ ssh into the TM2 vm and run the following command to attach TM2 to the right pro
     $ ip link set dev eth1.200 up
     $ ip addr add 172.30.20.2/24 dev eth1.200
 ```
-Run the following commands to create virutal router
+Run the following commands to create virtual router
 ```
    $ ip route add 172.30.10.0/24 via 172.30.20.3
    $ ip route add 172.30.33.0/24 via 172.30.20.3
@@ -120,8 +120,8 @@ Run the following commands to create virutal router
 ```
 ## Demo setup
 
-The setup show the SFC is connected to two network. One virutal and provider network.
-![sfc-virutal-and-provider-network-setup](../../images/sfc-virutal-and-provider-network-setup.png)
+The setup show the SFC is connected to two network. One virtual and provider network.
+![sfc-virtual-and-provider-network-setup](../../images/sfc-virtual-and-provider-network-setup.png)
 
 let create the demo setup
 ```

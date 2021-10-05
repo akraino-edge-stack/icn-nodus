@@ -19,8 +19,8 @@ type Config struct {
 	SubnetLen uint
 }
 
-const netConfPath = "/etc/subnet/virutal-net-conf.json"
-const virutalnetwork = "virutal-net"
+const netConfPath = "/etc/subnet/virtual-net-conf.json"
+const virtualnetwork = "virtual-net"
 
 // ParseConfig return network
 func ParseConfig(s string) ([]v1alpha1.IpSubnet, error) {
@@ -33,30 +33,30 @@ func ParseConfig(s string) ([]v1alpha1.IpSubnet, error) {
 	log.V(1).Info("Value of the config", "cfg", cfg)
 
 	if cfg.SubnetLen > 0 {
-		// SubnetLen needs to allow for a virutal network.
+		// SubnetLen needs to allow for a virtual network.
 		if cfg.SubnetLen > 30 {
 			return nil, errors.New("SubnetLen must be less than /31")
 		}
 
 		// SubnetLen needs to fit _more_ than twice into the Network.
-		// the first subnet isn't used, so splitting into two one only provide one usable virutal network
+		// the first subnet isn't used, so splitting into two one only provide one usable virtual network
 		if cfg.SubnetLen < cfg.Network.PrefixLen+2 {
 			return nil, errors.New("Network must be able to accommodate at least four subnets")
 		}
 	} else {
 		// If the network is smaller than a /28 then the network isn't big enough for Nodus so return an error.
-		// Default to giving each virutal network at least a /24 (as long as the network is big enough to support at least four virutal networks)
-		// Otherwise, if the network is too small to give each virutal network a /24 just split the network into four.
+		// Default to giving each virtual network at least a /24 (as long as the network is big enough to support at least four virtual networks)
+		// Otherwise, if the network is too small to give each virtual network a /24 just split the network into four.
 		if cfg.Network.PrefixLen > 28 {
 			// Each subnet needs at least four addresses (/30) and the network needs to accommodate at least four
-			// since the first subnet isn't used, so splitting into two would only provide one usable virutal network.
+			// since the first subnet isn't used, so splitting into two would only provide one usable virtual network.
 			// So the min useful PrefixLen is /28
 			return nil, errors.New("Network is too small. Minimum useful network prefix is /28")
 		} else if cfg.Network.PrefixLen <= 22 {
-			// Subent is big enough to give each virutal network a /24
+			// Subent is big enough to give each virtual network a /24
 			cfg.SubnetLen = 24
 		} else {
-			// Use +2 to provide four virutal network per subnet.
+			// Use +2 to provide four virtual network per subnet.
 			cfg.SubnetLen = cfg.Network.PrefixLen + 2
 		}
 	}
@@ -92,7 +92,7 @@ func ParseConfig(s string) ([]v1alpha1.IpSubnet, error) {
 	var vn []v1alpha1.IpSubnet
 	for i := 0; currentIP != cfg.Network.Next().IP; i++ {
 		var n v1alpha1.IpSubnet
-		n.Name = fmt.Sprintf("%s%s", virutalnetwork, strconv.Itoa(i))
+		n.Name = fmt.Sprintf("%s%s", virtualnetwork, strconv.Itoa(i))
 		n.Subnet = fmt.Sprintf("%s/%s", currentIP, strconv.FormatUint(uint64(cfg.SubnetLen), 10))
 		n.Gateway = fmt.Sprintf("%s/%s", currentIP+ip.IP4(1), strconv.FormatUint(uint64(cfg.SubnetLen), 10))
 		n.ExcludeIps = fmt.Sprintf("%s", currentIP+ip.IP4(2))
@@ -101,36 +101,38 @@ func ParseConfig(s string) ([]v1alpha1.IpSubnet, error) {
 	}
 
 	if len(vn) == 0 {
-		return nil, fmt.Errorf("value of virutal network is nil, user subnet is not right")
+		return nil, fmt.Errorf("value of virtual network is nil, user subnet is not right")
 	}
 
-	log.Info("Value of the virutal network slice", "virutal networks", vn)
+	log.Info("Value of the virtual network slice", "virtual networks", vn)
 	return vn, nil
 }
 
-// CheckVirutalNetworkConf returns true or false
-func CheckVirutalNetworkConf() (bool, error) {
+// CheckVirtualNetworkConf returns true or false
+func CheckVirtualNetworkConf() (bool, error) {
 	_, err := os.Stat(netConfPath)
 	if err != nil {
 		if os.IsNotExist(err) {
+			log.Info("Path /etc/subnet/virtual-net-conf.json doest not exit", "netConfPath", netConfPath)
 			return false, nil
 		}
+		log.Info("Checking  /etc/subnet/virtual-net-conf.json return error", "netConfPath", netConfPath, "err", err)
 		return false, err
 	}
 	return true, nil
 }
 
-// CalculateVirutalNetworkSubnet returns virutal networks configuration
-func CalculateVirutalNetworkSubnet() ([]v1alpha1.IpSubnet, error) {
+// CalculateVirtualNetworkSubnet returns virtual networks configuration
+func CalculateVirtualNetworkSubnet() ([]v1alpha1.IpSubnet, error) {
 	netConf, err := ioutil.ReadFile(netConfPath)
 	if err != nil {
 		return nil, fmt.Errorf("Error in reading the subnet conf file: %v", err.Error())
 	}
 
-	virutalNets, err := ParseConfig(string(netConf))
+	virtualNets, err := ParseConfig(string(netConf))
 	if err != nil {
-		return nil, fmt.Errorf("Error in Parsing netConfPath file and creating virutal networks : %v", err.Error())
+		return nil, fmt.Errorf("Error in Parsing netConfPath file and creating virtual networks : %v", err.Error())
 	}
 
-	return virutalNets, nil
+	return virtualNets, nil
 }

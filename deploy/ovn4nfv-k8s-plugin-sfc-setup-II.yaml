@@ -474,7 +474,7 @@ metadata:
 data:
   ovn_subnet: "10.154.142.0/18"
   ovn_gatewayip: "10.154.142.1/18"
-  virutal-net-conf.json: |
+  virtual-net-conf.json: |
     {
       "Network": "172.30.16.0/22",
       "SubnetLen": 24
@@ -545,8 +545,8 @@ spec:
           configMap:
             name: ovn-controller-network
             items:
-            - key: "virutal-net-conf.json"
-              path: "virutal-net-conf.json"
+            - key: "virtual-net-conf.json"
+              path: "virtual-net-conf.json"
 ---
 kind: ConfigMap
 apiVersion: v1

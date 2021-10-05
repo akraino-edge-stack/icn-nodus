@@ -1,9 +1,9 @@
 apiVersion: k8s.plugin.opnfv.org/v1alpha1
 kind: Network
 metadata:
-  name: virutal-net1
+  name: virtual-net1
   labels:
-    net: virutal-net1
+    net: virtual-net1
 spec:
   cniType : ovn4nfv
   ipv4Subnets:
@@ -17,9 +17,9 @@ spec:
 apiVersion: k8s.plugin.opnfv.org/v1alpha1
 kind: Network
 metadata:
-  name: virutal-net2
+  name: virtual-net2
   labels:
-    net: virutal-net2
+    net: virtual-net2
 spec:
   cniType : ovn4nfv
   ipv4Subnets:

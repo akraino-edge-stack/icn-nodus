@@ -99,7 +99,7 @@ ssh into the TM2 vm and run the following command to attach TM2 to the right pro
     $ ip link set dev eth1.200 up
     $ ip addr add 172.30.20.2/24 dev eth1.200
 ```
-Run the following commands to create virutal router
+Run the following commands to create virtual router
 ```
    $ ip route add 172.30.10.0/24 via 172.30.20.3
    $ ip route add 172.30.33.0/24 via 172.30.20.3
@@ -115,18 +115,18 @@ Run the following commands to create virutal router
 ```
 ## Demo setup
 
-The setup show the SFC is connected to two network. One virutal and provider network.
-![sfc-virutal-and-provider-network-setup](../../images/sfc-virutal-and-provider-network-setup.png)
+The setup show the SFC is connected to two network. One virtual and provider network.
+![sfc-virtual-and-provider-network-setup](../../images/sfc-virtual-and-provider-network-setup.png)
 
 let create the demo setup
 ```
-   $ kubectl apply -f demo/calico-nodus-secondary-sfc-setup/deploy/sfc-virutal-network.yaml
+   $ kubectl apply -f demo/calico-nodus-secondary-sfc-setup/deploy/sfc-virtual-network.yaml
    $ kubectl apply -f demo/calico-nodus-secondary-sfc-setup/deploy/slb-multiple-network.yaml
    $ kubectl apply -f demo/calico-nodus-secondary-sfc-setup/deploy/ngfw.yaml
    $ kubectl apply -f demo/calico-nodus-secondary-sfc-setup/deploy/sdewan-multiple-network.yaml
 ```
-- The above commends created the multiple networks - virutal-network-1, provider-network-1, dynamic-network-1
-dynamic-network-2, virutal-network-2 and provider-network-2. The corresponding vlan tagging is created in the nodes
+- The above commends created the multiple networks - virtual-network-1, provider-network-1, dynamic-network-1
+dynamic-network-2, virtual-network-2 and provider-network-2. The corresponding vlan tagging is created in the nodes
 - Dummy VFs application are deployed in this case are Smart Load balancer,Next Generation Firewall and Software Defined
 Edge WAN. This could be replaced by the actual VFs application.
 

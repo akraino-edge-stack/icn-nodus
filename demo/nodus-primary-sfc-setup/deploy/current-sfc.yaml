@@ -1,9 +1,9 @@
 apiVersion: k8s.plugin.opnfv.org/v1alpha1
 kind: Network
 metadata:
-  name: virutalnet1
+  name: virtualnet1
   labels:
-    net: virutalnet1
+    net: virtualnet1
 spec:
   cniType : ovn4nfv
   ipv4Subnets:
@@ -40,9 +40,9 @@ spec:
 apiVersion: k8s.plugin.opnfv.org/v1alpha1
 kind: Network
 metadata:
-  name: virutalnet2
+  name: virtualnet2
   labels:
-    net: virutalnet2
+    net: virtualnet2
 spec:
   cniType : ovn4nfv
   ipv4Subnets:
@@ -60,7 +60,7 @@ spec:
   chainType: "routing"
   routingSpec:
     namespace: "default"
-    networkChain: "net=virutalnet1,app=slb,net=dync-net1,app=ngfw,net=dync-net2,app=sdewan, net=virutalnet2,"
+    networkChain: "net=virtualnet1,app=slb,net=dync-net1,app=ngfw,net=dync-net2,app=sdewan, net=virtualnet2,"
     left:
       podSelector:
         matchLabels:

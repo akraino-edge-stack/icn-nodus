@@ -14,11 +14,11 @@ spec:
       labels:
         app: slb
       annotations:
-        k8s.v1.cni.cncf.io/networks: '[                                        
-            { "name": "ovn4nfv-k8s-plugin",                                    
-              "interface": "net1"                                              
+        k8s.v1.cni.cncf.io/networks: '[
+            { "name": "ovn4nfv-k8s-plugin",
+              "interface": "net1"
             }]'
-        k8s.plugin.opnfv.org/nfn-network: '{ "type": "ovn4nfv", "interface": [{"name": "virutal-net0", "interface": "net2", "defaultGateway": "false"}, {"name": "left-pnetwork", "interface": "net3", "defaultGateway": "false"}, { "name": "virutal-net1", "interface": "net4", "defaultGateway": "false"}]}'
+        k8s.plugin.opnfv.org/nfn-network: '{ "type": "ovn4nfv", "interface": [{"name": "virtual-net0", "interface": "net2", "defaultGateway": "false"}, {"name": "left-pnetwork", "interface": "net3", "defaultGateway": "false"}, { "name": "virtual-net1", "interface": "net4", "defaultGateway": "false"}]}'
     spec:
       containers:
       - name: slb

@@ -103,7 +103,7 @@ func configurePodSelectorDeployment(ln k8sv1alpha1.RoutingNetwork, sfcEntryPodLa
 		return nil, nil, err
 	}
 
-	if mode != k8sv1alpha1.VirutalMode {
+	if mode != k8sv1alpha1.VirtualMode {
 		pn, err := k8sv1alpha1Clientset.ProviderNetworks("default").Get(ln.NetworkName, v1.GetOptions{})
 		if err != nil {
 			log.Error(err, "Error in getting Provider Networks")
@@ -113,7 +113,7 @@ func configurePodSelectorDeployment(ln k8sv1alpha1.RoutingNetwork, sfcEntryPodLa
 		networkname = pn.GetName()
 	}
 
-	if mode == k8sv1alpha1.VirutalMode {
+	if mode == k8sv1alpha1.VirtualMode {
 		vn, err := k8sv1alpha1Clientset.Networks("default").List(v1.ListOptions{LabelSelector: networklabel})
 		if err != nil {
 			log.Error(err, "Error in getting Provider Networks")
@@ -121,7 +121,7 @@ func configurePodSelectorDeployment(ln k8sv1alpha1.RoutingNetwork, sfcEntryPodLa
 		}
 
 		if len(vn.Items) != 1 {
-			err := fmt.Errorf("Virutal network is not available for the networklabel - %s", networklabel)
+			err := fmt.Errorf("Virtual network is not available for the networklabel - %s", networklabel)
 			log.Error(err, "Error in kube clientset in listing the pods for namespace", "networklabel", networklabel)
 			return nil, nil, err
 		}
@@ -390,7 +390,7 @@ func calculateDeploymentRoutes(namespace, label string, pos int, num int, ln []k
 func CheckForOnlyNFLabel(cr *k8sv1alpha1.NetworkChaining) (bool, string, error) {
 	var updatedChain string
 	var hasNetlabels bool
-	virutalnetwork := "virutal-net"
+	virtualnetwork := "virtual-net"
 
 	chains := strings.Split(cr.Spec.RoutingSpec.NetworkChain, ",")
 
@@ -418,16 +418,16 @@ func CheckForOnlyNFLabel(cr *k8sv1alpha1.NetworkChaining) (bool, string, error) 
 		for i, nflabel := range chains {
 			if i == 0 {
 				//fmt.Printf("if 0 - %v\n", nflabel)
-				netlabelinPrefix := fmt.Sprintf("%s=%s%s", netlabelPrefix, virutalnetwork, strconv.Itoa(i))
+				netlabelinPrefix := fmt.Sprintf("%s=%s%s", netlabelPrefix, virtualnetwork, strconv.Itoa(i))
 				//updatedChain = append(updatedChain, fmt.Sprintf("%s,%s", netlabelinPrefix, nflabel))
 				updatedChain = fmt.Sprintf("%s,%s", netlabelinPrefix, nflabel)
-				netlabelinSuffix := fmt.Sprintf("%s=%s%s", netlabelPrefix, virutalnetwork, strconv.Itoa(i+1))
+				netlabelinSuffix := fmt.Sprintf("%s=%s%s", netlabelPrefix, virtualnetwork, strconv.Itoa(i+1))
 				//updatedChain = append(updatedChain, netlabelinSuffix)
 				updatedChain = fmt.Sprintf("%s,%s", updatedChain, netlabelinSuffix)
 				continue
 			}
 			//fmt.Printf("%v\n", nflabel)
-			netlabel := fmt.Sprintf("%s=%s%s", netlabelPrefix, virutalnetwork, strconv.Itoa(i+1))
+			netlabel := fmt.Sprintf("%s=%s%s", netlabelPrefix, virtualnetwork, strconv.Itoa(i+1))
 			//updatedChain = append(updatedChain, fmt.Sprintf(",%s,%s", nflabel, netlabel))
 			updatedChain = fmt.Sprintf("%s,%s,%s", updatedChain, nflabel, netlabel)
 
@@ -485,7 +485,7 @@ func ValidateNetworkChaining(cr *k8sv1alpha1.NetworkChaining) (string, error) {
 	}
 
 	if (len(sfcheadnet.Items) != 0) && (len(sfctailnet.Items) != 0) {
-		mode = k8sv1alpha1.VirutalMode
+		mode = k8sv1alpha1.VirtualMode
 	}
 
 	return mode, nil
@@ -508,7 +508,7 @@ func configureNetworkFromLabel(label string) (r k8sv1alpha1.RoutingNetwork, err 
 	}
 
 	if len(net.Items) != 1 {
-		err := fmt.Errorf("Virutal network is not available for the networklabel - %s", label)
+		err := fmt.Errorf("Virtual network is not available for the networklabel - %s", label)
 		log.Error(err, "Error in kube clientset in listing the pods for namespace", "networklabel")
 		return k8sv1alpha1.RoutingNetwork{}, err
 	}
@@ -718,7 +718,7 @@ func DerivedNetworkFromNetworklist(networklabellist []string) ([]string, error) 
 		}
 
 		if len(vn.Items) != 1 {
-			err := fmt.Errorf("Virutal network is not available for the networklabel - %s", networklabel)
+			err := fmt.Errorf("Virtual network is not available for the networklabel - %s", networklabel)
 			log.Error(err, "Error in kube clientset in listing the pods for namespace", "networklabel", networklabel)
 			return nil, err
 		}
@@ -841,7 +841,7 @@ func CheckSFCPodLabelStatus(cr *k8sv1alpha1.NetworkChaining) (bool, error) {
 		return false, err
 	}
 
-	if mode == k8sv1alpha1.VirutalMode {
+	if mode == k8sv1alpha1.VirtualMode {
 		chains = chains[1 : len(chains)-1]
 	}
 
@@ -923,7 +923,7 @@ func CalculateRoutes(cr *k8sv1alpha1.NetworkChaining, cs bool, onlyPodSelector b
 		return nil, nil, err
 	}
 
-	if mode == k8sv1alpha1.VirutalMode {
+	if mode == k8sv1alpha1.VirtualMode {
 		sfcheadlabel = chains[0]
 		sfctaillabel = chains[len(chains)-1]
 		_ = sfctaillabel
@@ -971,7 +971,7 @@ func CalculateRoutes(cr *k8sv1alpha1.NetworkChaining, cs bool, onlyPodSelector b
 
 	chainRoutingInfo = append(chainRoutingInfo, lnRoutingInfo...)
 
-	if mode == k8sv1alpha1.VirutalMode {
+	if mode == k8sv1alpha1.VirtualMode {
 		l, err := configureNetworkFromLabel(sfcheadlabel)
 		if err != nil {
 			return nil, nil, err

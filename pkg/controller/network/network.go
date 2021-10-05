@@ -9,31 +9,31 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-//CreateVirutalNetwork returns
-func CreateVirutalNetwork() error {
+//CreateVirtualNetwork returns
+func CreateVirtualNetwork() error {
 
-	isExist, err := net.CheckVirutalNetworkConf()
+	isExist, err := net.CheckVirtualNetworkConf()
 	if err != nil {
 		return err
 	}
 
 	if isExist != true {
-		log.Info("No need to create virutal network", "FileExist", isExist)
+		log.Info("No need to create virtual network", "FileExist", isExist)
 		return nil
 	}
 
-	nets, err := net.CalculateVirutalNetworkSubnet()
+	nets, err := net.CalculateVirtualNetworkSubnet()
 	if err != nil {
 		return err
 	}
 
-	log.Info("Value of the virutal Networks", "network-controller value of len(networks)", len(nets))
-	log.Info("Value of the virutal Networks", "network-controller value of networks", nets)
+	log.Info("Value of the virtual Networks", "network-controller value of len(networks)", len(nets))
+	log.Info("Value of the virtual Networks", "network-controller value of networks", nets)
 
 	for k, n := range nets {
 		err := CreateNetwork(k, n)
 		if err != nil {
-			return fmt.Errorf("Error in creating virutal Network - %v", err)
+			return fmt.Errorf("Error in creating virtual Network - %v", err)
 		}
 	}
 	return nil
@@ -84,13 +84,13 @@ func CreateNetwork(id int, sn k8sv1alpha1.IpSubnet) error {
 		},
 	}
 
-	log.Info("Value of the Virutal Network req", "req", req)
+	log.Info("Value of the Virtual Network req", "req", req)
 	resp, err = k8sv1alpha1Clientset.Networks("default").Create(req)
 	if err != nil {
 		return err
 	}
 
-	log.Info("Value of the Virutal Network created", "resp", resp)
+	log.Info("Value of the Virtual Network created", "resp", resp)
 
 	//To do check the status of the Network creation error
 

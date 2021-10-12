@@ -7,7 +7,7 @@ spec:
   chainType: "Routing"
   routingSpec:
     namespace: "default"
-    networkChain: "app=slb,app=ngfw,app=sdewan"
+    networkChain: "app.kubernetes.io/name=slb,app.kubernetes.io/name=ngfw,app.kubernetes.io/name=sdewan"
     left:
     - networkName: "left-pnetwork"
       gatewayIp: "172.30.10.2"

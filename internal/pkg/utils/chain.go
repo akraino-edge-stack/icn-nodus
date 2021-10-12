@@ -83,6 +83,44 @@ func (r RoutingInfo) IsEmpty() bool {
 	return reflect.DeepEqual(r, RoutingInfo{})
 }
 
+// CheckPodStatusFromPodLabel return error
+func CheckPodStatusFromPodLabel(podLabel string) (bool, string, error) {
+	var err error
+
+	// Get a config to talk to the apiserver
+	clientset, err := kube.GetKubeConfig()
+	if err != nil {
+		log.Error(err, "Error in kube clientset")
+		return false, "", err
+	}
+
+	pods, err := clientset.CoreV1().Pods("default").List(v1.ListOptions{LabelSelector: podLabel})
+	if err != nil {
+		log.Error(err, "Error in kube clientset in listing the pods for default namespace with label", "podLabel", podLabel)
+		return false, "", err
+	}
+
+	if len(pods.Items) != 1 {
+		err := fmt.Errorf("Currently load balancing is not supported, expected SFC deployment has only 1 replica")
+		log.Error(err, "Error in kube clientset in listing the pods for namespace", "podLabel", podLabel)
+		return false, "", err
+	}
+
+	podName := pods.Items[0].GetName()
+
+	for {
+		_, nf, err := checkPodstatus(podName)
+		if err != nil {
+			return false, "", err
+		}
+		if nf {
+			break
+		}
+	}
+
+	return true, podName, nil
+}
+
 //configurePodSelectorDeployment
 func configurePodSelectorDeployment(ln k8sv1alpha1.RoutingNetwork, sfcEntryPodLabel string, toDelete bool, mode string, networklabel string, sfcposition string, dst []string) ([]RoutingInfo, []PodNetworkInfo, error) {
 	var rt []RoutingInfo
@@ -316,10 +354,20 @@ func calculateDeploymentRoutes(namespace, label string, pos int, num int, ln []k
 		if pos == 0 {
 			nextLeftIP = l.GatewayIP
 		} else {
-			name := strings.Split(deploymentList[pos-1], "=")
-			nextLeftIP, err = ovn.GetIPAdressForPod(networkList[pos-1], name[1])
+			log.Info("Value of deployment pod label", "network function pod label", deploymentList[pos-1])
+			podrunningState, podname, err := CheckPodStatusFromPodLabel(deploymentList[pos-1])
 			if err != nil {
+				log.Error(err, "Error in pod deployment with pod label", "label", deploymentList[pos-1])
 				return RoutingInfo{}, err
+			}
+
+			if podrunningState == true {
+				nextLeftIP, err = ovn.GetIPAdressForPod(networkList[pos-1], podname)
+				if err != nil {
+					return RoutingInfo{}, err
+				}
+			} else {
+				return RoutingInfo{}, fmt.Errorf("Error in getting network function podname with pod label -%v", deploymentList[pos-1])
 			}
 		}
 		routeinfo.GW = nextLeftIP
@@ -334,10 +382,20 @@ func calculateDeploymentRoutes(namespace, label string, pos int, num int, ln []k
 			nextRightIP = right.GatewayIP
 			break
 		} else {
-			name := strings.Split(deploymentList[pos+1], "=")
-			nextRightIP, err = ovn.GetIPAdressForPod(networkList[pos], name[1])
+			log.Info("Value of deployment pod label", "network function pod label", deploymentList[pos+1])
+			podrunningState, podname, err := CheckPodStatusFromPodLabel(deploymentList[pos+1])
 			if err != nil {
+				log.Error(err, "Error in pod deployment with pod label", "label", deploymentList[pos+1])
 				return RoutingInfo{}, err
+			}
+
+			if podrunningState == true {
+				nextRightIP, err = ovn.GetIPAdressForPod(networkList[pos], podname)
+				if err != nil {
+					return RoutingInfo{}, err
+				}
+			} else {
+				return RoutingInfo{}, fmt.Errorf("Error in getting network function podname with pod label -%v", deploymentList[pos-1])
 			}
 		}
 		routeinfo.Dst = right.Subnet

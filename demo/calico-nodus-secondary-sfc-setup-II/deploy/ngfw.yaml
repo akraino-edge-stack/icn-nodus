@@ -3,16 +3,16 @@ kind: Deployment
 metadata:
   name: ngfw
   labels:
-    app: ngfw
+    app.kubernetes.io/name: ngfw
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: ngfw
+      app.kubernetes.io/name: ngfw
   template:
     metadata:
       labels:
-        app: ngfw
+        app.kubernetes.io/name: ngfw
       annotations:
         k8s.v1.cni.cncf.io/networks: '[
             { "name": "ovn4nfv-k8s-plugin",

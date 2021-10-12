@@ -3,16 +3,16 @@ kind: Deployment
 metadata:
   name: slb
   labels:
-    app: slb
+    app.kubernetes.io/name: slb
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: slb
+      app.kubernetes.io/name: slb
   template:
     metadata:
       labels:
-        app: slb
+        app.kubernetes.io/name: slb
       annotations:
         k8s.v1.cni.cncf.io/networks: '[
             { "name": "ovn4nfv-k8s-plugin",

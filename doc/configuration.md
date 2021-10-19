@@ -2,7 +2,7 @@
 
 ovn4nfv is not having any cni configuration. All the configuration are encapsulated within ovn4nfv-cni - `build/bin/entrypoint`
 
-ovn4nfv-cni daemonset creates following cni configuration file `/etc/cni/net.d/00-network.conf` in each node
+ovn4nfv-cni daemonset creates following cni configuration file `/etc/cni/net.d/20-network.conf` in each node
 ```
 {
   "name": "ovn4nfv-k8s-plugin",

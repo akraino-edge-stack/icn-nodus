@@ -513,7 +513,7 @@ spec:
       serviceAccountName: k8s-nfn-sa
       containers:
         - name: nfn-operator
-          image: docker.io/integratedcloudnative/ovn4nfv-k8s-plugin:v4.0.0
+          image: docker.io/integratedcloudnative/ovn4nfv-k8s-plugin:v4.0.1
           command: ["/usr/local/bin/entrypoint", "operator"]
           imagePullPolicy: IfNotPresent
           env:
@@ -567,7 +567,7 @@ data:
 
           [kubernetes]
           kubeconfig=/etc/cni/net.d/ovn4nfv-k8s.d/ovn4nfv-k8s.kubeconfig
-  00-network.conf: |
+  20-network.conf: |
           {
             "name": "ovn4nfv-k8s-plugin",
             "type": "ovn4nfvk8s-cni",
@@ -602,7 +602,7 @@ spec:
       serviceAccountName: k8s-nfn-sa
       containers:
       - name: ovn4nfv
-        image: docker.io/integratedcloudnative/ovn4nfv-k8s-plugin:v4.0.0
+        image: docker.io/integratedcloudnative/ovn4nfv-k8s-plugin:v4.0.1
         command: ["/usr/local/bin/entrypoint", "cni"]
         imagePullPolicy: IfNotPresent
         resources:
@@ -645,8 +645,8 @@ spec:
           configMap:
             name: ovn4nfv-cni-config
             items:
-            - key: 00-network.conf
-              path: 00-network.conf
+            - key: 20-network.conf
+              path: 20-network.conf
 ---
 apiVersion: apps/v1
 kind: DaemonSet
@@ -676,7 +676,7 @@ spec:
       serviceAccountName: k8s-nfn-sa
       containers:
       - name: nfn-agent
-        image: docker.io/integratedcloudnative/ovn4nfv-k8s-plugin:v4.0.0
+        image: docker.io/integratedcloudnative/ovn4nfv-k8s-plugin:v4.0.1
         command: ["/usr/local/bin/entrypoint", "agent"]
         imagePullPolicy: IfNotPresent
         resources:

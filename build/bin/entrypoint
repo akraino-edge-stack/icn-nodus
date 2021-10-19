@@ -83,7 +83,7 @@ case ${cmd} in
         OVN4NFV_CONF_DIR="/host/etc/openvswitch"
         OVN4NFV_BIN_FILE="/usr/local/bin/ovn4nfvk8s-cni"
         OVN4NFV_CONF_FILE="/tmp/ovn4nfv-conf/ovn4nfv_k8s.conf"
-        OVN4NFV_NET_CONF_FILE="/tmp/ovn4nfv-cni/00-network.conf"
+        OVN4NFV_NET_CONF_FILE="/tmp/ovn4nfv-cni/20-network.conf"
         CNI_CONF_DIR="/host/etc/cni/net.d"
 
         cp -f $OVN4NFV_BIN_FILE $CNI_BIN_DIR

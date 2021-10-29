@@ -50,9 +50,69 @@ func PGDel(group string) (string, error) {
 
 func preparePGArgs(command, group string, ports []string) []string {
 	var args []string
-	args = append(args, "pg-add", group)
+	args = append(args, command, group)
 	args = append(args, ports...)
 	return args
+}
+
+// AddDenyPG creates PG that denies all ingress/egress access
+func AddDenyPG(name string, isIngressPolicy, isEgressPolicy bool) error {
+	pgName := name + "_Deny"
+	stdout, existingACLs, err := ACLList(pgName, "")
+
+	if err != nil {
+		log.V(1).Info("PGAdd")
+		PGAdd(pgName)
+	}
+
+	if len(existingACLs) < 4 {
+		if isIngressPolicy {
+			err = addDenyRule(pgName, Ingress)
+			if err != nil {
+				log.Error(err, "Failed to add general deny all ingress ACL", "stdout", stdout)
+				return err
+			}
+		}
+		if isEgressPolicy {
+			err = addDenyRule(pgName, Egress)
+			if err != nil {
+				log.Error(err, "Failed to add general deny all ingress ACL", "stdout", stdout)
+				return err
+			}
+		}
+	}
+
+	return nil
+}
+
+func addDenyRule(pgName string, direction PolicyDirection) error {
+	ruleDeny := ACL{Entity: pgName,
+		Direction: direction,
+		Priority: 0,
+		Match: "tcp || udp || icmp",
+		Verdict: "drop",
+	}
+
+	stdout, err := ACLAdd(ruleDeny, "", "", "", "GeneralDenyACL", true, false)
+	if err != nil {
+		log.Error(err, "Failed to add general deny all ACL", "stdout", stdout)
+		return err
+	}
+
+	ruleAllowARP := ACL{Entity: pgName,
+		Direction: direction,
+		Priority: 1,
+		Match: "arp",
+		Verdict: "allow",
+	}
+
+	stdout, err = ACLAdd(ruleAllowARP, "", "", "", "ArpAllowACL", true, false)
+	if err != nil {
+		log.Error(err, "Failed to add general ARP allow ACL", "stdout", stdout)
+		return err
+	}
+
+	return nil
 }
 
 // AddDefaultPG adds default PG to deny ingress/egress traffic
@@ -63,31 +123,37 @@ func AddDefaultPG(direction PolicyDirection) error {
 	} else {
 		pgName = DefaultDenyEgress
 	}
-	PGAdd(pgName)
 
-	ruleDeny := ACL{Entity: pgName,
-				Direction: direction,
-				Priority: 0,
-				Match: "outport==" + pgName,
-				Verdict: "drop",
-	}
-	stdout, err := ACLAdd(ruleDeny, "", "", "", "GeneralDenyACL", true, false)
+	stdout, existingACLs, err := ACLList(pgName, "")
+	log.V(1).Info("ACLList output")
+	log.V(1).Info(stdout)
+
 	if err != nil {
+		PGAdd(pgName)
+	}
+
+	if len(existingACLs) < 2 {
+		ruleDeny := ACL{Entity: pgName,
+			Direction: direction,
+			Priority: 0,
+			Match: "tcp || udp || icmp",
+			Verdict: "drop",
+		}
+
+		stdout, err := ACLAdd(ruleDeny, "", "", "", "GeneralDenyACL", true, false)
 		if err != nil {
 			log.Error(err, "Failed to add general deny all ACL", "stdout", stdout)
 			return err
 		}
-	}
 
-	ruleAllowARP := ACL{Entity: pgName,
-		Direction: direction,
-		Priority: 0,
-		Match: "outport==" + pgName + " && arp",
-		Verdict: "allow",
-	}
+		ruleAllowARP := ACL{Entity: pgName,
+			Direction: direction,
+			Priority: 1,
+			Match: "arp",
+			Verdict: "allow",
+		}
 
-	stdout, err = ACLAdd(ruleAllowARP, "", "", "", "ArpAllowACL", true, false)
-	if err != nil {
+		stdout, err = ACLAdd(ruleAllowARP, "", "", "", "ArpAllowACL", true, false)
 		if err != nil {
 			log.Error(err, "Failed to add general ARP allow ACL", "stdout", stdout)
 			return err

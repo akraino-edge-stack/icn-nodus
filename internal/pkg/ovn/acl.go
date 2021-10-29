@@ -62,7 +62,7 @@ func ACLAdd(rule ACL, entityType, meter, severity, name string, mayExist, enLog 
 	var args []string
 	
 	if entityType != "" {
-		args = append(args, fmt.Sprintf("--type=%sd", entityType))
+		args = append(args, fmt.Sprintf("--type=%s", entityType))
 	}
 
 	if enLog {
@@ -70,11 +70,11 @@ func ACLAdd(rule ACL, entityType, meter, severity, name string, mayExist, enLog 
 	}
 
 	if meter != "" {
-		args = append(args, fmt.Sprintf("--meter=%sd", meter))
+		args = append(args, fmt.Sprintf("--meter=%s", meter))
 	}
 
 	if name != "" {
-		args = append(args, fmt.Sprintf("--name=%sd", name))
+		args = append(args, fmt.Sprintf("--name=%s", name))
 	}
 
 	if mayExist {

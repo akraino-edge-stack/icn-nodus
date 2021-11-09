@@ -59,9 +59,9 @@ OVN4NFV SFC currently support all 3 follows. The detailed demo is include [demo/
 
 Install the [docker](https://docs.docker.com/engine/install/ubuntu/) in the Kubernetes cluster node.
 Follow the steps in [create cluster kubeadm](https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/create-cluster-kubeadm/) to create kubernetes cluster in master
-In the master node run the `kubeadm init` as below. The ovn4nfv uses pod network cidr `10.233.64.0/18`
+In the master node run the `kubeadm init` as below. The ovn4nfv uses pod network cidr `10.210.0.0/16`
 ```
-    $ kubeadm init --kubernetes-version=1.19.0 --pod-network-cidr=10.233.64.0/18 --apiserver-advertise-address=<master_eth0_ip_address>
+    $ kubeadm init --kubernetes-version=1.19.0 --pod-network-cidr=10.210.0.0/16 --apiserver-advertise-address=<master_eth0_ip_address>
 ```
 Ensure the master node taint for no schedule is removed and labelled with `ovn4nfv-k8s-plugin=ovn-control-plane`
 ```
@@ -74,11 +74,13 @@ Deploy the ovn4nfv Pod network to the cluster.
     $ kubectl apply -f deploy/ovn-daemonset.yaml
     $ kubectl apply -f deploy/ovn4nfv-k8s-plugin.yaml
 ```
+
+Ensure the configmap `ovn-controller-network` data `OVN_SUBNET` matches the pod network cidr as well in `deploy/ovn4nfv-k8s-plugin.yaml`
 Join worker node by running the `kubeadm join` on each node as root as mentioned in [create cluster kubeadm](https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/create-cluster-kubeadm/)
 
 ### kubespray
 
-Kubespray support the ovn4nfv as the network plugin- please follow the steps in [kubernetes-sigs/kubespray//docs/ovn4nfv.md](https://github.com/kubernetes-sigs/kubespray/blob/master/docs/ovn4nfv.md)
+Kubespray support the ovn4nfv as the network plugin- please follow the steps in [kubernetes-sigs/kubespray/docs/ovn4nfv.md](https://github.com/kubernetes-sigs/kubespray/blob/master/docs/ovn4nfv.md)
 
 ## Comprehensive Documentation
 

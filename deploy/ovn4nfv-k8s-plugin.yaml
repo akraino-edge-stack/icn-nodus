@@ -472,8 +472,8 @@ metadata:
   name: ovn-controller-network
   namespace: kube-system
 data:
-  OVN_SUBNET: "10.154.142.0/18"
-  OVN_GATEWAYIP: "10.154.142.1/18"
+  OVN_SUBNET: "10.210.0.0/16"
+  OVN_GATEWAYIP: "10.210.0.1/16"
 
 ---
 
@@ -509,7 +509,7 @@ spec:
       serviceAccountName: k8s-nfn-sa
       containers:
         - name: nfn-operator
-          image: docker.io/integratedcloudnative/ovn4nfv-k8s-plugin:v4.0.1
+          image: docker.io/integratedcloudnative/ovn4nfv-k8s-plugin:v4.0.2
           command: ["/usr/local/bin/entrypoint", "operator"]
           imagePullPolicy: IfNotPresent
           envFrom:
@@ -581,7 +581,7 @@ spec:
       serviceAccountName: k8s-nfn-sa
       containers:
       - name: ovn4nfv
-        image: docker.io/integratedcloudnative/ovn4nfv-k8s-plugin:v4.0.1
+        image: docker.io/integratedcloudnative/ovn4nfv-k8s-plugin:v4.0.2
         command: ["/usr/local/bin/entrypoint", "cni"]
         imagePullPolicy: IfNotPresent
         resources:
@@ -655,7 +655,7 @@ spec:
       serviceAccountName: k8s-nfn-sa
       containers:
       - name: nfn-agent
-        image: docker.io/integratedcloudnative/ovn4nfv-k8s-plugin:v4.0.1
+        image: docker.io/integratedcloudnative/ovn4nfv-k8s-plugin:v4.0.2
         command: ["/usr/local/bin/entrypoint", "agent"]
         imagePullPolicy: IfNotPresent
         envFrom:

@@ -420,9 +420,9 @@ There are multi CNI Proxy plugins such as Multus, DAMN and CNI-Genie. In this te
 ### kubeadm
 Install the [docker](https://docs.docker.com/engine/install/ubuntu/) in the Kubernetes cluster node.
 Follow the steps in [create cluster kubeadm](https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/create-cluster-kubeadm/) to create kubernetes cluster in master
-In the master node run the `kubeadm init` as below. The calico uses pod network cidr `10.233.64.0/18`
+In the master node run the `kubeadm init` as below. The calico uses pod network cidr `10.210.0.0/16`
 ```
-    $ kubeadm init --kubernetes-version=1.19.0 --pod-network-cidr=10.233.64.0/18 --apiserver-advertise-address=<master_eth0_ip_address>
+    $ kubeadm init --kubernetes-version=1.19.0 --pod-network-cidr=10.210.0.0/16 --apiserver-advertise-address=<master_eth0_ip_address>
 ```
 Ensure the master node taint for no schedule is removed and labelled with `ovn4nfv-k8s-plugin=ovn-control-plane`
 ```
@@ -435,16 +435,16 @@ Deploy the Calico and Multus CNI in the kubeadm master
      $ kubectl apply -f deploy/calico.yaml
      $ kubectl apply -f deploy/multus-daemonset.yaml
 ```
-Rename the `/opt/cni/net.d/70-multus.conf` to `/opt/cni/net.d/00-multus.conf` . There will be multiple conf files, we have to make sure Multus file is in the Lexicographic order.
+There will be multiple conf files, we have to make sure Multus file is in the Lexicographic order.
 Kubernetes kubelet is designed to pick the config file in the lexicograpchic order.
 
-In this example, we are using pod CIDR as `10.233.64.0/18`. The Calico will automatically detect the CIDR based on the running configuration.
+In this example, we are using pod CIDR as `10.210.0.0/16`. The Calico will automatically detect the CIDR based on the running configuration.
 Since calico network going to the primary network in our case, ovn4nfv subnet should be a different network. Make sure you change the `OVN_SUBNET` and `OVN_GATEWAYIP` in `deploy/ovn4nfv-k8s-plugin.yaml`
 In this example, we customize the ovn network as follows.
 ```
 data:
-  OVN_SUBNET: "10.154.142.0/18"
-  OVN_GATEWAYIP: "10.154.142.1/18"
+  OVN_SUBNET: "10.154.142.0/16"
+  OVN_GATEWAYIP: "10.154.142.1/16"
 ```
 Deploy the ovn4nfv Pod network to the cluster.
 ```
@@ -452,7 +452,6 @@ Deploy the ovn4nfv Pod network to the cluster.
     $ kubectl apply -f deploy/ovn4nfv-k8s-plugin.yaml
 ```
 Join worker node by running the `kubeadm join` on each node as root as mentioned in [create cluster kubeadm](https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/create-cluster-kubeadm/).
-Also make sure to rename the the `/opt/cni/net.d/70-multus.conf` to `/opt/cni/net.d/00-multus.conf` in all nodes.
 
 ### Test the Multiple Network Setup with Multus
 Create a network attachment definition as mentioned in the [multi-net-spec](https://github.com/k8snetworkplumbingwg/multi-net-spec)

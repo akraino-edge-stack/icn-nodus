@@ -60,16 +60,10 @@ EOF
     fi
 }
 
-install_cni_plugins() {
-    curl --insecure --compressed -O -L https://github.com/containernetworking/plugins/releases/download/$CNI_VERSION/cni-plugins-linux-$IMAGE_ARC-$CNI_VERSION.tgz
-    tar -zxvf cni-plugins-linux-$IMAGE_ARC-$CNI_VERSION.tgz -C $CNI_BIN_DIR
-    rm -rf cni-plugins-linux-$IMAGE_ARC-$CNI_VERSION.tgz
-}
-
 set_snat_default_inteface() {
     default_interface=$(awk '$2 == 00000000 { print $1 }' /proc/net/route)
 
-    # Checking the SNAT for default interfaces                                             
+    # Checking the SNAT for default interfaces 
     if ! iptables -t nat -C POSTROUTING -o $default_interface -j MASQUERADE 2>/dev/null ; then
         iptables -t nat -A POSTROUTING -o $default_interface -j MASQUERADE
     fi
@@ -80,6 +74,7 @@ cmd=${1:-""}
 case ${cmd} in
     "cni")
         CNI_BIN_DIR="/host/opt/cni/bin"
+        DOWNLOADED_CNI_BIN="/opt/cni/bin"
         OVN4NFV_CONF_DIR="/host/etc/openvswitch"
         OVN4NFV_BIN_FILE="/usr/local/bin/ovn4nfvk8s-cni"
         OVN4NFV_CONF_FILE="/tmp/ovn4nfv-conf/ovn4nfv_k8s.conf"
@@ -87,11 +82,11 @@ case ${cmd} in
         CNI_CONF_DIR="/host/etc/cni/net.d"
 
         cp -f $OVN4NFV_BIN_FILE $CNI_BIN_DIR
+        mv -f $DOWNLOADED_CNI_BIN/* $CNI_BIN_DIR
         cp -f $OVN4NFV_CONF_FILE $OVN4NFV_CONF_DIR
         cp -f $OVN4NFV_NET_CONF_FILE $CNI_CONF_DIR
         set_snat_default_inteface
         create_kubeconfig
-        install_cni_plugins
         # Sleep forever.
         sleep infinity
     ;;

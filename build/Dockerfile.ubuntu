@@ -6,6 +6,7 @@ ARG HTTPS_PROXY=${HTTPS_PROXY}
 ENV http_proxy $HTTP_PROXY
 ENV https_proxy $HTTPS_PROXY
 ENV no_proxy $NO_PROXY
+ARG CNI_VERSION=v0.8.5
 
 RUN apt-get update && apt-get install -y -qq apt-transport-https make curl net-tools iproute2 iptables \
     wget software-properties-common setpriv dpkg-dev netcat jq
@@ -40,4 +41,11 @@ ENV OPERATOR=/usr/local/bin/nfn-operator \
     USER_NAME=nfn-operator
 
 RUN cp -r build/bin/* /usr/local/bin/
+ENV CNI_VERSION=$CNI_VERSION
+
+RUN mkdir -p /opt/cni/bin && \
+    curl --insecure --compressed -O -L https://github.com/containernetworking/plugins/releases/download/$CNI_VERSION/cni-plugins-linux-amd64-$CNI_VERSION.tgz && \
+    tar -zxvf cni-plugins-linux-amd64-$CNI_VERSION.tgz -C /opt/cni/bin && \
+    rm -rf cni-plugins-linux-amd64-$CNI_VERSION.tgz
+
 ENTRYPOINT ["entrypoint"]

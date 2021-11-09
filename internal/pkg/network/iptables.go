@@ -2,6 +2,7 @@ package network
 
 import (
 	"fmt"
+	"os"
 	"strings"
 
 	logf "sigs.k8s.io/controller-runtime/pkg/runtime/log"
@@ -24,9 +25,17 @@ type IPTablesRule struct {
 }
 
 func MasqRules(ifname string) []IPTablesRule {
+
+	subnet := os.Getenv("OVN_SUBNET")
+	if subnet == "" {
+		log.Info("OVN subnet is not set in nfn-operator configmap env")
+	}
+
 	return []IPTablesRule{
 		// This rule makes sure ifname is SNAT
 		{"nat", "POSTROUTING", []string{"-o", ifname, "-j", "MASQUERADE"}},
+		// NAT if it's not multicast traffic
+		{"nat", "POSTROUTING", []string{"-s", subnet, "!", "-d", "224.0.0.0/4", "-j", "MASQUERADE"}},
 	}
 }
 

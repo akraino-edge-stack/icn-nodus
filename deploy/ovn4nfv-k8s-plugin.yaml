@@ -658,6 +658,9 @@ spec:
         image: docker.io/integratedcloudnative/ovn4nfv-k8s-plugin:v4.0.1
         command: ["/usr/local/bin/entrypoint", "agent"]
         imagePullPolicy: IfNotPresent
+        envFrom:
+          - configMapRef:
+              name: ovn-controller-network
         resources:
           requests:
             cpu: 100m

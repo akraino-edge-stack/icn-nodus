@@ -264,7 +264,7 @@ func setupDistributedRouter(name string) error {
 }
 
 // CreateNetwork in OVN controller
-func createOvnLS(name, subnet, gatewayIP, excludeIps string) (gatewayIPMask string, err error) {
+func createOvnLS(name, subnetv4, gatewayIPv4, excludeIps, subnetv6, gatewayIPv6 string) (gatewayIPv4Mask, gatewayIPv6Mask string, err error) {
 	var stdout, stderr string
 
 	output, stderr, err := RunOVNNbctl("--data=bare", "--no-heading",
@@ -276,9 +276,42 @@ func createOvnLS(name, subnet, gatewayIP, excludeIps string) (gatewayIPMask stri
 
 	if strings.Compare(name, output) == 0 {
 		log.V(1).Info("Logical Switch already exists, delete first to update/recreate", "name", name)
-		return "", fmt.Errorf("LS exists")
+		return "", "", fmt.Errorf("LS exists")
 	}
 
+	var cidrv4, cidrv6 *net.IPNet
+	if subnetv4 != "" && gatewayIPv4 != "" {
+		cidrv4, gatewayIPv4Mask = getCidrAndGatewayIPMask(name, subnetv4, gatewayIPv4)
+	}
+	if subnetv6 != "" && gatewayIPv6 != "" {
+		cidrv6, gatewayIPv6Mask = getCidrAndGatewayIPMask(name, subnetv6, gatewayIPv6)
+	}
+
+	otherConfig := getOvnLSOtherConfig(cidrv4, cidrv6)
+	externalIds := getOvnLSExternalIds(gatewayIPv4Mask, gatewayIPv6Mask)
+
+	// Create a logical switch and set its subnet.
+	if len(otherConfig) > 1 {
+		if excludeIps != "" {
+			stdout, stderr, err = RunOVNNbctl("--wait=hv", "--", "--may-exist", "ls-add", name, "--", "set", "logical_switch", name, otherConfig[0], otherConfig[1], externalIds,"other-config:exclude_ips="+excludeIps)
+		} else {
+			stdout, stderr, err = RunOVNNbctl("--wait=hv", "--", "--may-exist", "ls-add", name, "--", "set", "logical_switch", name, otherConfig[0], otherConfig[1], externalIds)
+		}
+	} else {
+		if excludeIps != "" {
+			stdout, stderr, err = RunOVNNbctl("--wait=hv", "--", "--may-exist", "ls-add", name, "--", "set", "logical_switch", name, otherConfig[0], externalIds, "other-config:exclude_ips="+excludeIps)
+		} else {
+			stdout, stderr, err = RunOVNNbctl("--wait=hv", "--", "--may-exist", "ls-add", name, "--", "set", "logical_switch", name, otherConfig[0], externalIds)
+		}
+	}	
+	if err != nil {
+		log.Error(err, "Failed to create a logical switch", "name", name, "stdout", stdout, "stderr", stderr)
+		return
+	}
+	return
+}
+
+func getCidrAndGatewayIPMask(name, subnet, gatewayIP string) (cidr *net.IPNet, gatewayIPMask string) {
 	_, cidr, err := net.ParseCIDR(subnet)
 	if err != nil {
 		log.Error(err, "ovnNetwork '%s' invalid subnet CIDR", "name", name)
@@ -298,22 +331,45 @@ func createOvnLS(name, subnet, gatewayIP, excludeIps string) (gatewayIPMask stri
 	}
 	// If no valid Gateway use the first IP address for GatewayIP
 	if gwIP == nil {
-		gatewayIPMask = fmt.Sprintf("%s/%d", firstIP.String(), n)
+		return cidr, fmt.Sprintf("%s/%d", firstIP.String(), n)
 	} else {
-		gatewayIPMask = fmt.Sprintf("%s/%d", gwIP.String(), n)
+		return cidr, fmt.Sprintf("%s/%d", gwIP.String(), n)
+	}
+}
+
+func getOvnLSOtherConfig(ipNetv4, ipNetv6 *net.IPNet) []string {
+	configs := []string{}
+
+	if ipNetv6 != nil {
+		ipv6 := strings.Split(ipNetv6.IP.String(),"/")
+		configs = append(configs,"other-config:ipv6_prefix=" + ipv6[0])
+	}
+	if ipNetv4 != nil {
+		configs = append(configs,"other-config:subnet=" + ipNetv4.String())
 	}
 
-	// Create a logical switch and set its subnet.
-	if excludeIps != "" {
-		stdout, stderr, err = RunOVNNbctl("--wait=hv", "--", "--may-exist", "ls-add", name, "--", "set", "logical_switch", name, "other-config:subnet="+subnet, "external-ids:gateway_ip="+gatewayIPMask, "other-config:exclude_ips="+excludeIps)
-	} else {
-		stdout, stderr, err = RunOVNNbctl("--wait=hv", "--", "--may-exist", "ls-add", name, "--", "set", "logical_switch", name, "other-config:subnet="+subnet, "external-ids:gateway_ip="+gatewayIPMask)
+	return configs
+}
+
+func getOvnLSExternalIds(gatewayIPv4, gatewayIPv6 string) string {
+	externalIds := ""
+	gateways := ""
+	if gatewayIPv4 != "" { 
+		gateways += gatewayIPv4
 	}
-	if err != nil {
-		log.Error(err, "Failed to create a logical switch", "name", name, "stdout", stdout, "stderr", stderr)
-		return
+
+	if gatewayIPv6 != "" {
+		if gateways != "" {
+			gateways += ","
+		}
+		gateways += gatewayIPv6
 	}
-	return
+
+	if gateways != "" {
+		externalIds = "external-ids:gateway_ip=" + gateways
+	}
+	
+	return externalIds
 }
 
 // generateMac generates mac address.

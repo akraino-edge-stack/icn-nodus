@@ -53,7 +53,7 @@ wait_ovn_sb() {
     fi
     while ! nc -z "${OVN_SB_TCP_SERVICE_HOST}" "${OVN_SB_TCP_SERVICE_PORT}" </dev/null;
     do
-        echo "sleep 10 seconds, waiting for ovn-sb ${OVN_SB_TCP_SERVICE_HOST}:${OVN_SB_TCP_SERVICE_PORT} ready "
+        echo "sleep 10 seconds, waiting for ovn-sb [${OVN_SB_TCP_SERVICE_HOST}]:${OVN_SB_TCP_SERVICE_PORT} ready "
         sleep 10;
     done
 }
@@ -88,21 +88,29 @@ start_ovs_vswitch() {
 #cleanup_ovs_controller() {
 #}
 
-function select_interface () {
-  local _interface=$1
-  local _intvar=$(echo ${NODENAME}_INTERFACE)
-  _interface=$(echo ${!_intvar})
+function prepare_address {
+    local _ip=$1
+    if [[ "$_ip" == *":"* ]]; then
+        _ip="[$_ip]"
+    else
+        _ip="$_ip"
+    fi
+    echo $_ip
 }
 
 function get_interface_ipaddress {
     local _ip=$2
-    local _ipv4address=$(ip addr show dev $1 | awk '$1 == "inet" { sub("/.*", "", $2); print $2 }')
+    local _inet="inet"
+    if [[ "${POD_IP}" == *":"* ]]; then
+        _inet="inet6"
+    fi
+    local _ipv4address=$(ip addr show dev $1 | awk -v inetvar="$_inet" '$1 == inetvar { sub("/.*", "", $2); print $2 }' | grep -v '^fe80')
     eval $_ip="'$_ipv4address'"
 }
 
-function get_default_interface_ipaddress {
+function get_default_inteface_ipaddress {
     local _ip=$1
-    local _default_interface=$(awk '$2 == 00000000 { print $1 }' /proc/net/route)
+    local _default_interface=$(awk '$2 == 00000000 { print $1 }' /proc/net/route | head -n 1)
     local _ipv4address
     get_interface_ipaddress _default_interface _ipv4address
     eval $_ip="'$_ipv4address'"
@@ -139,12 +147,13 @@ start_ovn_controller() {
     fi
     
     $(ovn-ctl) restart_controller
+    local _ovn_sb_tcp_service_host=$(prepare_address ${OVN_SB_TCP_SERVICE_HOST})
     # Set remote ovn-sb for ovn-controller to connect to
-    ovs-vsctl set open . external-ids:ovn-remote=tcp:"${OVN_SB_TCP_SERVICE_HOST}":"${OVN_SB_TCP_SERVICE_PORT}"
+    ovs-vsctl set open . external-ids:ovn-remote=tcp:"$_ovn_sb_tcp_service_host":"${OVN_SB_TCP_SERVICE_PORT}"
     ovs-vsctl set open . external-ids:ovn-remote-probe-interval=10000
     ovs-vsctl set open . external-ids:ovn-openflow-probe-interval=180
     ovs-vsctl set open . external-ids:ovn-encap-type=geneve
-    ovs-vsctl set open . external-ids:ovn-encap-ip=$node_ipv4_address
+    ovs-vsctl set open . external-ids:ovn-encap-ip=$node_ip_address
     tail -f ${OVN_LOGDIR}/ovn-controller.log
 }
 
@@ -186,3 +195,4 @@ case ${cmd} in
 esac
 
 exit 0
+

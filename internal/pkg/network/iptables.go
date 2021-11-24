@@ -24,19 +24,37 @@ type IPTablesRule struct {
 	rulespec []string
 }
 
-func MasqRules(ifname string) []IPTablesRule {
+func MasqRules(ifname string) ([]IPTablesRule,[]IPTablesRule) {
 
 	subnet := os.Getenv("OVN_SUBNET")
-	if subnet == "" {
+	subnetV6 := os.Getenv("OVN_SUBNET_V6")
+
+	if subnet == "" && subnetV6 == "" {
 		log.Info("OVN subnet is not set in nfn-operator configmap env")
 	}
 
-	return []IPTablesRule{
-		// This rule makes sure ifname is SNAT
-		{"nat", "POSTROUTING", []string{"-o", ifname, "-j", "MASQUERADE"}},
-		// NAT if it's not multicast traffic
-		{"nat", "POSTROUTING", []string{"-s", subnet, "!", "-d", "224.0.0.0/4", "-j", "MASQUERADE"}},
+	var ipv4Rules []IPTablesRule
+	var ipv6Rules []IPTablesRule
+
+	if subnet != "" {
+		ipv4Rules = []IPTablesRule{
+			// This rule makes sure ifname is SNAT
+			{"nat", "POSTROUTING", []string{"-o", ifname, "-j", "MASQUERADE"}},
+			// NAT if it's not multicast traffic
+			{"nat", "POSTROUTING", []string{"-s", subnet, "!", "-d", "224.0.0.0/4", "-j", "MASQUERADE"}},
+		}
 	}
+
+	if subnetV6 != "" {
+		ipv6Rules = []IPTablesRule{
+			// This rule makes sure ifname is SNAT
+			{"nat", "POSTROUTING", []string{"-o", ifname, "-j", "MASQUERADE"}},
+			// NAT if it's not multicast traffic
+			{"nat", "POSTROUTING", []string{"-s", subnet, "!", "-d", "ff00::/8", "-j", "MASQUERADE"}},
+		}
+	}
+
+	return ipv4Rules, ipv6Rules
 }
 
 func ForwardRules(ovnNetwork string) []IPTablesRule {
@@ -62,8 +80,8 @@ func ipTablesRulesExist(ipt IPTables, rules []IPTablesRule) (bool, error) {
 	return true, nil
 }
 
-func SetupAndEnsureIPTables(rules []IPTablesRule) error {
-	ipt, err := iptables.New()
+func SetupAndEnsureIPTables(rules []IPTablesRule, protocol iptables.Protocol) error {
+	ipt, err := iptables.NewWithProtocol(protocol)
 	if err != nil {
 		// if we can't find iptables, give up and return
 		log.Error(err, "Failed to setup IPTables. iptables binary was not found")
@@ -77,7 +95,6 @@ func SetupAndEnsureIPTables(rules []IPTablesRule) error {
 	}
 
 	return nil
-
 }
 
 // DeleteIPTables delete specified iptables rules

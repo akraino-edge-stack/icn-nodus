@@ -225,10 +225,11 @@ DIRECTPRNETWORK:
 
 func createNodeOVSInternalPort(payload *pb.Notification_InSync) error {
 	nodeIntfIPAddr := strings.Trim(strings.TrimSpace(payload.InSync.GetNodeIntfIpAddress()), "\"")
+	nodeIntfIPv6Addr := strings.Trim(strings.TrimSpace(payload.InSync.GetNodeIntfIpv6Address()), "\"")
 	nodeIntfMacAddr := strings.Trim(strings.TrimSpace(payload.InSync.GetNodeIntfMacAddress()), "\"")
 	nodeName := os.Getenv("NFN_NODE_NAME")
 
-	err := app.CreateNodeOVSInternalPort(nodeIntfIPAddr, nodeIntfMacAddr, nodeName)
+	err := app.CreateNodeOVSInternalPort(nodeIntfIPAddr, nodeIntfIPv6Addr, nodeIntfMacAddr, nodeName)
 	if err != nil {
 		return err
 	}
@@ -344,7 +345,7 @@ func handleNotif(msg *pb.Notification) {
 			inSyncDirectProvidernetwork()
 			pnCreateStore = nil
 			inSync = true
-			if payload.InSync.GetNodeIntfIpAddress() != "" && payload.InSync.GetNodeIntfMacAddress() != "" {
+			if (payload.InSync.GetNodeIntfIpAddress() != "" || payload.InSync.GetNodeIntfIpv6Address() != "" ) && payload.InSync.GetNodeIntfMacAddress() != "" {
 				err := createNodeOVSInternalPort(payload)
 				if err != nil {
 					return
@@ -391,7 +392,11 @@ func main() {
 	//logf.SetLogger(zap.Logger(true))
 	log.Info("nfn-agent Started")
 
-	serverAddr := os.Getenv("NFN_OPERATOR_SERVICE_HOST") + ":" + os.Getenv("NFN_OPERATOR_SERVICE_PORT")
+	serverIP := os.Getenv("NFN_OPERATOR_SERVICE_HOST")
+	if strings.Contains(serverIP, ":") {
+		serverIP = "[" + serverIP + "]"
+	}
+	serverAddr := serverIP + ":" + os.Getenv("NFN_OPERATOR_SERVICE_PORT")
 	// Setup ovn utilities
 	exec := kexec.New()
 	err := ovn.SetExec(exec)

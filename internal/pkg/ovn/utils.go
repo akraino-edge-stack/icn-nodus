@@ -38,8 +38,14 @@ var SetupOvnUtils = func() error {
 		return err
 	}
 
-	log.Info("OVN Network", "OVN Default NW", Ovn4nfvDefaultNw, "OVN Subnet", ovnConf.Subnet, "OVN Gateway IP", ovnConf.GatewayIP, "OVN ExcludeIPs", ovnConf.ExcludeIPs)
-	_, err = createOvnLS(Ovn4nfvDefaultNw, ovnConf.Subnet, ovnConf.GatewayIP, ovnConf.ExcludeIPs)
+	log.Info("OVN Network", "OVN Default NW", Ovn4nfvDefaultNw,
+		"OVN Subnet", ovnConf.Subnetv4,
+		"OVN Gateway IP", ovnConf.GatewayIPv4,
+		"OVN ExcludeIPs", ovnConf.ExcludeIPs,
+		"OVN IPv6 Subnet", ovnConf.Subnetv6,
+		"OVN IPv6 Gateway IP", ovnConf.GatewayIPv6)
+
+	_, _, err = createOvnLS(Ovn4nfvDefaultNw, ovnConf.Subnetv4, ovnConf.GatewayIPv4, ovnConf.ExcludeIPs, ovnConf.Subnetv6, ovnConf.GatewayIPv6)
 	if err != nil && !reflect.DeepEqual(err, fmt.Errorf("LS exists")) {
 		log.Error(err, "Failed to create ovn4nfvk8s default nw")
 		return err
@@ -65,12 +71,21 @@ func SetExec(exec kexec.Interface) error {
 	if err != nil {
 		return err
 	}
-	runner.hostIP = os.Getenv("OVN_NB_TCP_SERVICE_HOST")
+	runner.hostIP = getHostIP()
 	// OVN Host Port
 	runner.hostPort = "6641"
 	log.Info("Host Port", "IP", runner.hostIP, "Port", runner.hostPort)
 
 	return nil
+}
+
+func getHostIP() string {
+	hostIP := os.Getenv("OVN_NB_TCP_SERVICE_HOST")
+
+	if strings.Contains(hostIP, ":") {
+		hostIP = "[" + hostIP + "]"
+	}
+	return hostIP
 }
 
 // Run the ovn-ctl command and retry if "Connection refused"
@@ -145,4 +160,8 @@ func RunOVSVsctl(args ...string) (string, string, error) {
 	cmdArgs = append(cmdArgs, args...)
 	stdout, stderr, err := run(runner.vsctlPath, cmdArgs...)
 	return strings.Trim(strings.TrimSpace(stdout.String()), "\""), stderr.String(), err
+}
+
+func RunSysctl(args ...string) (*bytes.Buffer, *bytes.Buffer, error) {
+	return run("sysctl", args...)
 }

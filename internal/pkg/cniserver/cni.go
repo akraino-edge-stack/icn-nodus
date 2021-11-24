@@ -36,6 +36,14 @@ type nfnNetwork struct {
 	} `json:"interface"`
 }
 
+type ovnNetwork struct {
+	IpAddress      []string `json:"ip_address"`
+	MacAddress     string   `json:"mac_address"`
+	GatewayIP      []string `json:"gateway_ip"`
+	DefaultGateway string   `json:"defaultGateway,omitempty"`
+	Interface      string   `json:"interface"`
+}
+
 func parseNfnNetworkObject(nfnnetwork string) (*nfnNetwork, error) {
 	var nfnNet nfnNetwork
 
@@ -50,8 +58,22 @@ func parseNfnNetworkObject(nfnnetwork string) (*nfnNetwork, error) {
 	return &nfnNet, nil
 }
 
-func parseOvnNetworkObject(ovnnetwork string) ([]map[string]string, error) {
+func parseOvnNetworkMap(ovnnetwork string) ([]map[string]string, error) {
 	var ovnNet []map[string]string
+
+	if ovnnetwork == "" {
+		return nil, fmt.Errorf("parseOvnNetworkObject:error")
+	}
+
+	if err := json.Unmarshal([]byte(ovnnetwork), &ovnNet); err != nil {
+		return nil, fmt.Errorf("parseOvnNetworkObject: failed to load ovn network err: %v | ovn network: %v", err, ovnnetwork)
+	}
+
+	return ovnNet, nil
+}
+
+func parseOvnNetworkObject(ovnnetwork string) ([]ovnNetwork, error) {
+	var ovnNet []ovnNetwork
 
 	if ovnnetwork == "" {
 		return nil, fmt.Errorf("parseOvnNetworkObject:error")
@@ -151,20 +173,25 @@ func (cr *CNIServerRequest) AddMultipleInterfaces(nfnAnnotation, ovnAnnotation, 
 	var dstResult types.Result
 	var isDefaultGW bool
 	for _, ovnNet := range ovnAnnotatedMap {
-		ipAddress := ovnNet["ip_address"]
-		macAddress := ovnNet["mac_address"]
-		gatewayIP := ovnNet["gateway_ip"]
-		defaultGateway := ovnNet["defaultGateway"]
+		ipAddress := ovnNet.IpAddress
+		macAddress := ovnNet.MacAddress
+		gatewayIP := ovnNet.GatewayIP
+		defaultGateway := ovnNet.DefaultGateway
+		interfaceName := ovnNet.Interface
 
-		if ipAddress == "" || macAddress == "" {
+		if len(ipAddress) == 0 || macAddress == "" {
 			klog.Errorf("failed in pod annotation key extract")
 			return nil
 		}
 
 		index++
-		interfaceName := ovnNet["interface"]
 		if interfaceName == "" {
 			klog.Errorf("addMultipleInterfaces: interface can't be null")
+			return nil
+		}
+
+		if len(ipAddress) != len(gatewayIP) {
+			klog.Errorf("addMultipleInterfaces: ip_address number is not the same as gateway_ip number")
 			return nil
 		}
 
@@ -198,8 +225,8 @@ func (cr *CNIServerRequest) AddMultipleInterfaces(nfnAnnotation, ovnAnnotation, 
 				klog.Errorf("addMultipleInterfaces: error finding nfn network")
 				return nil
 			}
-			if ovnNet["interface"] != interfaceName {
-				klog.Infof("addMultipleInterfaces: skipping interface %v (requested %v)", ovnNet["interface"], interfaceName)
+			if ovnNet.Interface != interfaceName {
+				klog.Infof("addMultipleInterfaces: skipping interface %v (requested %v)", ovnNet.Interface, interfaceName)
 				continue
 			}
 		}
@@ -210,43 +237,33 @@ func (cr *CNIServerRequest) AddMultipleInterfaces(nfnAnnotation, ovnAnnotation, 
 			klog.Errorf("Failed to configure interface in pod: %v", err)
 			return nil
 		}
-		addr, addrNet, err := net.ParseCIDR(ipAddress)
-		if err != nil {
-			klog.Errorf("failed to parse IP address %q: %v", ipAddress, err)
-			return nil
-		}
-		ipVersion := "6"
-		if addr.To4() != nil {
-			ipVersion = "4"
-		}
-		var routes types.Route
 		if defaultGateway == "true" {
 			defaultAddr, defaultAddrNet, _ := net.ParseCIDR("0.0.0.0/0")
-			routes = types.Route{Dst: net.IPNet{IP: defaultAddr, Mask: defaultAddrNet.Mask}, GW: net.ParseIP(gatewayIP)}
+
+			var routes []*types.Route
+			for _, gateway := range gatewayIP {
+				routes = append(routes, &types.Route{Dst: net.IPNet{IP: defaultAddr, Mask: defaultAddrNet.Mask}, GW: net.ParseIP(gateway)})
+			}
+
+			ipConfigs, err := generateIpConfigs(ipAddress, gatewayIP)
+			if err != nil {
+				return nil
+			}
 
 			result = &current.Result{
 				Interfaces: interfacesArray,
-				IPs: []*current.IPConfig{
-					{
-						Version:   ipVersion,
-						Interface: current.Int(1),
-						Address:   net.IPNet{IP: addr, Mask: addrNet.Mask},
-						Gateway:   net.ParseIP(gatewayIP),
-					},
-				},
-				Routes: []*types.Route{&routes},
+				IPs: ipConfigs,
+				Routes: routes,
 			}
 		} else {
+			ipConfigs, err := generateIpConfigs(ipAddress, gatewayIP)
+			if err != nil {
+				return nil
+			}
+
 			result = &current.Result{
 				Interfaces: interfacesArray,
-				IPs: []*current.IPConfig{
-					{
-						Version:   ipVersion,
-						Interface: current.Int(1),
-						Address:   net.IPNet{IP: addr, Mask: addrNet.Mask},
-						Gateway:   net.ParseIP(gatewayIP),
-					},
-				},
+				IPs: ipConfigs,
 			}
 
 		}
@@ -261,10 +278,36 @@ func (cr *CNIServerRequest) AddMultipleInterfaces(nfnAnnotation, ovnAnnotation, 
 	return dstResult
 }
 
+func generateIpConfigs(ipAddresses, gatewayIP []string) ([]*current.IPConfig, error) {
+	var ipConfigs []*current.IPConfig
+
+	for i, ipAddress := range ipAddresses {
+		addr, addrNet, err := net.ParseCIDR(ipAddress)
+		if err != nil {
+			klog.Errorf("failed to parse IP address %q: %v", ipAddress, err)
+			return nil, err
+		}
+
+		ipVersion := "6"
+		if addr.To4() != nil {
+			ipVersion = "4"
+		}
+
+		ipConfigs = append(ipConfigs, &current.IPConfig{
+			Version:   ipVersion,
+			Interface: current.Int(1),
+			Address:   net.IPNet{IP: addr, Mask: addrNet.Mask},
+			Gateway:   net.ParseIP(gatewayIP[i]),
+		})
+	}
+
+	return ipConfigs, nil
+}
+
 func (cr *CNIServerRequest) addRoutes(ovnAnnotation string, dstResult types.Result) types.Result {
 	klog.Infof("ovn4nfvk8s-cni: addRoutes ")
 	var ovnAnnotatedMap []map[string]string
-	ovnAnnotatedMap, err := parseOvnNetworkObject(ovnAnnotation)
+	ovnAnnotatedMap, err := parseOvnNetworkMap(ovnAnnotation)
 	if err != nil {
 		klog.Errorf("addLogicalPort : Error Parsing Ovn Route List %v", err)
 		return nil
@@ -395,7 +438,7 @@ func (cr *CNIServerRequest) DeleteMultipleInterfaces(ovnAnnotation, namespace, p
 	klog.Infof("Delete Interface")
 	klog.Infof("ovn4nfvk8s-cni: DeleteInterface ovn annotation %v namespace %v podName %v", ovnAnnotation, namespace, podName)
 
-	var ovnAnnotatedMap []map[string]string
+	var ovnAnnotatedMap []ovnNetwork
 	ovnAnnotatedMap, err := parseOvnNetworkObject(ovnAnnotation)
 	if err != nil {
 		klog.Infof("addLogicalPort : Error Parsing Ovn Network List %v %v", ovnAnnotatedMap, err)
@@ -410,15 +453,15 @@ func (cr *CNIServerRequest) DeleteMultipleInterfaces(ovnAnnotation, namespace, p
 	}
 
 	for i, ovnNet := range ovnAnnotatedMap {
-		ipAddress := ovnNet["ip_address"]
-		macAddress := ovnNet["mac_address"]
+		ipAddress := ovnNet.IpAddress
+		macAddress := ovnNet.MacAddress
 
-		if ipAddress == "" || macAddress == "" {
+		if len(ipAddress) == 0 || macAddress == "" {
 			klog.Errorf("failed in pod annotation key extract")
 			return nil
 		}
 
-		interfaceName := ovnNet["interface"]
+		interfaceName := ovnNet.Interface
 		if interfaceName == "" {
 			klog.Errorf("deleteMultipleInterfaces: interface can't be null")
 			return nil

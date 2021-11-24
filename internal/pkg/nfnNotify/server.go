@@ -46,6 +46,7 @@ type client struct {
 type serverDB struct {
 	name       string
 	clientList map[string]client
+	pb.UnimplementedNfnNotifyServer
 }
 
 var notifServer *serverDB
@@ -60,13 +61,14 @@ func newServer() *serverDB {
 
 // Subscribe stores the client information & sends data
 func (s *serverDB) Subscribe(sc *pb.SubscribeContext, ss pb.NfnNotify_SubscribeServer) error {
+	log.Info("server.go - Subscribe")
 	nodeName := sc.GetNodeName()
 	log.Info("Subscribe request from node", "Node Name", nodeName)
 	if nodeName == "" {
 		return fmt.Errorf("Node name can't be empty")
 	}
 
-	nodeIntfIPAddr, nodeIntfMacAddr, err := node.AddNodeLogicalPorts(nodeName)
+	nodeIntfMacAddr, nodeIntfIPAddr, nodeIntfIPv6Addr, err := node.AddNodeLogicalPorts(nodeName)
 	if err != nil {
 		return fmt.Errorf("Error in creating node logical port for node- %s: %v", nodeName, err)
 	}
@@ -89,6 +91,7 @@ func (s *serverDB) Subscribe(sc *pb.SubscribeContext, ss pb.NfnNotify_SubscribeS
 			InSync: &pb.InSync{
 				NodeIntfIpAddress:  nodeIntfIPAddr,
 				NodeIntfMacAddress: nodeIntfMacAddr,
+				NodeIntfIpv6Address: nodeIntfIPv6Addr,
 			},
 		},
 	}

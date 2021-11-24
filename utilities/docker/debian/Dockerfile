@@ -2,7 +2,7 @@ FROM ubuntu:18.04 as base
 
 USER root
 
-RUN apt-get update && apt-get install -y iproute2 curl software-properties-common setpriv dpkg-dev netcat jq wget
+RUN apt-get update && apt-get install -y iproute2 curl software-properties-common setpriv dpkg-dev netcat-openbsd jq wget
 
 RUN mkdir -p /opt/ovn4nfv-k8s-plugin/dist/ubuntu/deb
 RUN bash -xc "\

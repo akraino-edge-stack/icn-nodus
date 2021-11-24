@@ -5,6 +5,8 @@
 //
 syntax = "proto3";
 
+option go_package="github.com/akraino-edge-stack/icn-nodus/internal/pkg/nfn";
+
 service nfnNotify {
 	rpc Subscribe (SubscribeContext) returns (stream Notification);
 }
@@ -91,4 +93,5 @@ message PodDelNetwork {
 message InSync {
     string node_intf_ip_address = 1;
     string node_intf_mac_address = 2;
+    string node_intf_ipv6_address = 3;
 }

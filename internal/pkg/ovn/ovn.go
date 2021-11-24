@@ -22,9 +22,11 @@ type Controller struct {
 }
 
 type OVNNetworkConf struct {
-	Subnet     string
-	GatewayIP  string
-	ExcludeIPs string
+	Subnetv4    string
+	GatewayIPv4 string
+	ExcludeIPs  string
+	Subnetv6    string
+	GatewayIPv6 string
 }
 
 const (
@@ -42,19 +44,33 @@ var ovnConf *OVNNetworkConf
 func GetOvnNetConf() error {
 	ovnConf = &OVNNetworkConf{}
 
-	ovnConf.Subnet = os.Getenv("OVN_SUBNET")
-	if ovnConf.Subnet == "" {
+	ovnConf.Subnetv4 = os.Getenv("OVN_SUBNET")
+	if ovnConf.Subnetv4 == "" {
+		log.Info("OVN subnet IPv4 is not set in nfn-operator configmap env")
+	}
+
+	ovnConf.Subnetv6 = os.Getenv("OVN_SUBNET_V6")
+	if ovnConf.Subnetv6 == "" {
+		log.Info("OVN subnet IPv6 is not set in nfn-operator configmap env")
+	}
+
+	if ovnConf.Subnetv4 == "" && ovnConf.Subnetv6 == ""  {
 		return fmt.Errorf("OVN subnet is not set in nfn-operator configmap env")
 	}
 
-	ovnConf.GatewayIP = os.Getenv("OVN_GATEWAYIP")
-	if ovnConf.GatewayIP == "" {
-		log.Info("No Gateway IP address provided - 1st IP address of the subnet range will be used as Gateway", "Subnet", ovnConf.Subnet)
+	ovnConf.GatewayIPv4 = os.Getenv("OVN_GATEWAYIP")
+	if ovnConf.GatewayIPv4 == "" {
+		log.Info("No Gateway IP address provided - 1st IP address of the subnet range will be used as Gateway", "Subnet", ovnConf.Subnetv4)
 	}
 
 	ovnConf.ExcludeIPs = os.Getenv("OVN_EXCLUDEIPS")
 	if ovnConf.ExcludeIPs == "" {
-		log.Info("No IP addresses are excluded in the subnet range", "Subnet", ovnConf.Subnet)
+		log.Info("No IP addresses are excluded in the subnet range", "Subnet", ovnConf.Subnetv4)
+	}
+
+	ovnConf.GatewayIPv6 = os.Getenv("OVN_GATEWAYIP_V6")
+	if ovnConf.GatewayIPv6 == "" {
+		log.Info("No Gateway IPv6 address provided - 1st IP address of the subnet range will be used as Gateway", "Subnet", ovnConf.Subnetv6)
 	}
 
 	return nil
@@ -106,18 +122,18 @@ func GetOvnController() (*Controller, error) {
 	return nil, fmt.Errorf("OVN Controller not initialized")
 }
 
-func (oc *Controller) AddNodeLogicalPorts(node string) (ipAddr, macAddr string, err error) {
+func (oc *Controller) AddNodeLogicalPorts(node string) (ipAddr, ipv6Addr, macAddr string, err error) {
 	nodeName := strings.ToLower(node)
 	portName := config.GetNodeIntfName(nodeName)
 
 	log.V(1).Info("Creating Node logical port", "node", nodeName, "portName", portName)
 
-	ipAddr, macmacAddr, err := oc.addNodeLogicalPortWithSwitch(Ovn4nfvDefaultNw, portName)
+	ipAddr, ipv6Addr, macAddr, err = oc.addNodeLogicalPortWithSwitch(Ovn4nfvDefaultNw, portName)
 	if err != nil {
-		return "", "", err
+		return "", "", "", err
 	}
 
-	return ipAddr, macmacAddr, nil
+	return ipAddr, ipv6Addr, macAddr, nil
 }
 
 // AddLogicalPorts adds ports to the Pod
@@ -239,20 +255,48 @@ func (oc *Controller) DeleteLogicalPorts(name, namespace string) {
 
 // CreateNetwork in OVN controller
 func (oc *Controller) CreateNetwork(cr *k8sv1alpha1.Network) error {
-	var stdout, stderr string
-
 	// Currently only these fields are supported
 	name := cr.Name
-	subnet := cr.Spec.Ipv4Subnets[0].Subnet
-	gatewayIP := cr.Spec.Ipv4Subnets[0].Gateway
-	excludeIps := cr.Spec.Ipv4Subnets[0].ExcludeIps
 
-	gatewayIPMask, err := createOvnLS(name, subnet, gatewayIP, excludeIps)
+	if len(cr.Spec.Ipv4Subnets) > 0 {
+		subnet := cr.Spec.Ipv4Subnets[0].Subnet
+		gatewayIP := cr.Spec.Ipv4Subnets[0].Gateway
+		excludeIps := cr.Spec.Ipv4Subnets[0].ExcludeIps
+
+		logicalSwitchName := getIPv4LogicalSwitchName(name)
+		logicalRouterPortName := getIPv4LogicalRouterPortName(name)
+
+		err := createNetwork(logicalSwitchName, subnet, gatewayIP, excludeIps, logicalRouterPortName)
+		if err != nil {
+			return err
+		}
+	}
+
+	if len(cr.Spec.Ipv6Subnets) > 0 {
+		subnet := cr.Spec.Ipv6Subnets[0].Subnet
+		gatewayIP := cr.Spec.Ipv6Subnets[0].Gateway
+		excludeIps := cr.Spec.Ipv6Subnets[0].ExcludeIps
+
+		logicalSwitchName := getIPv6LogicalSwitchName(name)
+		logicalRouterPortName := getIPv6LogicalRouterPortName(name)
+
+		err := createNetwork(logicalSwitchName, subnet, gatewayIP, excludeIps, logicalRouterPortName)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func createNetwork(name, subnet, gatewayIP, excludeIps, logicalRouterPortName string) error {
+	var stdout, stderr string
+	gatewayIPMask, _, err := createOvnLS(name, subnet, gatewayIP, excludeIps, "", "")
 	if err != nil {
 		return err
 	}
 
-	routerMac, stderr, err := RunOVNNbctl("--if-exist", "get", "logical_router_port", "rtos-"+name, "mac")
+	routerMac, stderr, err := RunOVNNbctl("--if-exist", "get", "logical_router_port", logicalRouterPortName, "mac")
 	if err != nil {
 		log.Error(err, "Failed to get logical router port", "stderr", stderr)
 		return err
@@ -263,14 +307,14 @@ func (oc *Controller) CreateNetwork(cr *k8sv1alpha1.Network) error {
 		routerMac = fmt.Sprintf("%s:%02x:%02x:%02x", prefix, newRand.Intn(255), newRand.Intn(255), newRand.Intn(255))
 	}
 
-	_, stderr, err = RunOVNNbctl("--wait=hv", "--may-exist", "lrp-add", ovn4nfvRouterName, "rtos-"+name, routerMac, gatewayIPMask)
+	_, stderr, err = RunOVNNbctl("--wait=hv", "--may-exist", "lrp-add", ovn4nfvRouterName, logicalRouterPortName, routerMac, gatewayIPMask)
 	if err != nil {
 		log.Error(err, "Failed to add logical port to router", "stderr", stderr)
 		return err
 	}
 
 	// Connect the switch to the router.
-	stdout, stderr, err = RunOVNNbctl("--wait=hv", "--", "--may-exist", "lsp-add", name, "stor-"+name, "--", "set", "logical_switch_port", "stor-"+name, "type=router", "options:router-port=rtos-"+name, "addresses="+"\""+routerMac+"\"")
+	stdout, stderr, err = RunOVNNbctl("--wait=hv", "--", "--may-exist", "lsp-add", name, "stor-"+name, "--", "set", "logical_switch_port", "stor-"+name, "type=router", "options:router-port="+logicalRouterPortName, "addresses="+"\""+routerMac+"\"")
 	if err != nil {
 		log.Error(err, "Failed to add logical port to switch", "stderr", stderr, "stdout", stdout)
 		return err
@@ -283,12 +327,30 @@ func (oc *Controller) CreateNetwork(cr *k8sv1alpha1.Network) error {
 func (oc *Controller) DeleteNetwork(cr *k8sv1alpha1.Network) error {
 
 	name := cr.Name
-	stdout, stderr, err := RunOVNNbctl("--if-exist", "--wait=hv", "lrp-del", "rtos-"+name)
+
+	err := deleteLogicalRouterPort(getIPv4LogicalRouterPortName(name))
 	if err != nil {
-		log.Error(err, "Failed to delete router port", "name", name, "stdout", stdout, "stderr", stderr)
 		return err
 	}
-	stdout, stderr, err = RunOVNNbctl("--if-exist", "--wait=hv", "ls-del", name)
+	err = deleteLogicalRouterPort(getIPv6LogicalRouterPortName(name))
+	if err != nil {
+		return err
+	}
+
+	err = deleteLogicalSwitch(getIPv4LogicalSwitchName(name))
+	if err != nil {
+		return err
+	}
+	err = deleteLogicalSwitch(getIPv6LogicalSwitchName(name))
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func deleteLogicalSwitch(name string) error {
+	stdout, stderr, err := RunOVNNbctl("--if-exist", "--wait=hv", "ls-del", name)
 	if err != nil {
 		log.Error(err, "Failed to delete switch", "name", name, "stdout", stdout, "stderr", stderr)
 		return err
@@ -296,16 +358,86 @@ func (oc *Controller) DeleteNetwork(cr *k8sv1alpha1.Network) error {
 	return nil
 }
 
+func deleteLogicalRouterPort(name string) error {
+	stdout, stderr, err := RunOVNNbctl("--if-exist", "--wait=hv", "lrp-del", name)
+	if err != nil {
+		log.Error(err, "Failed to delete router port", "name", name, "stdout", stdout, "stderr", stderr)
+		return err
+	}
+	return nil
+}
+
+func getIPv4LogicalSwitchName(prefix string) string {
+	return prefix
+}
+
+func getIPv6LogicalSwitchName(prefix string) string {
+	return prefix + "v6"
+}
+
+func getIPv4LogicalRouterPortName(suffix string) string {
+	return "rtos-" + suffix
+}
+
+func getIPv6LogicalRouterPortName(suffix string) string {
+	return "rtosv6-" + suffix
+}
+
 // CreateProviderNetwork in OVN controller
 func (oc *Controller) CreateProviderNetwork(cr *k8sv1alpha1.ProviderNetwork) error {
-	var stdout, stderr string
-
 	// Currently only these fields are supported
 	name := cr.Name
-	subnet := cr.Spec.Ipv4Subnets[0].Subnet
-	gatewayIP := cr.Spec.Ipv4Subnets[0].Gateway
-	excludeIps := cr.Spec.Ipv4Subnets[0].ExcludeIps
-	_, err := createOvnLS(name, subnet, gatewayIP, excludeIps)
+
+	if len(cr.Spec.Ipv4Subnets) > 0 {
+		subnet := cr.Spec.Ipv4Subnets[0].Subnet
+		gatewayIP := cr.Spec.Ipv4Subnets[0].Gateway
+		excludeIps := cr.Spec.Ipv4Subnets[0].ExcludeIps
+
+		logicalSwitchName := getIPv4LogicalSwitchName(name)
+
+		err := createProviderNetwork(logicalSwitchName, subnet, gatewayIP, excludeIps)
+		if err != nil {
+			return err
+		}
+	}
+
+	if len(cr.Spec.Ipv6Subnets) > 0 {
+		subnet := cr.Spec.Ipv6Subnets[0].Subnet
+		gatewayIP := cr.Spec.Ipv6Subnets[0].Gateway
+		excludeIps := cr.Spec.Ipv6Subnets[0].ExcludeIps
+
+		logicalSwitchName := getIPv6LogicalSwitchName(name)
+
+		err := createProviderNetwork(logicalSwitchName, subnet, gatewayIP, excludeIps)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// DeleteProviderNetwork in OVN controller
+func (oc *Controller) DeleteProviderNetwork(cr *k8sv1alpha1.ProviderNetwork) error {
+
+	name := cr.Name
+
+	err := deleteLogicalSwitch(getIPv4LogicalSwitchName(name))
+	if err != nil {
+		return err
+	}
+	err = deleteLogicalSwitch(getIPv6LogicalSwitchName(name))
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func createProviderNetwork(name, subnet, gatewayIP, excludeIps string) error {
+	var stdout, stderr string
+
+	_, _, err := createOvnLS(name, subnet, gatewayIP, excludeIps, "", "")
 	if err != nil {
 		return err
 	}
@@ -317,19 +449,6 @@ func (oc *Controller) CreateProviderNetwork(cr *k8sv1alpha1.ProviderNetwork) err
 		"lsp-set-options", "server-localnet_"+name, "network_name=nw_"+name)
 	if err != nil {
 		log.Error(err, "Failed to add logical port to switch", "stderr", stderr, "stdout", stdout)
-		return err
-	}
-
-	return nil
-}
-
-// DeleteProviderNetwork in OVN controller
-func (oc *Controller) DeleteProviderNetwork(cr *k8sv1alpha1.ProviderNetwork) error {
-
-	name := cr.Name
-	stdout, stderr, err := RunOVNNbctl("--if-exist", "--wait=hv", "ls-del", name)
-	if err != nil {
-		log.Error(err, "Failed to delete switch", "name", name, "stdout", stdout, "stderr", stderr)
 		return err
 	}
 	return nil
@@ -350,7 +469,7 @@ func (oc *Controller) FindLogicalSwitch(name string) bool {
 	return false
 }
 
-func (oc *Controller) getGatewayFromSwitch(logicalSwitch string) (string, string, error) {
+func (oc *Controller) getGatewayFromSwitch(logicalSwitch string) ([]string, []string, error) {
 	var gatewayIPMaskStr, stderr string
 	var ok bool
 	var err error
@@ -360,25 +479,32 @@ func (oc *Controller) getGatewayFromSwitch(logicalSwitch string) (string, string
 			"external_ids:gateway_ip")
 		if err != nil {
 			log.Error(err, "Failed to get gateway IP", "stderr", stderr, "gatewayIPMaskStr", gatewayIPMaskStr)
-			return "", "", err
+			return nil, nil, err
 		}
 		if gatewayIPMaskStr == "" {
-			return "", "", fmt.Errorf("Empty gateway IP in logical switch %s",
+			return nil, nil, fmt.Errorf("Empty gateway IP in logical switch %s",
 				logicalSwitch)
 		}
 		oc.gatewayCache[logicalSwitch] = gatewayIPMaskStr
 	}
-	gatewayIPMask := strings.Split(gatewayIPMaskStr, "/")
-	if len(gatewayIPMask) != 2 {
-		return "", "", fmt.Errorf("Failed to get IP and Mask from gateway CIDR:  %s",
-			gatewayIPMaskStr)
+	gateways := strings.Split(gatewayIPMaskStr, ",")
+
+	gatewayIPs := []string{}
+	masks := []string{}
+	for _, gateway := range gateways {
+		gatewayIPMask := strings.Split(gateway, "/")
+		if len(gatewayIPMask) != 2 {
+			return nil, nil, fmt.Errorf("Failed to get IP and Mask from gateway CIDR: %s",
+			gateway)
+		}
+		gatewayIPs = append(gatewayIPs, gatewayIPMask[0])
+		masks = append(masks, gatewayIPMask[1])
 	}
-	gatewayIP := gatewayIPMask[0]
-	mask := gatewayIPMask[1]
-	return gatewayIP, mask, nil
+	
+	return gatewayIPs, masks, nil
 }
 
-func (oc *Controller) addNodeLogicalPortWithSwitch(logicalSwitch, portName string) (ipAddr, macAddr string, r error) {
+func (oc *Controller) addNodeLogicalPortWithSwitch(logicalSwitch, portName string) (ipAddr, ipv6Addr, macAddr string, r error) {
 	var out, stderr string
 	var err error
 
@@ -390,7 +516,7 @@ func (oc *Controller) addNodeLogicalPortWithSwitch(logicalSwitch, portName strin
 		portName, "dynamic")
 	if err != nil {
 		log.Error(err, "Error while creating logical port %s ", "portName", portName, "stdout", out, "stderr", stderr)
-		return "", "", err
+		return "", "", "", err
 	}
 
 	count := 30
@@ -403,14 +529,14 @@ func (oc *Controller) addNodeLogicalPortWithSwitch(logicalSwitch, portName strin
 		}
 		if err != nil {
 			log.Error(err, "Error while obtaining addresses for", "portName", portName)
-			return "", "", err
+			return "", "", "", err
 		}
 		time.Sleep(time.Second)
 		count--
 	}
 	if count == 0 {
 		log.Error(err, "Error while obtaining addresses for", "portName", portName, "stdout", out, "stderr", stderr)
-		return "", "", err
+		return "", "", "", err
 	}
 
 	// static addresses have format ["0a:00:00:00:00:01 192.168.1.3"], while
@@ -419,24 +545,48 @@ func (oc *Controller) addNodeLogicalPortWithSwitch(logicalSwitch, portName strin
 	outStr = strings.TrimRight(outStr, `]`)
 	outStr = strings.Trim(outStr, `"`)
 	addresses := strings.Split(outStr, " ")
-	if len(addresses) != 2 {
+	if len(addresses) < 2 {
 		log.Info("Error while obtaining addresses for", "portName", portName)
-		return "", "", err
+		return "", "", "", err
 	}
 
-	_, mask, err := oc.getGatewayFromSwitch(logicalSwitch)
+	gwAddresses, gwMasks, err := oc.getGatewayFromSwitch(logicalSwitch)
 	if err != nil {
 		log.Error(err, "Error obtaining gateway address for switch", "logicalSwitch", logicalSwitch)
-		return "", "", err
+		return "", "", "", err
 	}
-
-	ipAddr = fmt.Sprintf("%s/%s", addresses[1], mask)
+	
 	macAddr = fmt.Sprintf("%s", addresses[0])
 
-	return ipAddr, macAddr, nil
+	addresses = addresses[1:]
+
+	ipv4Index := findIndex(addresses, ".")
+	ipv4GWIndex := findIndex(gwAddresses, ".")
+	ipv6Index := findIndex(addresses, ":")
+	ipv6GWIndex := findIndex(gwAddresses, ":")
+
+
+	if ipv4Index != -1 && ipv4GWIndex != -1 {
+		ipAddr = fmt.Sprintf("%s/%s", addresses[ipv4Index], gwMasks[ipv4GWIndex])
+	}
+
+	if ipv6Index != -1 && ipv6GWIndex != -1 {
+		ipv6Addr = fmt.Sprintf("%s/%s", addresses[ipv6Index], gwMasks[ipv6GWIndex])
+	}
+
+	return ipAddr, ipv6Addr, macAddr, nil
 }
 
-func (oc *Controller) getNodeLogicalPortIPAddr(pod *kapi.Pod) (ipAddress string, r error) {
+func findIndex(addresses []string, separator string) int {
+	for i, addr := range addresses {
+		if strings.Contains(addr, separator) {
+			return i
+		}
+	}
+	return -1
+}
+
+func (oc *Controller) getNodeLogicalPortIPAddr(pod *kapi.Pod) (ipAddr, ipv6Addr string, r error) {
 	var out, stderr, nodeName, portName string
 	var err error
 
@@ -455,14 +605,14 @@ func (oc *Controller) getNodeLogicalPortIPAddr(pod *kapi.Pod) (ipAddress string,
 		}
 		if err != nil {
 			log.Error(err, "Error while obtaining addresses for", "portName", portName)
-			return "", err
+			return "", "", err
 		}
 		time.Sleep(time.Second)
 		count--
 	}
 	if count == 0 {
 		log.Error(err, "Error while obtaining addresses for", "portName", portName, "stdout", out, "stderr", stderr)
-		return "", err
+		return "", "", err
 	}
 
 	// static addresses have format ["0a:00:00:00:00:01 192.168.1.3"], while
@@ -471,15 +621,18 @@ func (oc *Controller) getNodeLogicalPortIPAddr(pod *kapi.Pod) (ipAddress string,
 	outStr = strings.TrimRight(outStr, `]`)
 	outStr = strings.Trim(outStr, `"`)
 	addresses := strings.Split(outStr, " ")
-	if len(addresses) != 2 {
+	if len(addresses) < 2 {
 		log.Info("Error while obtaining addresses for", "portName", portName)
-		return "", err
+		return "", "", err
 	}
 
-	ipAddr := fmt.Sprintf("%s", addresses[1])
-	log.V(1).Info("Get Node logical port", "pod", pod.GetName(), "node", nodeName, "portName", portName, "Node port IP", ipAddr)
+	ipAddr = fmt.Sprintf("%s", addresses[1])
+	if len(addresses) > 2 {
+		ipv6Addr = fmt.Sprintf("%s", addresses[2])
+	}
+	log.V(1).Info("Get Node logical port", "pod", pod.GetName(), "node", nodeName, "portName", portName, "Node port IP4v", ipAddr, "Node port IPv6", ipv6Addr)
 
-	return ipAddr, nil
+	return ipAddr, ipv6Addr, nil
 }
 
 func (oc *Controller) addLogicalPortWithSwitch(pod *kapi.Pod, logicalSwitch, ipAddress, macAddress, gwipAddress, portName string) (annotation string) {
@@ -558,31 +711,68 @@ func (oc *Controller) addLogicalPortWithSwitch(pod *kapi.Pod, logicalSwitch, ipA
 	outStr = strings.TrimRight(outStr, `]`)
 	outStr = strings.Trim(outStr, `"`)
 	addresses := strings.Split(outStr, " ")
-	if len(addresses) != 2 {
+	if len(addresses) < 2 {
 		log.Info("Error while obtaining addresses for", "portName", portName)
 		return
 	}
 
-	_, mask, err := oc.getGatewayFromSwitch(logicalSwitch)
+	gwAddresses, gwMasks, err := oc.getGatewayFromSwitch(logicalSwitch)
 	if err != nil {
 		log.Error(err, "Error obtaining gateway address for switch", "logicalSwitch", logicalSwitch)
 		return
 	}
 
-	var gatewayIP string
+	var gatewayIP, gatewayIPv6 string
 	if gwipAddress != "" {
 		gatewayIP = gwipAddress
 	} else {
-		gatewayIP, err = oc.getNodeLogicalPortIPAddr(pod)
+		gatewayIP, gatewayIPv6, err = oc.getNodeLogicalPortIPAddr(pod)
 		if err != nil {
 			log.Error(err, "Error obtaining gateway address for switch", "logicalSwitch", logicalSwitch)
 			return
 		}
 	}
+	
+	macAddr := addresses[0]
+	addresses = addresses[1:]
 
-	annotation = fmt.Sprintf(`{\"ip_address\":\"%s/%s\", \"mac_address\":\"%s\", \"gateway_ip\": \"%s\"}`, addresses[1], mask, addresses[0], gatewayIP)
+	ipAddr := ""
+	ipv6Addr := ""
+
+	ipv4Index := findIndex(addresses, ".")
+	ipv4GWIndex := findIndex(gwAddresses, ".")
+	ipv6Index := findIndex(addresses, ":")
+	ipv6GWIndex := findIndex(gwAddresses, ":")
+
+	if ipv4Index != -1 && ipv4GWIndex != -1 {
+		ipAddr = fmt.Sprintf("%s/%s", addresses[ipv4Index], gwMasks[ipv4GWIndex])
+	}
+
+	if ipv6Index != -1 && ipv6GWIndex != -1 {
+		ipv6Addr = fmt.Sprintf("%s/%s", addresses[ipv6Index], gwMasks[ipv6GWIndex])
+	}
+
+	addrStr := composeAddresses(ipAddr, ipv6Addr)
+	gatewayStr := composeAddresses(gatewayIP, gatewayIPv6)
+
+	annotation = fmt.Sprintf(`{\"ip_address\":[%s], \"mac_address\":\"%s\", \"gateway_ip\": [%s]}`, addrStr, macAddr, gatewayStr)
 
 	return annotation
+}
+
+func composeAddresses(ipv4, ipv6 string) string {
+	addrStr := ""
+	if ipv4 != "" {
+		addrStr += "\\\"" + ipv4 + "\\\""
+	}
+	if addrStr != "" && ipv6 != "" {
+		addrStr += ","
+	}
+	if ipv6 != "" {
+		addrStr += "\\\"" + ipv6 + "\\\""
+	}
+
+	return addrStr
 }
 
 func GetSFCNetworkIfname() (f func() string) {

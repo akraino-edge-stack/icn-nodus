@@ -146,3 +146,7 @@ func RunOVSVsctl(args ...string) (string, string, error) {
 	stdout, stderr, err := run(runner.vsctlPath, cmdArgs...)
 	return strings.Trim(strings.TrimSpace(stdout.String()), "\""), stderr.String(), err
 }
+
+func RunSysctl(args ...string) (*bytes.Buffer, *bytes.Buffer, error) {
+	return run("sysctl", args...)
+}

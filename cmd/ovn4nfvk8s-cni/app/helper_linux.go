@@ -184,7 +184,7 @@ func setExtraRoutes(hostNet, serviceSubnet, podSubnet, gatewayIP string) error {
 	return nil
 }
 
-func setupInterface(netns ns.NetNS, containerID, ifName, macAddress, ipAddress, gatewayIP, defaultGateway string, idx, mtu int, isDefaultGW bool) (*current.Interface, *current.Interface, error) {
+func setupInterface(netns ns.NetNS, containerID, ifName, macAddress string, ipAddress, gatewayIP []string, defaultGateway string, idx, mtu int, isDefaultGW bool) (*current.Interface, *current.Interface, error) {
 	hostIface := &current.Interface{}
 	contIface := &current.Interface{}
 	var hostNet string
@@ -238,20 +238,20 @@ func setupInterface(netns ns.NetNS, containerID, ifName, macAddress, ipAddress, 
 		contIface.Mac = macAddress
 		contIface.Sandbox = netns.Path()
 
-		addr, err := netlink.ParseAddr(ipAddress)
-		if err != nil {
-			return err
-		}
-		err = netlink.AddrAdd(link, addr)
-		if err != nil {
-			return fmt.Errorf("failed to add IP addr %s to %s: %v", ipAddress, contIface.Name, err)
+		for _, address := range ipAddress {
+			err = addIpAddressToLinkDevice(address, &link, contIface.Name)
+			if err != nil {
+				return nil
+			}
 		}
 
 		log.Infof("Value of defaultGateway- %v and ifname- %v", defaultGateway, ifName)
 		if defaultGateway == "true" && ifName == "eth0" {
-			err := setGateway(link, gatewayIP)
-			if err != nil {
-				return err
+			for _, address := range gatewayIP {
+				err := setGateway(link, address)
+				if err != nil {
+					return err
+				}
 			}
 		}
 
@@ -259,26 +259,32 @@ func setupInterface(netns ns.NetNS, containerID, ifName, macAddress, ipAddress, 
 			_, err = GetPrimaryInterface()
 			if err != nil {
 				if strings.Contains(err.Error(), "Link not found") {
-					err := setGateway(link, gatewayIP)
-					if err != nil {
-						return err
+					for _, address := range gatewayIP {
+						err := setGateway(link, address)
+						if err != nil {
+							return err
+						}
 					}
 				} else {
 					log.Error(err, "Error in getting the eth0 link in container ns")
 					return err
 				}
 			} else {
-				err := setpodGWRoutes(hostNet, serviceSubnet, podSubnet, gatewayIP)
-				if err != nil {
-					return err
+				for _, address := range gatewayIP {
+					err := setpodGWRoutes(hostNet, serviceSubnet, podSubnet, address)
+					if err != nil {
+						return err
+					}
 				}
 			}
 		}
 
 		if defaultGateway == "false" && isDefaultGW == true && ifName == "eth0" {
-			err = setExtraRoutes(hostNet, serviceSubnet, podSubnet, gatewayIP)
-			if err != nil {
-				return err
+			for _, address := range gatewayIP {
+				err = setExtraRoutes(hostNet, serviceSubnet, podSubnet, address)
+				if err != nil {
+					return err
+				}
 			}
 		}
 
@@ -297,6 +303,28 @@ func setupInterface(netns ns.NetNS, containerID, ifName, macAddress, ipAddress, 
 	}
 
 	return hostIface, contIface, nil
+}
+
+func addIpAddressToLinkDevice(ipAddress string, link *netlink.Link, contIfaceName string) error {
+	addr, err := netlink.ParseAddr(ipAddress)
+	if err != nil {
+		log.Error("parsing address failed: ", err)
+		return err
+	}
+
+	if addr.IP.To4() == nil {
+		_, _, err = ovn.RunSysctl("net.ipv6.conf.all.disable_ipv6=0")
+		if err != nil {
+			log.Error("enabling IPv6 failed: ", err)
+			return fmt.Errorf("failed to enable IPv6")
+		}
+	}
+
+	err = netlink.AddrAdd(*link, addr)
+	if err != nil {
+		return fmt.Errorf("failed to add IP addr %s to %s: %v", ipAddress, contIfaceName, err)
+	}
+	return nil
 }
 
 //DeleteInterface return ...
@@ -340,7 +368,7 @@ var ConfigureDeleteInterface = func(containerNetns, ifName string) error {
 }
 
 // ConfigureInterface sets up the container interface
-var ConfigureInterface = func(containerNetns, containerID, ifName, namespace, podName, macAddress, ipAddress, gatewayIP, interfaceName, defaultGateway string, idx, mtu int, isDefaultGW bool) ([]*current.Interface, error) {
+var ConfigureInterface = func(containerNetns, containerID, ifName, namespace, podName, macAddress string, ipAddress, gatewayIP []string, interfaceName, defaultGateway string, idx, mtu int, isDefaultGW bool) ([]*current.Interface, error) {
 	netns, err := ns.GetNS(containerNetns)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open netns %q: %v", containerNetns, err)

@@ -101,14 +101,23 @@ Vagrant.configure("2") do |config|
           # ansible.verbose = 'vvv'
           ansible.limit ='all' # Do not limit ansible hosts to the last node
           ansible.playbook = 'deployment.yml'
+          ansible.groups = {
+            'all:vars' => { 'ansible_python_interpreter' => '/usr/bin/python3' }
+          }
         end
         nodeconfig.vm.provision 'demo', type: 'ansible', run: 'never' do |ansible|
           ansible.limit ='all'
           ansible.playbook = 'demo.yml'
+          ansible.groups = {
+            'all:vars' => { 'ansible_python_interpreter' => '/usr/bin/python3' }
+          }
         end
         nodeconfig.vm.provision 'connectivity-test', type: 'ansible', run: 'never' do |ansible|
           ansible.limit ='all'
           ansible.playbook = 'connectivity-test.yml'
+          ansible.groups = {
+            'all:vars' => { 'ansible_python_interpreter' => '/usr/bin/python3' }
+          }
         end
       end
     end

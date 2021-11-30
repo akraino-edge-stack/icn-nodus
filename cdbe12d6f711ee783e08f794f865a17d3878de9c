@@ -1,0 +1,27 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "f2a2885a_ea411185",
+        "filename": "cmd/ovn4nfvk8s-cni/app/helper_linux.go",
+        "patchSetId": 1
+      },
+      "lineNbr": 321,
+      "author": {
+        "id": 239
+      },
+      "writtenOn": "2021-11-30T02:44:28Z",
+      "side": 1,
+      "message": "Why the os network configuration here ? what is the purpose of it ?",
+      "range": {
+        "startLine": 316,
+        "startChar": 2,
+        "endLine": 321,
+        "endChar": 2
+      },
+      "revId": "cdbe12d6f711ee783e08f794f865a17d3878de9c",
+      "serverId": "4cada01b-0314-4fe0-84a1-f9ddc89863f9",
+      "unresolved": true
+    }
+  ]
+}

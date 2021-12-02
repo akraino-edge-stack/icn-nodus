@@ -1,4 +1,12 @@
 ---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nodus-network
+  namespace: kube-system
+data:
+  nodename_INTERFACE: default
+---
 kind: Service
 apiVersion: v1
 metadata:
@@ -179,6 +187,13 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: status.podIP
+            - name: NODENAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+          envFrom:
+          - configMapRef:
+              name: nodus-network
           volumeMounts:
             - mountPath: /lib/modules
               name: host-modules

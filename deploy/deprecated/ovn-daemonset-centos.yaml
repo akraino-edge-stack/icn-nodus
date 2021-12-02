@@ -1,4 +1,17 @@
 ---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nodus-network
+  namespace: kube-system
+data:
+  # 'nodename' can be changed to the actual hostname of your machine
+  # 'default' can be changed to some specific interface that should be used
+  # e.g for the host named 'mynode' with interface 'ens785f0' it should be:
+  # mynode_INTERFACE: ens785f0
+  # If you have more nodes, please configure them the same way
+  nodename_INTERFACE: default
+---
 kind: Service
 apiVersion: v1
 metadata:
@@ -179,6 +192,13 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: status.podIP
+            - name: NODENAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+          envFrom:
+          - configMapRef:
+              name: nodus-network
           volumeMounts:
             - mountPath: /lib/modules
               name: host-modules

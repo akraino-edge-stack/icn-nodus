@@ -88,10 +88,23 @@ start_ovs_vswitch() {
 #cleanup_ovs_controller() {
 #}
 
-function get_default_inteface_ipaddress {
+function select_interface () {
+  local _interface=$1
+  local _intvar=$(echo ${NODENAME}_INTERFACE)
+  _interface=$(echo ${!_intvar})
+}
+
+function get_interface_ipaddress {
+    local _ip=$2
+    local _ipv4address=$(ip addr show dev $1 | awk '$1 == "inet" { sub("/.*", "", $2); print $2 }')
+    eval $_ip="'$_ipv4address'"
+}
+
+function get_default_interface_ipaddress {
     local _ip=$1
     local _default_interface=$(awk '$2 == 00000000 { print $1 }' /proc/net/route)
-    local _ipv4address=$(ip addr show dev $_default_interface | awk '$1 == "inet" { sub("/.*", "", $2); print $2 }')
+    local _ipv4address
+    get_interface_ipaddress _default_interface _ipv4address
     eval $_ip="'$_ipv4address'"
 }
 
@@ -116,7 +129,15 @@ start_ovn_controller() {
     }
     trap quit EXIT
     wait_ovn_sb
-    get_default_inteface_ipaddress node_ipv4_address
+    local _interface
+    select_interface _interface
+    if [ -z "$_interface" ]
+    then
+        get_default_interface_ipaddress node_ipv4_address
+    else
+        get_interface_ipaddress _interface node_ipv4_address
+    fi
+    
     $(ovn-ctl) restart_controller
     # Set remote ovn-sb for ovn-controller to connect to
     ovs-vsctl set open . external-ids:ovn-remote=tcp:"${OVN_SB_TCP_SERVICE_HOST}":"${OVN_SB_TCP_SERVICE_PORT}"

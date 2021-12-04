@@ -22,6 +22,30 @@
       "revId": "18efdd132212a192aea113d3153b119352824db9",
       "serverId": "4cada01b-0314-4fe0-84a1-f9ddc89863f9",
       "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "3163de7c_34e2495c",
+        "filename": "demo/nodus-primary-sfc-setup/deploy/sfc.yaml",
+        "patchSetId": 1
+      },
+      "lineNbr": 10,
+      "author": {
+        "id": 356
+      },
+      "writtenOn": "2021-12-04T00:35:04Z",
+      "side": 1,
+      "message": "sdwan: https://github.com/akraino-edge-stack/icn-nodus/blob/master/demo/nodus-primary-sfc-setup/deploy/slb-ngfw-sdewan-cnf-deployment.yaml#L155",
+      "parentUuid": "c4e4464f_32959583",
+      "range": {
+        "startLine": 10,
+        "startChar": 68,
+        "endLine": 10,
+        "endChar": 73
+      },
+      "revId": "18efdd132212a192aea113d3153b119352824db9",
+      "serverId": "4cada01b-0314-4fe0-84a1-f9ddc89863f9",
+      "unresolved": true
     }
   ]
 }

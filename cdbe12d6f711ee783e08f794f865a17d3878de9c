@@ -22,6 +22,30 @@
       "revId": "cdbe12d6f711ee783e08f794f865a17d3878de9c",
       "serverId": "4cada01b-0314-4fe0-84a1-f9ddc89863f9",
       "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "356c8522_1f3bb479",
+        "filename": "cmd/ovn4nfvk8s-cni/app/helper_linux.go",
+        "patchSetId": 1
+      },
+      "lineNbr": 321,
+      "author": {
+        "id": 480
+      },
+      "writtenOn": "2021-12-06T09:16:15Z",
+      "side": 1,
+      "message": "Even if disable_ipv6 is set to 0 on host it is set to 1 in containers and it is not possible to assign IPv6 address to an interface.",
+      "parentUuid": "f2a2885a_ea411185",
+      "range": {
+        "startLine": 316,
+        "startChar": 2,
+        "endLine": 321,
+        "endChar": 2
+      },
+      "revId": "cdbe12d6f711ee783e08f794f865a17d3878de9c",
+      "serverId": "4cada01b-0314-4fe0-84a1-f9ddc89863f9",
+      "unresolved": true
     }
   ]
 }

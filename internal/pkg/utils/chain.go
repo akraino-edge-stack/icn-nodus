@@ -445,6 +445,54 @@ func calculateDeploymentRoutes(namespace, label string, pos int, num int, ln []k
 	return
 }
 
+//CheckNetFromLabel return
+func CheckNetFromLabel(label string) error {
+	var err error
+	k8sv1alpha1Clientset, err := kube.GetKubev1alpha1Config()
+	if err != nil {
+		log.Error(err, "Error in getting k8s v1alpha1 clientset")
+		return err
+	}
+
+	net, err := k8sv1alpha1Clientset.Networks("default").List(v1.ListOptions{LabelSelector: label})
+	if err != nil {
+		log.Error(err, "Error in kube clientset in listing the namespaces")
+		return err
+	}
+
+	if len(net.Items) == 0 {
+		log.Info("Network for the label-%s doesn't exist, check network pools for virtual net creation", "network label", label)
+		networkname := label[len("net="):]
+		err := network.CreateNetworkFromPool(networkname)
+		if err != nil {
+			log.Error(err, "Error in creating network from network pools")
+			return err
+		}
+	} else {
+		log.Info("Network for the label-% already exist, no need to create network", "network label", label)
+	}
+
+	return nil
+}
+
+//CheckNetForNetPool return
+func CheckNetForNetPool(cr *k8sv1alpha1.NetworkChaining) error {
+	chains := strings.Split(cr.Spec.RoutingSpec.NetworkChain, ",")
+
+	for _, label := range chains {
+		if strings.Compare("net", label[:len("net")]) == 0 {
+			err := CheckNetFromLabel(label)
+			if err != nil {
+				log.Error(err, "Error in checking the net labels")
+				return fmt.Errorf("Error in Checking network in Network pool-%v", err)
+			}
+		}
+	}
+
+	return nil
+}
+
+//CheckForOnlyNFLabel return
 func CheckForOnlyNFLabel(cr *k8sv1alpha1.NetworkChaining) (bool, string, error) {
 	var updatedChain string
 	var hasNetlabels bool
@@ -925,9 +973,14 @@ func CheckSFCPodLabelStatus(cr *k8sv1alpha1.NetworkChaining) (bool, error) {
 			return false, err
 		}
 
+		if len(pods.Items) == 0 {
+			log.Info("No pod is created for the sfc podlabel", "sfcpodlabel", sfcpodlabel)
+			return false, err
+		}
+
 		if len(pods.Items) != 1 {
 			err := fmt.Errorf("Currently load balancing is not supported, expected SFC deployment has only 1 replica")
-			log.Error(err, "Error in kube clientset in listing the pods for namespace", "sfcpodlabel", sfcpodlabel)
+			log.Error(err, "currently load balancing is not supported, expected SFC deployment has only 1 replica", "sfcpodlabel", sfcpodlabel)
 			return false, err
 		}
 
@@ -961,14 +1014,19 @@ func CalculateRoutes(cr *k8sv1alpha1.NetworkChaining, cs bool, onlyPodSelector b
 	var networklabelList []string
 	var sfctaillabel, sfcheadlabel string
 
-	updateStatus, UpdatedChain, err := CheckForOnlyNFLabel(cr)
+	err := CheckNetForNetPool(cr)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	if updateStatus == true {
-		cr.Spec.RoutingSpec.NetworkChain = UpdatedChain
-	}
+	//updateStatus, UpdatedChain, err := CheckForOnlyNFLabel(cr)
+	//if err != nil {
+	//	return nil, nil, err
+	//}
+
+	//if updateStatus == true {
+	//	cr.Spec.RoutingSpec.NetworkChain = UpdatedChain
+	//}
 
 	log.Info("Value of networkchain", "cr.Spec.RoutingSpec.NetworkChain", cr.Spec.RoutingSpec.NetworkChain)
 

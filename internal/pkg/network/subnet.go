@@ -92,7 +92,7 @@ func ParseConfig(s string) ([]v1alpha1.IpSubnet, error) {
 	var vn []v1alpha1.IpSubnet
 	for i := 0; currentIP != cfg.Network.Next().IP; i++ {
 		var n v1alpha1.IpSubnet
-		n.Name = fmt.Sprintf("%s%s", virtualnetwork, strconv.Itoa(i))
+		n.Name = "nil"
 		n.Subnet = fmt.Sprintf("%s/%s", currentIP, strconv.FormatUint(uint64(cfg.SubnetLen), 10))
 		n.Gateway = fmt.Sprintf("%s/%s", currentIP+ip.IP4(1), strconv.FormatUint(uint64(cfg.SubnetLen), 10))
 		n.ExcludeIps = fmt.Sprintf("%s", currentIP+ip.IP4(2))

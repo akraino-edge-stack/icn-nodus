@@ -29,6 +29,12 @@ type IpSubnet struct {
 	ExcludeIps string `json:"excludeIps,omitempty"`
 }
 
+type NetworkPool struct {
+	PoolNr    int      `json:"poolnumber"`
+	Network   IpSubnet `json:"network"`
+	Available bool     `json:"available"`
+}
+
 type Route struct {
 	Dst string `json:"dst"`
 	GW  string `json:"gw,omitempty"`

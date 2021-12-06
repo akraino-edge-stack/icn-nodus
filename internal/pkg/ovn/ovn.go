@@ -10,6 +10,7 @@ import (
 	k8sv1alpha1 "github.com/akraino-edge-stack/icn-nodus/pkg/apis/k8s/v1alpha1"
 
 	"github.com/akraino-edge-stack/icn-nodus/internal/pkg/config"
+	"github.com/akraino-edge-stack/icn-nodus/internal/pkg/network"
 
 	"github.com/mitchellh/mapstructure"
 	kapi "k8s.io/api/core/v1"
@@ -144,6 +145,16 @@ func (oc *Controller) AddLogicalPorts(pod *kapi.Pod, ovnNetObjs []map[string]int
 			log.Error(err, "mapstruct error", "network", net)
 			return
 		}
+
+		if !oc.FindLogicalSwitch(ns.Name) && IsExtraInterfaces == false {
+			log.Info("Logical Switch not found, create the network")
+			err := network.CreateNetworkFromPool(ns.Name)
+			if err != nil {
+				log.Error(err, "Error in creating networkpool or network")
+				return
+			}
+		}
+
 		if !oc.FindLogicalSwitch(ns.Name) {
 			log.Info("Logical Switch not found")
 			return

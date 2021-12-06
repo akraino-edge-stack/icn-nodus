@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"sync"
 
 	"github.com/akraino-edge-stack/icn-nodus/internal/pkg/ovn"
 
@@ -41,6 +42,7 @@ type nfnNetwork struct {
 }
 
 var enableOvnDefaultIntf bool = true
+var m sync.Mutex
 
 // Add creates a new Pod Controller and adds it to the Manager. The Manager will set fields on the Controller
 // and Start it when the Manager is Started.
@@ -195,7 +197,7 @@ func (r *ReconcilePod) Reconcile(request reconcile.Request) (reconcile.Result, e
 		}, nil
 	}
 
-	err = r.addLogicalPorts(instance)
+	err = r.addLogicalPorts(instance, &m)
 	if err != nil && err.Error() == "Failed to add ports" {
 		// Requeue the object
 		return reconcile.Result{}, err
@@ -240,7 +242,7 @@ func (r *ReconcilePod) checkforsfc(pod *corev1.Pod) error {
 	return nil
 }
 
-func (r *ReconcilePod) addLogicalPorts(pod *corev1.Pod) error {
+func (r *ReconcilePod) addLogicalPorts(pod *corev1.Pod, m *sync.Mutex) error {
 
 	nfn, err := r.readPodAnnotation(pod)
 	if err != nil {
@@ -262,7 +264,7 @@ func (r *ReconcilePod) addLogicalPorts(pod *corev1.Pod) error {
 		if _, ok := pod.Annotations[ovn.Ovn4nfvAnnotationTag]; ok {
 			return fmt.Errorf("Pod annotation found")
 		}
-		key, value := ovnCtl.AddLogicalPorts(pod, nfn.Interface, false)
+		key, value := ovnCtl.AddLogicalPorts(pod, nfn.Interface, false, m)
 		if len(key) > 0 {
 			return r.setPodAnnotation(pod, key, value)
 		}

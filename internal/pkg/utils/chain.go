@@ -1445,7 +1445,7 @@ func buildNfnAnnotations(pod corev1.Pod, ifname, networkname string, toDelete bo
 		return "", err
 	}
 
-	key, value := ovnCtl.AddLogicalPorts(&pod, nfn.Interface, IsExtraInterfaces)
+	key, value := ovnCtl.AddLogicalPorts(&pod, nfn.Interface, IsExtraInterfaces, nil)
 	if len(value) == 0 {
 		log.Info("Extra Annotations value is nil: key - %v | value - %v", key, value)
 		return "", fmt.Errorf("requested annotation value from the AddLogicalPorts() can't be empty")

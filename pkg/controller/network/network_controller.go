@@ -9,6 +9,7 @@ import (
 
 	k8sv1alpha1 "github.com/akraino-edge-stack/icn-nodus/pkg/apis/k8s/v1alpha1"
 
+	"github.com/akraino-edge-stack/icn-nodus/internal/pkg/network"
 	"github.com/akraino-edge-stack/icn-nodus/internal/pkg/ovn"
 
 	"github.com/go-logr/logr"
@@ -48,7 +49,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	if err != nil {
 		return err
 	}
-	_ = CreateVirtualNetwork()
+	_ = network.CheckandCreateNetworkPools()
 
 	return nil
 }

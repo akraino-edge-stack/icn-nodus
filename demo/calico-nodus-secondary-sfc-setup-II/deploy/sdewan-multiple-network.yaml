@@ -18,7 +18,7 @@ spec:
             { "name": "ovn4nfv-k8s-plugin",
               "interface": "net1"
             }]'
-        k8s.plugin.opnfv.org/nfn-network: '{ "type": "ovn4nfv", "interface": [{"name": "virtual-net3", "interface": "net2", "defaultGateway": "false"}, { "name": "virtual-net2", "interface": "net3", "defaultGateway": "false"}, { "name": "right-pnetwork", "interface": "net4", "defaultGateway": "false"}]}'
+        k8s.plugin.opnfv.org/nfn-network: '{ "type": "ovn4nfv", "interface": [{"name": "dynamic-2", "interface": "net2", "defaultGateway": "false"}, { "name": "my-subnet2", "interface": "net3", "defaultGateway": "false"}, { "name": "right-pnetwork", "interface": "net4", "defaultGateway": "false"}]}'
 
     spec:
       containers:

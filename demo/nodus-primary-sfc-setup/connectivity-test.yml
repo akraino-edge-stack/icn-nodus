@@ -23,13 +23,13 @@
         src: "deploy/{{ item }}"
         dest: "{{ ansible_user_dir }}"
       with_items:
-      - "sfc-network.yaml"
+      - "sfc-virtual-network.yaml"
       - "slb-ngfw-sdewan-cnf-deployment.yaml"
       - "ms1.yaml"
     - name: "Create test scenario : Apply YAML files"
       shell: "kubectl apply -f {{ item }}"
       with_items:
-      - "sfc-network.yaml"
+      - "sfc-virtual-network.yaml"
       - "slb-ngfw-sdewan-cnf-deployment.yaml"
       - "ms1.yaml"
       args:
@@ -170,7 +170,7 @@
     with_items:
       - "connectivity.yaml"
       - "sfc.yaml"
-      - "sfc-network.yaml"
+      - "sfc-virtual-network.yaml"
       - "slb-ngfw-sdewan-cnf-deployment.yaml"
       - "ms1.yaml"
       - "https://raw.githubusercontent.com/akraino-edge-stack/icn-sdwan/master/platform/crd-ctrlr/examples/sdewan-controller.yaml"

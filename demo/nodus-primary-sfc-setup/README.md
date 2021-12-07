@@ -82,7 +82,7 @@ From TM1 try to ping google.com, the ping operation will fails.
 
 Deploy the SFC as following
 ```
-   $ kubectl apply -f demo/sfc-setup/deploy/sfc-network.yaml
+   $ kubectl apply -f demo/sfc-setup/deploy/sfc-virtual-network.yaml
    $ kubectl apply -f demo/sfc-setup/deploy/slb-ngfw-sdewan-cnf-deployment.yaml
    $ kubectl apply -f demo/sfc-setup/deploy/ms1.yaml
 ```

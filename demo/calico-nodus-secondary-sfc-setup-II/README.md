@@ -67,13 +67,13 @@ data:
     {
       "Network": "172.30.16.0/22",
       "SubnetLen": 24
-    }```
+    }
+```
 Deploy the Nodus Pod network to the cluster.
 ```
     $ kubectl apply -f deploy/ovn-daemonset.yaml
     $ kubectl apply -f deploy/ovn4nfv-k8s-plugin-sfc-setup-II.yaml
 ```
-
 Join minion01 and minion02 by running the `kubeadm join` on each node as root as mentioned in [create cluster kubeadm](https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/create-cluster-kubeadm/)
 
 ### notes
@@ -139,77 +139,104 @@ Next steps to deploy Pods and deploy the SFCs
 ```
     $ kubectl apply -f demo/calico-nodus-secondary-sfc-setup/deploy/nginx-left-deployment.yaml
     $ kubectl apply -f demo/calico-nodus-secondary-sfc-setup/deploy/nginx-right-deployment.yaml
-    $ kubectl apply -f demo/calico-nodus-secondary-sfc-setup/deploy/sfc-with-only-nf-labels.yaml
+    $ kubectl apply -f demo/calico-nodus-secondary-sfc-setup/deploy/sfc.yaml
 ```
 Let trace the packet flow in the sfc for the internal and external traffic throug sfc
 
 ```
-   $ kubectl get pods -A -o wide
-NAMESPACE     NAME                                      READY   STATUS    RESTARTS   AGE     IP               NODE       NOMINATED NODE   READINESS GATES
-default       ngfw-6bccb7789-9f92p                      1/1     Running   0          3m39s   10.233.89.240    minion21   <none>           <none>
-default       sdewan-5866d596c9-phpnt                   1/1     Running   0          2m51s   10.233.89.241    minion21   <none>           <none>
-default       slb-759ff8df84-2spc2                      1/1     Running   0          4m18s   10.233.89.239    minion21   <none>           <none>
-kube-system   calico-kube-controllers-c9784d67d-xbr99   1/1     Running   0          40d     10.233.89.133    minion21   <none>           <none>
-kube-system   calico-node-vng88                         1/1     Running   0          38d     192.168.121.19   minion21   <none>           <none>
-kube-system   calico-node-vq69d                         1/1     Running   0          38d     192.168.121.23   master20   <none>           <none>
-kube-system   coredns-f9fd979d6-6lq9s                   1/1     Running   0          40d     10.233.89.132    minion21   <none>           <none>
-kube-system   coredns-f9fd979d6-xgw9q                   1/1     Running   0          40d     10.233.95.66     master20   <none>           <none>
-kube-system   etcd-master20                             1/1     Running   3          40d     192.168.121.23   master20   <none>           <none>
-kube-system   kube-apiserver-master20                   1/1     Running   3          40d     192.168.121.23   master20   <none>           <none>
-kube-system   kube-controller-manager-master20          1/1     Running   27         40d     192.168.121.23   master20   <none>           <none>
-kube-system   kube-multus-ds-amd64-2m2lr                1/1     Running   1          40d     192.168.121.23   master20   <none>           <none>
-kube-system   kube-multus-ds-amd64-88d7v                1/1     Running   1          40d     192.168.121.19   minion21   <none>           <none>
-kube-system   kube-proxy-k7gcv                          1/1     Running   1          40d     192.168.121.23   master20   <none>           <none>
-kube-system   kube-proxy-zvwn9                          1/1     Running   1          40d     192.168.121.19   minion21   <none>           <none>
-kube-system   kube-scheduler-master20                   1/1     Running   27         40d     192.168.121.23   master20   <none>           <none>
-kube-system   nfn-agent-hhlnk                           1/1     Running   0          6m20s   192.168.121.19   minion21   <none>           <none>
-kube-system   nfn-agent-qwpzr                           1/1     Running   0          6m20s   192.168.121.23   master20   <none>           <none>
-kube-system   nfn-operator-d48b44586-mkkl7              1/1     Running   0          6m20s   192.168.121.23   master20   <none>           <none>
-kube-system   ovn-control-plane-cc67d7668-6z2lp         1/1     Running   1          40d     192.168.121.23   master20   <none>           <none>
-kube-system   ovn-controller-chnmn                      1/1     Running   1          40d     192.168.121.23   master20   <none>           <none>
-kube-system   ovn-controller-dqm4b                      1/1     Running   1          40d     192.168.121.19   minion21   <none>           <none>
-kube-system   ovn4nfv-cni-8btdz                         1/1     Running   0          6m20s   192.168.121.23   master20   <none>           <none>
-kube-system   ovn4nfv-cni-cf49n                         1/1     Running   0          6m20s   192.168.121.19   minion21   <none>           <none>
-sfc-head      nginx-left-deployment-76c9bb4ff-98ww7     1/1     Running   0          98s     10.233.95.101    master20   <none>           <none>
-sfc-head      nginx-left-deployment-76c9bb4ff-gd745     1/1     Running   0          98s     10.233.89.242    minion21   <none>           <none>
-sfc-head      nginx-left-deployment-76c9bb4ff-mq97r     1/1     Running   0          98s     10.233.89.243    minion21   <none>           <none>
-sfc-tail      nginx-right-deployment-f6cfb7679-btpwx    1/1     Running   0          78s     10.233.95.102    master20   <none>           <none>
-sfc-tail      nginx-right-deployment-f6cfb7679-rrdbc    1/1     Running   0          78s     10.233.89.245    minion21   <none>           <none>
-sfc-tail      nginx-right-deployment-f6cfb7679-shggl    1/1     Running   0          78s     10.233.89.244    minion21   <none>           <none>
+   $ kubectl get pod -A -o wide
+NAMESPACE     NAME                                      READY   STATUS    RESTARTS   AGE    IP               NODE       NOMINATED NODE   READINESS GATES
+default       ngfw-6474c85f8f-ckpb5                     1/1     Running   0          17m    10.244.153.178   minion21   <none>           <none>
+default       sdewan-8458d76d7d-2pwh6                   1/1     Running   0          17m    10.244.153.179   minion21   <none>           <none>
+default       slb-b7f4cd687-rhwbx                       1/1     Running   0          17m    10.244.153.177   minion21   <none>           <none>
+kube-system   calico-kube-controllers-c9784d67d-7s2rz   1/1     Running   0          5d3h   10.244.153.131   minion21   <none>           <none>
+kube-system   calico-node-b6fpj                         1/1     Running   1          5d3h   192.168.121.20   master20   <none>           <none>
+kube-system   calico-node-d7wkl                         0/1     Running   0          5d3h   192.168.121.2    minion21   <none>           <none>
+kube-system   coredns-f9fd979d6-g6sr9                   1/1     Running   0          5d3h   10.244.153.132   minion21   <none>           <none>
+kube-system   coredns-f9fd979d6-nvhxf                   1/1     Running   0          5d3h   10.244.148.2     master20   <none>           <none>
+kube-system   etcd-master20                             1/1     Running   1          5d3h   192.168.121.20   master20   <none>           <none>
+kube-system   kube-apiserver-master20                   1/1     Running   1          5d3h   192.168.121.20   master20   <none>           <none>
+kube-system   kube-controller-manager-master20          1/1     Running   9          5d3h   192.168.121.20   master20   <none>           <none>
+kube-system   kube-multus-ds-amd64-89ds2                1/1     Running   1          5d3h   192.168.121.20   master20   <none>           <none>
+kube-system   kube-multus-ds-amd64-n5vhj                1/1     Running   1          5d3h   192.168.121.2    minion21   <none>           <none>
+kube-system   kube-proxy-cr77v                          1/1     Running   1          5d3h   192.168.121.2    minion21   <none>           <none>
+kube-system   kube-proxy-sv5jd                          1/1     Running   1          5d3h   192.168.121.20   master20   <none>           <none>
+kube-system   kube-scheduler-master20                   1/1     Running   8          5d3h   192.168.121.20   master20   <none>           <none>
+kube-system   nfn-agent-mlj2f                           1/1     Running   0          25m    192.168.121.2    minion21   <none>           <none>
+kube-system   nfn-agent-tzp8f                           1/1     Running   0          25m    192.168.121.20   master20   <none>           <none>
+kube-system   nfn-operator-5775bcd7d6-7l75z             1/1     Running   0          26m    192.168.121.20   master20   <none>           <none>
+kube-system   ovn-control-plane-cc67d7668-kbzc7         1/1     Running   1          5d3h   192.168.121.20   master20   <none>           <none>
+kube-system   ovn-controller-7l4xg                      1/1     Running   1          5d3h   192.168.121.20   master20   <none>           <none>
+kube-system   ovn-controller-k9h4m                      1/1     Running   1          5d3h   192.168.121.2    minion21   <none>           <none>
+kube-system   ovn4nfv-cni-2678f                         1/1     Running   0          26m    192.168.121.20   master20   <none>           <none>
+kube-system   ovn4nfv-cni-w89xw                         1/1     Running   0          26m    192.168.121.2    minion21   <none>           <none>
+sfc-head      nginx-left-deployment-76c9bb4ff-78kwt     1/1     Running   0          17m    10.244.148.15    master20   <none>           <none>
+sfc-head      nginx-left-deployment-76c9bb4ff-8c7bb     1/1     Running   0          17m    10.244.153.180   minion21   <none>           <none>
+sfc-head      nginx-left-deployment-76c9bb4ff-bb8lp     1/1     Running   0          17m    10.244.153.181   minion21   <none>           <none>
+sfc-tail      nginx-right-deployment-f6cfb7679-25lzr    1/1     Running   0          17m    10.244.153.182   minion21   <none>           <none>
+sfc-tail      nginx-right-deployment-f6cfb7679-dg8j8    1/1     Running   0          17m    10.244.148.16    master20   <none>           <none>
+sfc-tail      nginx-right-deployment-f6cfb7679-vtn59    1/1     Running   0          17m    10.244.153.183   minion21   <none>           <none>
+
 ```
-Let ping from the left pod to right pod and left pod to internet
+Let trace the packet from the left pod to right pod and left pod to internet
 ```
-   $ kubectl exec -it nginx-right-deployment-f6cfb7679-btpwx -n sfc-tail -- ifconfig
-eth0      Link encap:Ethernet  HWaddr 46:D3:84:3A:5F:14
-          inet addr:10.233.95.102  Bcast:10.233.95.102  Mask:255.255.255.255
+   $ kubectl exec -it nginx-right-deployment-f6cfb7679-25lzr -n sfc-tail -- ifconfig
+eth0      Link encap:Ethernet  HWaddr CE:BF:1D:2A:86:E8  
+          inet addr:10.244.153.182  Bcast:10.244.153.182  Mask:255.255.255.255
           UP BROADCAST RUNNING MULTICAST  MTU:1440  Metric:1
           RX packets:0 errors:0 dropped:0 overruns:0 frame:0
           TX packets:0 errors:0 dropped:0 overruns:0 carrier:0
-          collisions:0 txqueuelen:0
+          collisions:0 txqueuelen:0 
           RX bytes:0 (0.0 B)  TX bytes:0 (0.0 B)
 
-lo        Link encap:Local Loopback
+lo        Link encap:Local Loopback  
           inet addr:127.0.0.1  Mask:255.0.0.0
           UP LOOPBACK RUNNING  MTU:65536  Metric:1
           RX packets:0 errors:0 dropped:0 overruns:0 frame:0
           TX packets:0 errors:0 dropped:0 overruns:0 carrier:0
-          collisions:0 txqueuelen:1000
+          collisions:0 txqueuelen:1000 
           RX bytes:0 (0.0 B)  TX bytes:0 (0.0 B)
 
-sn0       Link encap:Ethernet  HWaddr 0E:95:83:1E:13:05
+sn0       Link encap:Ethernet  HWaddr 4A:1A:05:1E:13:05  
           inet addr:172.30.19.4  Bcast:172.30.19.255  Mask:255.255.255.0
           UP BROADCAST RUNNING MULTICAST  MTU:1400  Metric:1
-          RX packets:0 errors:0 dropped:0 overruns:0 frame:0
-          TX packets:0 errors:0 dropped:0 overruns:0 carrier:0
-          collisions:0 txqueuelen:0
-          RX bytes:0 (0.0 B)  TX bytes:0 (0.0 B)
+          RX packets:2 errors:0 dropped:0 overruns:0 frame:0
+          TX packets:2 errors:0 dropped:0 overruns:0 carrier:0
+          collisions:0 txqueuelen:0 
+          RX bytes:102 (102.0 B)  TX bytes:102 (102.0 B)
 
-$ kubectl exec -it nginx-left-deployment-76c9bb4ff-98ww7 -n sfc-head -- traceroute -n -q 1 -I 172.30.19.4
+$ kubectl exec -it nginx-left-deployment-76c9bb4ff-78kwt -n sfc-head -- traceroute -n -q 1 -I 172.30.19.4
 traceroute to 172.30.19.4 (172.30.19.4), 30 hops max, 46 byte packets
- 1  172.30.16.3  3.051 ms
- 2  172.30.17.4  2.589 ms
- 3  172.30.18.4  1.860 ms
- 4  172.30.19.4  2.855 ms
+ 1  172.30.16.3  5.515 ms
+ 2  172.30.17.4  1.443 ms
+ 3  172.30.18.4  1.581 ms
+ 4  172.30.19.4  1.268 ms
+```
+Before testing the next feature, please make sure the calico node and calico kube controller are up and running. Please refer the [Troubleshooting](https://projectcalico.docs.tigera.io/maintenance/troubleshoot/troubleshooting) for more info.
+
+Let trace the packet from left pod to the Internet. The packet flow through the chain and then to virutal router(tm2) and reach the Internet.
+If your setup up is behind the proxy. Please take care of your proxy setup before running these testing.
+```
+# kubectl exec -it nginx-left-deployment-76c9bb4ff-78kwt -n sfc-head -- traceroute -n -q 1 -I google.com
+traceroute to google.com (172.217.14.206), 30 hops max, 46 byte packets
+ 1  172.30.16.3  3.426 ms
+ 2  172.30.17.4  1.355 ms
+ 3  172.30.18.4  1.160 ms
+ 4  172.30.20.2  2.170 ms
+ 5  *
+ 6  10.10.110.1  2.362 ms
+ 7  192.55.66.2  2.616 ms
+ 8  10.54.2.45  1.967 ms
+ 9  10.128.161.137  1.868 ms
+10  *
+11  *
+12  *
+13  *
+14  *
+15  *
+16  *
+17  *
+18  172.217.14.206  9.814 ms
 ```
 ## License
 

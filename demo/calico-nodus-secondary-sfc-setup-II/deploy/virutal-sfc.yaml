@@ -1,0 +1,36 @@
+apiVersion: k8s.plugin.opnfv.org/v1alpha1
+kind: NetworkChaining
+metadata:
+  name: example-networkchaining
+spec:
+  # Add fields here
+  chainType: "Routing"
+  routingSpec:
+    namespace: "default"
+    networkChain: "net=my-subnet1,app.kubernetes.io/name=slb,net=dynamic-1,app.kubernetes.io/name=ngfw,net=dynamic-2,app.kubernetes.io/name=sdewan,net=my-subnet2"
+    left:
+    - podSelector:
+        matchLabels:
+          sfc: head
+      namespaceSelector:
+        matchLabels:
+          sfc: head
+    - podSelector:
+        matchLabels:
+          sfc: head-1
+      namespaceSelector:
+        matchLabels:
+          sfc: head
+    right:
+    - podSelector:
+        matchLabels:
+          sfc: tail
+      namespaceSelector:
+        matchLabels:
+          sfc: tail
+    - podSelector:
+        matchLabels:
+          sfc: tail-1
+      namespaceSelector:
+        matchLabels:
+          sfc: tail

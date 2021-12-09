@@ -142,13 +142,19 @@ func configurePodSelectorDeployment(ln k8sv1alpha1.RoutingNetwork, sfcEntryPodLa
 	}
 
 	if mode != k8sv1alpha1.VirtualMode {
-		pn, err := k8sv1alpha1Clientset.ProviderNetworks("default").Get(ln.NetworkName, v1.GetOptions{})
-		if err != nil {
-			log.Error(err, "Error in getting Provider Networks")
+		if ln.NetworkName != "" {
+			pn, err := k8sv1alpha1Clientset.ProviderNetworks("default").Get(ln.NetworkName, v1.GetOptions{})
+			if err != nil {
+				log.Error(err, "Error in getting Provider Networks")
+				return nil, nil, err
+			}
+
+			networkname = pn.GetName()
+		} else {
+			err = fmt.Errorf("Provider network can't be empty in Non Virutal mode")
+			log.Error(err, "Error in Getting Provider network")
 			return nil, nil, err
 		}
-
-		networkname = pn.GetName()
 	}
 
 	if mode == k8sv1alpha1.VirtualMode {
@@ -1122,11 +1128,15 @@ func CalculateRoutes(cr *k8sv1alpha1.NetworkChaining, cs bool, onlyPodSelector b
 
 		//For the sfc tail dst will be all left and right network subnet
 		for _, lnet := range ln {
-			rdst = append(rdst, lnet.Subnet)
+			if lnet.Subnet != "" {
+				rdst = append(rdst, lnet.Subnet)
+			}
 		}
 
 		for _, rnet := range rn {
-			rdst = append(rdst, rnet.Subnet)
+			if rnet.Subnet != "" {
+				rdst = append(rdst, rnet.Subnet)
+			}
 		}
 
 		log.Info("list of the before rdst", "rdst", rdst)
@@ -1144,9 +1154,35 @@ func CalculateRoutes(cr *k8sv1alpha1.NetworkChaining, cs bool, onlyPodSelector b
 
 	chainRoutingInfo = append(chainRoutingInfo, lnRoutingInfo...)
 
+	var lnconf []k8sv1alpha1.RoutingNetwork
+	var rnconf []k8sv1alpha1.RoutingNetwork
+
+	for _, lnf := range ln {
+		if lnf.NetworkName != "" {
+			lnconf = append(lnconf, lnf)
+		}
+	}
+
+	if len(lnconf) == 0 {
+		log.Info("length of left network configuration can't be zero", "lnconf", len(lnconf))
+
+	}
+	log.Info("left networks configuration", "lnconf", lnconf)
+
+	for _, rnf := range rn {
+		if rnf.NetworkName != "" {
+			rnconf = append(rnconf, rnf)
+		}
+	}
+	log.Info("reft networks configuration", "rnconf", rnconf)
+
+	if len(rnconf) == 0 {
+		log.Info("length of right network configuration can't be zero", "rnconf", len(rnconf))
+	}
+
 	if onlyPodSelector != true {
 		for i, deployment := range deploymentList {
-			r, err := calculateDeploymentRoutes(cr.Namespace, deployment, i, num, ln, rn, networkList, deploymentList)
+			r, err := calculateDeploymentRoutes(cr.Namespace, deployment, i, num, lnconf, rnconf, networkList, deploymentList)
 			if err != nil {
 				return nil, nil, err
 			}

@@ -151,7 +151,7 @@ func configurePodSelectorDeployment(ln k8sv1alpha1.RoutingNetwork, sfcEntryPodLa
 
 			networkname = pn.GetName()
 		} else {
-			err = fmt.Errorf("Provider network can't be empty in Non Virutal mode")
+			err = fmt.Errorf("Provider network can't be empty in Non Virtual mode")
 			log.Error(err, "Error in Getting Provider network")
 			return nil, nil, err
 		}

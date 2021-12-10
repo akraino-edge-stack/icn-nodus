@@ -214,7 +214,7 @@ traceroute to 172.30.19.4 (172.30.19.4), 30 hops max, 46 byte packets
 ```
 Before testing the next feature, please make sure the calico node and calico kube controller are up and running. Please refer the [Troubleshooting](https://projectcalico.docs.tigera.io/maintenance/troubleshoot/troubleshooting) for more info.
 
-Let trace the packet from left pod to the Internet. The packet flow through the chain and then to virutal router(tm2) and reach the Internet.
+Let trace the packet from left pod to the Internet. The packet flow through the chain and then to virtual router(tm2) and reach the Internet.
 If your setup up is behind the proxy. Please take care of your proxy setup before running these testing.
 ```
 # kubectl exec -it nginx-left-deployment-76c9bb4ff-78kwt -n sfc-head -- traceroute -n -q 1 -I google.com

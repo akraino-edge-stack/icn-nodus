@@ -165,7 +165,9 @@ func UpdateNetworkPool(np []k8sv1alpha1.NetworkPool) error {
 }
 
 // CreateNetworkFromPool create the network from the pool
-func CreateNetworkFromPool(ns string) error {
+func CreateNetworkFromPool(ns, thread string) error {
+	m.Lock()
+	defer m.Unlock()
 	isExist, err := CheckVirtualNetworkConf()
 	if err != nil {
 		return err
@@ -182,7 +184,7 @@ func CreateNetworkFromPool(ns string) error {
 		return fmt.Errorf("Error in getting k8s clientset -%v", err)
 	}
 
-	m.Lock()
+	log.Info("Before entering the shared resources: ", "calling thread", thread)
 	configmaps, err := k8sv1ClientSet.CoreV1().ConfigMaps(networkpoolns).Get(networkpoolconfig, metav1.GetOptions{})
 	if err != nil {
 		log.Error(err, "Error in getting k8s configmaps")
@@ -257,7 +259,7 @@ func CreateNetworkFromPool(ns string) error {
 		return fmt.Errorf("Error in the updating the config map -%v", err)
 	}
 
-	m.Unlock()
+	log.Info("Before existing the shared resources: ", "calling thread", thread)
 	return nil
 }
 

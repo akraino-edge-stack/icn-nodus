@@ -148,7 +148,8 @@ func (oc *Controller) AddLogicalPorts(pod *kapi.Pod, ovnNetObjs []map[string]int
 
 		if !oc.FindLogicalSwitch(ns.Name) && IsExtraInterfaces == false {
 			log.Info("Logical Switch not found, create the network")
-			err := network.CreateNetworkFromPool(ns.Name)
+			th := "pod"
+			err := network.CreateNetworkFromPool(ns.Name, th)
 			if err != nil {
 				log.Error(err, "Error in creating networkpool or network")
 				return

@@ -469,7 +469,8 @@ func CheckNetFromLabel(label string) error {
 	if len(net.Items) == 0 {
 		log.Info("Network for the label-%s doesn't exist, check network pools for virtual net creation", "network label", label)
 		networkname := label[len("net="):]
-		err := network.CreateNetworkFromPool(networkname)
+		th := "sfc"
+		err := network.CreateNetworkFromPool(networkname, th)
 		if err != nil {
 			log.Error(err, "Error in creating network from network pools")
 			return err

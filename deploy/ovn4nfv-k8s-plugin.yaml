@@ -38,13 +38,63 @@ spec:
                   type: string
                 routingSpec:
                   properties:
-                    leftNetwork:
+                    left:
                       items:
                         properties:
                           gatewayIp:
                             type: string
                           networkName:
                             type: string
+                          subnet:
+                            type: string
+                          podSelector:
+                            type: object
+                            properties:
+                              matchExpressions:
+                                type: array
+                                items:
+                                  type: object
+                                  properties:
+                                    key:
+                                      type: string
+                                    operator:
+                                      enum:
+                                        - In
+                                        - NotIn
+                                        - Exists
+                                        - DoesNotExist
+                                      type: string
+                                    values:
+                                      type: array
+                                      items:
+                                        type: string
+                                        pattern: "^(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])?$"
+                              matchLabels:
+                                x-kubernetes-preserve-unknown-fields: true
+                          namespaceSelector:
+                            type: object
+                            properties:
+                              matchExpressions:
+                                type: array
+                                items:
+                                  type: object
+                                  properties:
+                                    key:
+                                      type: string
+                                    operator:
+                                      enum:
+                                        - In
+                                        - NotIn
+                                        - Exists
+                                        - DoesNotExist
+                                      type: string
+                                    values:
+                                      type: array
+                                      items:
+                                        type: string
+                                        pattern: "^(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])?$"
+                              matchLabels:
+                                x-kubernetes-preserve-unknown-fields: true
                         required:
                           - gatewayIp
                           - networkName
@@ -54,13 +104,63 @@ spec:
                       type: string
                     networkChain:
                       type: string
-                    rightNetwork:
+                    right:
                       items:
                         properties:
                           gatewayIp:
                             type: string
                           networkName:
                             type: string
+                          subnet:
+                            type: string
+                          podSelector:
+                            type: object
+                            properties:
+                              matchExpressions:
+                                type: array
+                                items:
+                                  type: object
+                                  properties:
+                                    key:
+                                      type: string
+                                    operator:
+                                      enum:
+                                        - In
+                                        - NotIn
+                                        - Exists
+                                        - DoesNotExist
+                                      type: string
+                                    values:
+                                      type: array
+                                      items:
+                                        type: string
+                                        pattern: "^(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])?$"
+                              matchLabels:
+                                x-kubernetes-preserve-unknown-fields: true
+                          namespaceSelector:
+                            type: object
+                            properties:
+                              matchExpressions:
+                                type: array
+                                items:
+                                  type: object
+                                  properties:
+                                    key:
+                                      type: string
+                                    operator:
+                                      enum:
+                                        - In
+                                        - NotIn
+                                        - Exists
+                                        - DoesNotExist
+                                      type: string
+                                    values:
+                                      type: array
+                                      items:
+                                        type: string
+                                        pattern: "^(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])?$"
+                              matchLabels:
+                                x-kubernetes-preserve-unknown-fields: true
                         required:
                           - gatewayIp
                           - networkName
@@ -470,8 +570,8 @@ metadata:
   name: ovn-controller-network
   namespace: kube-system
 data:
-  OVN_SUBNET: "10.210.0.0/16"
-  OVN_GATEWAYIP: "10.210.0.1/16"
+  OVN_SUBNET: "10.151.142.0/18"
+  OVN_GATEWAYIP: "10.151.142.1/18"
 
 ---
 apiVersion: apps/v1
@@ -506,7 +606,7 @@ spec:
       serviceAccountName: k8s-nfn-sa
       containers:
         - name: nfn-operator
-          image: docker.io/integratedcloudnative/ovn4nfv-k8s-plugin:v4.1.1
+          image: docker.io/integratedcloudnative/ovn4nfv-k8s-plugin:v5.0.0-alpha
           command: ["/usr/local/bin/entrypoint", "operator"]
           imagePullPolicy: IfNotPresent
           envFrom:
@@ -571,14 +671,14 @@ spec:
     spec:
       hostNetwork: true
       nodeSelector:
-        kubernetes.io/arch: amd64
+        beta.kubernetes.io/arch: amd64
       tolerations:
         - operator: Exists
           effect: NoSchedule
       serviceAccountName: k8s-nfn-sa
       containers:
         - name: ovn4nfv
-          image: docker.io/integratedcloudnative/ovn4nfv-k8s-plugin:v4.1.1
+          image: docker.io/integratedcloudnative/ovn4nfv-k8s-plugin:v5.0.0-alpha
           command: ["/usr/local/bin/entrypoint", "cni"]
           imagePullPolicy: IfNotPresent
           resources:
@@ -645,14 +745,14 @@ spec:
       hostNetwork: true
       hostPID: true
       nodeSelector:
-        kubernetes.io/arch: amd64
+        beta.kubernetes.io/arch: amd64
       tolerations:
         - operator: Exists
           effect: NoSchedule
       serviceAccountName: k8s-nfn-sa
       containers:
         - name: nfn-agent
-          image: docker.io/integratedcloudnative/ovn4nfv-k8s-plugin:v4.1.1
+          image: docker.io/integratedcloudnative/ovn4nfv-k8s-plugin:v5.0.0-alpha
           command: ["/usr/local/bin/entrypoint", "agent"]
           imagePullPolicy: IfNotPresent
           envFrom:

@@ -34,9 +34,9 @@ Install the [docker](https://docs.docker.com/engine/install/ubuntu/) in the mast
 Follow the steps in [create cluster kubeadm](https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/create-cluster-kubeadm/) to create kubernetes cluster in master
 
 ### kubeadm
-In the master node run the `kubeadm init` as below. The calico uses pod network cidr `10.233.64.0/18`
+In the master node run the `kubeadm init` as below. The calico uses pod network cidr `10.210.0.0/16`
 ```
-    $ kubeadm init --kubernetes-version=1.19.0 --pod-network-cidr=10.233.64.0/18 --apiserver-advertise-address=<master_eth0_ip_address>
+    $ kubeadm init --kubernetes-version=1.23.3 --pod-network-cidr=10.210.0.0/16 --apiserver-advertise-address=<master_eth0_ip_address>
 ```
 Ensure the master node taint for no schedule is removed and labelled with `ovn4nfv-k8s-plugin=ovn-control-plane`
 ```
@@ -55,7 +55,7 @@ This is enabled by macro `allow_ip_forwarding` to `true` in the calico cni confi
 There will be multiple conf files, we have to make sure Multus file is in the Lexicographic order.
 Kubernetes kubelet is designed to pick the config file in the lexicograpchic order.
 
-In this example, we are using pod CIDR as `10.233.64.0/18`. The Calico will automatically detect the CIDR based on the running configuration.
+In this example, we are using pod CIDR as `10.210.0.0/16`. The Calico will automatically detect the CIDR based on the running configuration.
 Since calico network going to the primary network in our case, ovn4nfv subnet should be a different network. Make sure you change the `ovn_subnet` and `ovn_gatewayip` in `deploy/ovn4nfv-k8s-plugin-sfc-setup-II.yaml`. Setup `Network` and `SubnetLen`as per user configuration.
 
 In this example, we customize the ovn network as follows.

@@ -133,6 +133,8 @@ Edge WAN. This could be replaced by the actual VFs application.
 Next steps to deploy Pods and deploy the SFCs
 
 ```
+    $ kubectl apply -f demo/calico-nodus-secondary-sfc-setup/deploy/namespace-right
+    $ kubectl apply -f demo/calico-nodus-secondary-sfc-setup/deploy/namespace-left
     $ kubectl apply -f demo/calico-nodus-secondary-sfc-setup/deploy/nginx-left-deployment.yaml
     $ kubectl apply -f demo/calico-nodus-secondary-sfc-setup/deploy/nginx-right-deployment.yaml
     $ kubectl apply -f demo/calico-nodus-secondary-sfc-setup/deploy/sfc-with-virtual-and-provider-network.yaml
@@ -175,7 +177,7 @@ sfc-tail      nginx-right-deployment-f6cfb7679-kfsvc                     1/1    
 ```
 Let ping from the left pod to right pod and left pod to internet
 ```
-   $ kubectl exec -it nginx-right-deployment-f6cfb7679-8bcbd -n sfc-tail -- ifconfig
+$ kubectl exec -it nginx-right-deployment-f6cfb7679-8bcbd -n sfc-tail -- ifconfig
 eth0      Link encap:Ethernet  HWaddr DE:59:0B:4C:34:6F                        
           inet addr:10.233.97.194  Bcast:10.233.97.194  Mask:255.255.255.255   
           UP BROADCAST RUNNING MULTICAST  MTU:1440  Metric:1                   
@@ -200,16 +202,13 @@ sn0       Link encap:Ethernet  HWaddr 02:FD:CC:1E:16:05
           collisions:0 txqueuelen:0                                            
           RX bytes:0 (0.0 B)  TX bytes:0 (0.0 B)                               
                                                                                
-   $ kubectl exec -it nginx-left-deployment-76c9bb4ff-4zz5f -n sfc-head -- traceroute -q 1 I 172.30.22.4
-traceroute: bad address 'I'                                                    
-command terminated with exit code 1                                            
-root@master:/mnt/sharedclient/forpatch/ovn4nfv-k8s-network-controller# kubectl exec -it nginx-left-deployment-76c9bb4ff-4zz5f -n sfc-head -- traceroute -q 1 -I 172.30.22.4
+$ kubectl exec -it nginx-left-deployment-76c9bb4ff-4zz5f -n sfc-head -- traceroute -q 1 -I 172.30.22.4
 traceroute to 172.30.22.4 (172.30.22.4), 30 hops max, 46 byte packets          
  1  172.30.11.3 (172.30.11.3)  2.061 ms                                        
  2  172.30.33.3 (172.30.33.3)  0.823 ms                                        
  3  172.30.44.3 (172.30.44.3)  1.781 ms                                        
  4  172.30.22.4 (172.30.22.4)  5.090 ms                                        
-   $ kubectl exec -it nginx-left-deployment-76c9bb4ff-4zz5f -n sfc-head -- traceroute -q 1 -I google.com
+$ kubectl exec -it nginx-left-deployment-76c9bb4ff-4zz5f -n sfc-head -- traceroute -q 1 -I google.com
 traceroute to google.com (142.251.33.78), 30 hops max, 46 byte packets         
  1  172.30.11.3 (172.30.11.3)  1.097 ms                                        
  2  172.30.33.3 (172.30.33.3)  0.627 ms                                        

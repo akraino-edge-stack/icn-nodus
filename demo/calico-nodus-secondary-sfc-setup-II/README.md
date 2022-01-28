@@ -107,10 +107,10 @@ ssh into the TM2 vm and run the following command to attach TM2 to the right pro
 Run the following commands to create virtual router
 ```
    $ ip route add 172.30.10.0/24 via 172.30.20.3
-   $ ip route add 172.30.33.0/24 via 172.30.20.3
-   $ ip route add 172.30.44.0/24 via 172.30.20.3
-   $ ip route add 172.30.11.0/24 via 172.30.20.3
-   $ ip route add 172.30.22.0/24 via 172.30.20.3
+   $ ip route add 172.30.16.0/24 via 172.30.20.3
+   $ ip route add 172.30.17.0/24 via 172.30.20.3
+   $ ip route add 172.30.18.0/24 via 172.30.20.3
+   $ ip route add 172.30.19.0/24 via 172.30.20.3
 ```
 ```
    $ echo 1 > /proc/sys/net/ipv4/ip_forward
@@ -125,10 +125,10 @@ The setup show the SFC is connected to two network. One virtual and provider net
 
 let create the demo setup
 ```
-   $ kubectl apply -f demo/calico-nodus-secondary-sfc-setup/deploy/sfc-private-network.yaml
-   $ kubectl apply -f demo/calico-nodus-secondary-sfc-setup/deploy/slb-multiple-network.yaml
-   $ kubectl apply -f demo/calico-nodus-secondary-sfc-setup/deploy/ngfw.yaml
-   $ kubectl apply -f demo/calico-nodus-secondary-sfc-setup/deploy/sdewan-multiple-network.yaml
+   $ kubectl apply -f demo/calico-nodus-secondary-sfc-setup-II/deploy/sfc-private-network.yaml
+   $ kubectl apply -f demo/calico-nodus-secondary-sfc-setup-II/deploy/slb-multiple-network.yaml
+   $ kubectl apply -f demo/calico-nodus-secondary-sfc-setup-II/deploy/ngfw.yaml
+   $ kubectl apply -f demo/calico-nodus-secondary-sfc-setup-II/deploy/sdewan-multiple-network.yaml
 ```
 - The above commends created the multiple networks - provider-network-1 and provider-network-2. The corresponding vlan tagging is created in the nodes
 - Dummy VFs application are deployed in this case are Smart Load balancer,Next Generation Firewall and Software Defined
@@ -137,9 +137,11 @@ Edge WAN. This could be replaced by the actual VFs application.
 Next steps to deploy Pods and deploy the SFCs
 
 ```
-    $ kubectl apply -f demo/calico-nodus-secondary-sfc-setup/deploy/nginx-left-deployment.yaml
-    $ kubectl apply -f demo/calico-nodus-secondary-sfc-setup/deploy/nginx-right-deployment.yaml
-    $ kubectl apply -f demo/calico-nodus-secondary-sfc-setup/deploy/sfc.yaml
+    $ kubectl apply -f demo/calico-nodus-secondary-sfc-setup-II/deploy/namespace-right
+    $ kubectl apply -f demo/calico-nodus-secondary-sfc-setup-II/deploy/namespace-left
+    $ kubectl apply -f demo/calico-nodus-secondary-sfc-setup-II/deploy/nginx-left-deployment.yaml
+    $ kubectl apply -f demo/calico-nodus-secondary-sfc-setup-II/deploy/nginx-right-deployment.yaml
+    $ kubectl apply -f demo/calico-nodus-secondary-sfc-setup-II/deploy/sfc.yaml
 ```
 Let trace the packet flow in the sfc for the internal and external traffic throug sfc
 

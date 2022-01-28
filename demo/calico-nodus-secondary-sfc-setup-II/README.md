@@ -125,6 +125,7 @@ The setup show the SFC is connected to two network. One virtual and provider net
 
 let create the demo setup
 ```
+   $ kubectl apply -f example/multus-net-attach-def-cr.yaml
    $ kubectl apply -f demo/calico-nodus-secondary-sfc-setup-II/deploy/sfc-private-network.yaml
    $ kubectl apply -f demo/calico-nodus-secondary-sfc-setup-II/deploy/slb-multiple-network.yaml
    $ kubectl apply -f demo/calico-nodus-secondary-sfc-setup-II/deploy/ngfw.yaml

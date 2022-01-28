@@ -61,7 +61,7 @@ Install the [docker](https://docs.docker.com/engine/install/ubuntu/) in the Kube
 Follow the steps in [create cluster kubeadm](https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/create-cluster-kubeadm/) to create kubernetes cluster in master
 In the master node run the `kubeadm init` as below. The ovn4nfv uses pod network cidr `10.210.0.0/16`
 ```
-    $ kubeadm init --kubernetes-version=1.19.0 --pod-network-cidr=10.210.0.0/16 --apiserver-advertise-address=<master_eth0_ip_address>
+    $ kubeadm init --kubernetes-version=1.23.3 --pod-network-cidr=10.210.0.0/16 --apiserver-advertise-address=<master_eth0_ip_address>
 ```
 Ensure the master node taint for no schedule is removed and labelled with `ovn4nfv-k8s-plugin=ovn-control-plane`
 ```

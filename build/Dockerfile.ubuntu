@@ -1,15 +1,32 @@
+FROM golang:1.17.6 as builder
+
+WORKDIR /workspace
+
+# Copy the Go Modules manifests
+COPY go.mod go.mod
+COPY go.sum go.sum
+# cache deps before building and copying source so that we don't need to re-download as much
+# and so that source changes don't invalidate our downloaded layer
+RUN go mod download
+COPY cmd cmd
+COPY pkg pkg
+COPY internal internal
+COPY build build
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 GO111MODULE=on go build -o build/bin/nfn-operator ./cmd/nfn-operator
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 GO111MODULE=on go build -o build/bin/ovn4nfvk8s-cni ./cmd/ovn4nfvk8s-cni
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 GO111MODULE=on go build -o build/bin/nfn-agent ./cmd/nfn-agent
+
 FROM ubuntu:18.04
 
-ARG HTTP_PROXY=${HTTP_PROXY}
-ARG HTTPS_PROXY=${HTTPS_PROXY}
-
-ENV http_proxy $HTTP_PROXY
-ENV https_proxy $HTTPS_PROXY
-ENV no_proxy $NO_PROXY
 ARG CNI_VERSION=v0.8.5
-
-RUN apt-get update && apt-get install -y -qq apt-transport-https make curl net-tools iproute2 iptables \
-    wget software-properties-common setpriv dpkg-dev netcat jq
+ENV DEBIAN_FRONTEND=noninteractive 
+WORKDIR /
+COPY --from=builder /workspace/build/bin/* usr/local/bin/
+# apt-get upgrade -y 
+RUN apt-get update && \
+    apt-get install -y -qq apt-transport-https make curl net-tools iproute2 iptables \
+    wget software-properties-common setpriv dpkg-dev netcat jq && \
+    rm -rf /var/lib/apt/lists/*
 
 RUN mkdir -p /opt/ovn4nfv-k8s-plugin/dist/ubuntu/deb
 RUN bash -xc "\
@@ -21,26 +38,11 @@ popd; \
 RUN echo "deb [trusted=yes] file:///opt/ovn4nfv-k8s-plugin/dist/ubuntu/deb ./" | tee -a /etc/apt/sources.list > /dev/null
 RUN apt-get update && apt-get install -y -qq ovn-common=2.12.0-1 openvswitch-common=2.12.0-1 openvswitch-switch=2.12.0-1
 
-ENV GOLANG_VERSION 1.14.1
-RUN curl -sSL https://storage.googleapis.com/golang/go$GOLANG_VERSION.linux-amd64.tar.gz \
-        | tar -v -C /usr/local -xz
-
-ENV PATH /usr/local/go/bin:$PATH
-RUN mkdir -p /go/src /go/bin && chmod -R 777 /go
-ENV GOROOT /usr/local/go
-ENV GOPATH /go
-ENV PATH /go/bin:$PATH
-
-WORKDIR /go/src/github.com/opnfv/ovn4nfv-k8s-plugin
-COPY . .
-RUN make all
-
 ENV OPERATOR=/usr/local/bin/nfn-operator \
     AGENT=/usr/local/bin/nfn-agent \
     USER_UID=1001 \
     USER_NAME=nfn-operator
 
-RUN cp -r build/bin/* /usr/local/bin/
 ENV CNI_VERSION=$CNI_VERSION
 
 RUN mkdir -p /opt/cni/bin && \

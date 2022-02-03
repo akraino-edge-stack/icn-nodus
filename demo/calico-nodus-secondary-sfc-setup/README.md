@@ -60,8 +60,8 @@ Since calico network going to the primary network in our case, ovn4nfv subnet sh
 In this example, we customize the ovn network as follows.                      
 ```                                                                            
 data:                                                                          
-  OVN_SUBNET: "10.154.142.0/18"                                                
-  OVN_GATEWAYIP: "10.154.142.1/18"                                             
+  OVN_SUBNET: "10.154.141.0/18"                                                
+  OVN_GATEWAYIP: "10.154.141.1/18"                                    
 ```                                                                            
 Deploy the Nodus Pod network to the cluster.                                 
 ```                                                                            
@@ -120,6 +120,7 @@ The setup show the SFC is connected to two network. One virtual and provider net
 
 let create the demo setup
 ```
+   $ kubectl apply -f example/multus-net-attach-def-cr.yaml
    $ kubectl apply -f demo/calico-nodus-secondary-sfc-setup/deploy/sfc-virtual-network.yaml
    $ kubectl apply -f demo/calico-nodus-secondary-sfc-setup/deploy/slb-multiple-network.yaml
    $ kubectl apply -f demo/calico-nodus-secondary-sfc-setup/deploy/ngfw.yaml
@@ -133,8 +134,8 @@ Edge WAN. This could be replaced by the actual VFs application.
 Next steps to deploy Pods and deploy the SFCs
 
 ```
-    $ kubectl apply -f demo/calico-nodus-secondary-sfc-setup/deploy/namespace-right
-    $ kubectl apply -f demo/calico-nodus-secondary-sfc-setup/deploy/namespace-left
+    $ kubectl apply -f demo/calico-nodus-secondary-sfc-setup/deploy/namespace-right.yaml
+    $ kubectl apply -f demo/calico-nodus-secondary-sfc-setup/deploy/namespace-left.yaml
     $ kubectl apply -f demo/calico-nodus-secondary-sfc-setup/deploy/nginx-left-deployment.yaml
     $ kubectl apply -f demo/calico-nodus-secondary-sfc-setup/deploy/nginx-right-deployment.yaml
     $ kubectl apply -f demo/calico-nodus-secondary-sfc-setup/deploy/sfc-with-virtual-and-provider-network.yaml
@@ -142,92 +143,128 @@ Next steps to deploy Pods and deploy the SFCs
 Let trace the packet flow in the sfc for the internal and external traffic throug sfc
 
 ```
-   $ kubectl get pods -A -o wide                                                                                                                                           
-NAMESPACE     NAME                                                       READY   STATUS    RESTARTS   AGE     IP               NODE       NOMINATED NODE   READINESS GATES
-default       ngfw-64746d5897-mnwvv                                      1/1     Running   0          10m     10.233.105.110   minion01   <none>           <none>
-default       sdewan-7db46bdd45-nhh9r                                    1/1     Running   0          9m54s   10.233.105.111   minion01   <none>           <none>
-default       slb-598448fb4b-qp6rr                                       1/1     Running   0          10m     10.233.105.109   minion01   <none>           <none>
-kube-system   calico-kube-controllers-c9784d67d-ttzd5                    1/1     Running   0          3d22h   10.233.105.80    minion01   <none>           <none>
-kube-system   calico-node-58pj2                                          1/1     Running   0          3d16h   192.168.121.26   master     <none>           <none>
-kube-system   calico-node-mvntb                                          1/1     Running   0          3d16h   192.168.121.30   minion01   <none>           <none>
-kube-system   coredns-f9fd979d6-g88zw                                    1/1     Running   0          3d16h   10.233.97.189    master     <none>           <none>
-kube-system   coredns-f9fd979d6-qtc9b                                    1/1     Running   0          3d16h   10.233.105.102   minion01   <none>           <none>
-kube-system   etcd-master                                                1/1     Running   1          26d     192.168.121.26   master     <none>           <none>
-kube-system   kube-apiserver-master                                      1/1     Running   1          26d     192.168.121.26   master     <none>           <none>
-kube-system   kube-controller-manager-master                             1/1     Running   24         26d     192.168.121.26   master     <none>           <none>
-kube-system   kube-multus-ds-amd64-9r8b6                                 1/1     Running   1          26d     192.168.121.26   master     <none>           <none>
-kube-system   kube-multus-ds-amd64-bdfz5                                 1/1     Running   1          26d     192.168.121.30   minion01   <none>           <none>
-kube-system   kube-proxy-lwkm8                                           1/1     Running   1          26d     192.168.121.26   master     <none>           <none>
-kube-system   kube-proxy-mj98m                                           1/1     Running   2          26d     192.168.121.30   minion01   <none>           <none>
-kube-system   kube-scheduler-master                                      1/1     Running   23         26d     192.168.121.26   master     <none>           <none>
-kube-system   nfn-agent-mf6zv                                            1/1     Running   0          12m     192.168.121.30   minion01   <none>           <none>
-kube-system   nfn-agent-qfc8d                                            1/1     Running   0          12m     192.168.121.26   master     <none>           <none>
-kube-system   nfn-operator-689d79dc69-8fghz                              1/1     Running   0          12m     192.168.121.26   master     <none>           <none>
-kube-system   ovn-control-plane-cc67d7668-jqbcv                          1/1     Running   1          26d     192.168.121.26   master     <none>           <none>
-kube-system   ovn-controller-cbh8t                                       1/1     Running   1          26d     192.168.121.26   master     <none>           <none>
-kube-system   ovn-controller-l8spp                                       1/1     Running   1          26d     192.168.121.30   minion01   <none>           <none>
-kube-system   ovn4nfv-cni-hl9nd                                          1/1     Running   0          12m     192.168.121.26   master     <none>           <none>
-kube-system   ovn4nfv-cni-qqptj                                          1/1     Running   0          12m     192.168.121.30   minion01   <none>           <none>
-sfc-head      nginx-left-deployment-76c9bb4ff-4zz5f                      1/1     Running   0          2m59s   10.233.105.112   minion01   <none>           <none>
-sfc-head      nginx-left-deployment-76c9bb4ff-cbg77                      1/1     Running   0          2m59s   10.233.97.193    master     <none>           <none>
-sfc-head      nginx-left-deployment-76c9bb4ff-qvxm8                      1/1     Running   0          2m59s   10.233.105.113   minion01   <none>           <none>
-sfc-tail      nginx-right-deployment-f6cfb7679-8bcbd                     1/1     Running   0          95s     10.233.97.194    master     <none>           <none>
-sfc-tail      nginx-right-deployment-f6cfb7679-ccqqc                     1/1     Running   0          95s     10.233.105.114   minion01   <none>           <none>
-sfc-tail      nginx-right-deployment-f6cfb7679-kfsvc                     1/1     Running   0          95s     10.233.97.195    master     <none>           <none>
+   $ kubectl get pods -A -o wide
+NAMESPACE     NAME                                       READY   STATUS    RESTARTS   AGE     IP               NODE       NOMINATED NODE   READINESS GATES
+default       ngfw-66b7d958c9-sgtj8                      1/1     Running   0          3m2s    10.210.50.75     minion01   <none>           <none>
+default       sdewan-8b8867c49-jpg78                     1/1     Running   0          2m52s   10.210.50.76     minion01   <none>           <none>
+default       slb-7bc67f7866-894sk                       1/1     Running   0          3m10s   10.210.50.74     minion01   <none>           <none>
+kube-system   calico-kube-controllers-66d6894896-mmmrk   1/1     Running   0          5h10m   10.210.50.65     minion01   <none>           <none>
+kube-system   calico-node-krkgr                          1/1     Running   0          5h6m    192.168.121.28   minion01   <none>           <none>
+kube-system   calico-node-mpx2s                          1/1     Running   0          5h6m    192.168.121.13   master     <none>           <none>
+kube-system   coredns-64897985d-9t2wf                    1/1     Running   0          5h58m   10.210.50.67     minion01   <none>           <none>
+kube-system   coredns-64897985d-z2sjk                    1/1     Running   0          5h58m   10.210.50.66     minion01   <none>           <none>
+kube-system   etcd-master                                1/1     Running   0          5h58m   192.168.121.13   master     <none>           <none>
+kube-system   kube-apiserver-master                      1/1     Running   0          5h58m   192.168.121.13   master     <none>           <none>
+kube-system   kube-controller-manager-master             1/1     Running   0          5h58m   192.168.121.13   master     <none>           <none>
+kube-system   kube-multus-ds-amd64-bj5j7                 1/1     Running   0          5h9m    192.168.121.28   minion01   <none>           <none>
+kube-system   kube-multus-ds-amd64-lbt98                 1/1     Running   0          5h9m    192.168.121.13   master     <none>           <none>
+kube-system   kube-proxy-pb4nj                           1/1     Running   0          5h58m   192.168.121.13   master     <none>           <none>
+kube-system   kube-proxy-vdj5g                           1/1     Running   0          5h57m   192.168.121.28   minion01   <none>           <none>
+kube-system   kube-scheduler-master                      1/1     Running   0          5h58m   192.168.121.13   master     <none>           <none>
+kube-system   nfn-agent-879w7                            1/1     Running   0          7m57s   192.168.121.13   master     <none>           <none>
+kube-system   nfn-agent-hwrrj                            1/1     Running   0          7m57s   192.168.121.28   minion01   <none>           <none>
+kube-system   nfn-operator-7c465f466b-4kqs2              1/1     Running   0          7m57s   192.168.121.13   master     <none>           <none>
+kube-system   ovn-control-plane-7dd9ff64c8-9hmwn         1/1     Running   0          5h6m    192.168.121.13   master     <none>           <none>
+kube-system   ovn-controller-c94br                       1/1     Running   0          5h6m    192.168.121.28   minion01   <none>           <none>
+kube-system   ovn-controller-pf8hb                       1/1     Running   0          5h6m    192.168.121.13   master     <none>           <none>
+kube-system   ovn4nfv-cni-pm4wd                          1/1     Running   0          7m57s   192.168.121.13   master     <none>           <none>
+kube-system   ovn4nfv-cni-xlbs4                          1/1     Running   0          7m57s   192.168.121.28   minion01   <none>           <none>
+sfc-head      nginx-left-deployment-7476fb75fc-g8brt     1/1     Running   0          73s     10.210.50.78     minion01   <none>           <none>
+sfc-head      nginx-left-deployment-7476fb75fc-h8w6s     1/1     Running   0          73s     10.210.50.77     minion01   <none>           <none>
+sfc-head      nginx-left-deployment-7476fb75fc-qz8nz     1/1     Running   0          73s     10.210.219.68    master     <none>           <none>
+sfc-tail      nginx-right-deployment-965b96d57-65bvx     1/1     Running   0          64s     10.210.50.79     minion01   <none>           <none>
+sfc-tail      nginx-right-deployment-965b96d57-cvrpt     1/1     Running   0          64s     10.210.219.69    master     <none>           <none>
+sfc-tail      nginx-right-deployment-965b96d57-ff7pg     1/1     Running   0          64s     10.210.50.80     minion01   <none>           <none>
 ```
+### Flow I
 Let ping from the left pod to right pod and left pod to internet
 ```
-$ kubectl exec -it nginx-right-deployment-f6cfb7679-8bcbd -n sfc-tail -- ifconfig
-eth0      Link encap:Ethernet  HWaddr DE:59:0B:4C:34:6F                        
-          inet addr:10.233.97.194  Bcast:10.233.97.194  Mask:255.255.255.255   
-          UP BROADCAST RUNNING MULTICAST  MTU:1440  Metric:1                   
-          RX packets:0 errors:0 dropped:0 overruns:0 frame:0                   
-          TX packets:0 errors:0 dropped:0 overruns:0 carrier:0                 
-          collisions:0 txqueuelen:0                                            
-          RX bytes:0 (0.0 B)  TX bytes:0 (0.0 B)                               
-                                                                               
-lo        Link encap:Local Loopback                                            
-          inet addr:127.0.0.1  Mask:255.0.0.0                                  
-          UP LOOPBACK RUNNING  MTU:65536  Metric:1                             
-          RX packets:0 errors:0 dropped:0 overruns:0 frame:0                   
-          TX packets:0 errors:0 dropped:0 overruns:0 carrier:0                 
-          collisions:0 txqueuelen:1000                                         
-          RX bytes:0 (0.0 B)  TX bytes:0 (0.0 B)                               
-                                                                               
-sn0       Link encap:Ethernet  HWaddr 02:FD:CC:1E:16:05                        
-          inet addr:172.30.22.4  Bcast:172.30.22.255  Mask:255.255.255.0       
-          UP BROADCAST RUNNING MULTICAST  MTU:1400  Metric:1                   
-          RX packets:0 errors:0 dropped:0 overruns:0 frame:0                   
-          TX packets:0 errors:0 dropped:0 overruns:0 carrier:0                 
-          collisions:0 txqueuelen:0                                            
-          RX bytes:0 (0.0 B)  TX bytes:0 (0.0 B)                               
-                                                                               
-$ kubectl exec -it nginx-left-deployment-76c9bb4ff-4zz5f -n sfc-head -- traceroute -q 1 -I 172.30.22.4
-traceroute to 172.30.22.4 (172.30.22.4), 30 hops max, 46 byte packets          
- 1  172.30.11.3 (172.30.11.3)  2.061 ms                                        
- 2  172.30.33.3 (172.30.33.3)  0.823 ms                                        
- 3  172.30.44.3 (172.30.44.3)  1.781 ms                                        
- 4  172.30.22.4 (172.30.22.4)  5.090 ms                                        
-$ kubectl exec -it nginx-left-deployment-76c9bb4ff-4zz5f -n sfc-head -- traceroute -q 1 -I google.com
-traceroute to google.com (142.251.33.78), 30 hops max, 46 byte packets         
- 1  172.30.11.3 (172.30.11.3)  1.097 ms                                        
- 2  172.30.33.3 (172.30.33.3)  0.627 ms                                        
- 3  172.30.44.3 (172.30.44.3)  0.571 ms                                        
- 4  172.30.20.2 (172.30.20.2)  2.847 ms                                        
- 5  *                                                                          
- 6  10.10.110.1 (10.10.110.1)  1.545 ms                                        
- 7  192.55.66.2 (192.55.66.2)  1.697 ms                                        
- 8  10.54.2.45 (10.54.2.45)  35.393 ms                                         
- 9  10.128.161.137 (10.128.161.137)  1.319 ms                                  
-10  *                                                                          
-11  *                                                                          
-12  *                                                                          
-13  *                                                                          
-14  *                                                                          
-15  *                                                                          
-16  *                                                                          
-17  *                                                                          
-18  sea09s28-in-f14.1e100.net (142.251.33.78)  8.434 ms               
+$ kubectl exec -it nginx-right-deployment-965b96d57-65bvx -n sfc-tail -- ifconfig
+eth0      Link encap:Ethernet  HWaddr EE:97:C9:3A:85:C3  
+          inet addr:10.210.50.79  Bcast:10.210.50.79  Mask:255.255.255.255
+          UP BROADCAST RUNNING MULTICAST  MTU:1440  Metric:1
+          RX packets:0 errors:0 dropped:0 overruns:0 frame:0
+          TX packets:0 errors:0 dropped:0 overruns:0 carrier:0
+          collisions:0 txqueuelen:0 
+          RX bytes:0 (0.0 B)  TX bytes:0 (0.0 B)
+
+lo        Link encap:Local Loopback  
+          inet addr:127.0.0.1  Mask:255.0.0.0
+          UP LOOPBACK RUNNING  MTU:65536  Metric:1
+          RX packets:0 errors:0 dropped:0 overruns:0 frame:0
+          TX packets:0 errors:0 dropped:0 overruns:0 carrier:0
+          collisions:0 txqueuelen:1000 
+          RX bytes:0 (0.0 B)  TX bytes:0 (0.0 B)
+
+sn0       Link encap:Ethernet  HWaddr 1E:3E:B1:1E:16:05  
+          inet addr:172.30.22.4  Bcast:172.30.22.255  Mask:255.255.255.0
+          UP BROADCAST RUNNING MULTICAST  MTU:1400  Metric:1
+          RX packets:0 errors:0 dropped:0 overruns:0 frame:0
+          TX packets:0 errors:0 dropped:0 overruns:0 carrier:0
+          collisions:0 txqueuelen:0 
+          RX bytes:0 (0.0 B)  TX bytes:0 (0.0 B)
+                                                                                                             
+$ kubectl exec -it nginx-left-deployment-7476fb75fc-g8brt -n sfc-head -- traceroute -q 1 -I 172.30.22.4
+traceroute to 172.30.22.4 (172.30.22.4), 30 hops max, 46 byte packets
+ 1  172.30.11.3 (172.30.11.3)  2.263 ms
+ 2  172.30.33.3 (172.30.33.3)  2.116 ms
+ 3  172.30.44.3 (172.30.44.3)  1.196 ms
+ 4  172.30.22.4 (172.30.22.4)  1.247 ms
+ ```
+ ### Flow II
+ Before testing the next feature, please make sure the calico node and calico kube controller are up and running. Please refer the [Troubleshooting](https://projectcalico.docs.tigera.io/maintenance/troubleshoot/troubleshooting) for more info.
+
+Let trace the packet from left pod to the Internet. The packet flow through the chain and then to virtual router(tm2) and reach the Internet.
+If your setup up is behind the proxy. Please take care of your proxy setup before running these testing.
+ ```                                        
+$ kubectl exec -it nginx-left-deployment-7476fb75fc-g8brt -n sfc-head -- traceroute -q 1 -I google.com
+traceroute to google.com (142.251.40.142), 30 hops max, 46 byte packets
+ 1  172.30.11.3 (172.30.11.3)  0.655 ms
+ 2  172.30.33.3 (172.30.33.3)  0.589 ms
+ 3  172.30.44.3 (172.30.44.3)  0.447 ms
+ 4  172.30.20.2 (172.30.20.2)  2.192 ms
+ 5  *
+ 6  10.11.16.1 (10.11.16.1)  1.487 ms
+ 7  opnfv-gateway.iol.unh.edu (132.177.125.249)  1.152 ms
+ 8  rcc-iol-gw.iol.unh.edu (132.177.123.1)  1.355 ms
+ 9  fatcat.unh.edu (132.177.100.4)  1.802 ms
+10  unh-cps-nox300gw1.nox.org (18.2.128.85)  5.060 ms
+11  192.5.89.38 (192.5.89.38)  11.580 ms
+12  18.2.145.18 (18.2.145.18)  11.306 ms
+13  108.170.248.65 (108.170.248.65)  12.086 ms
+14  216.239.49.65 (216.239.49.65)  12.083 ms
+15  lga25s80-in-f14.1e100.net (142.251.40.142)  11.893 ms               
+```
+### Flow III
+Let trace the packet from the server tm1-node to Internet through SFC
+```
+vagrant@tm1-node:~$ sudo traceroute -q 1 -I google.com
+traceroute to google.com (142.251.32.110), 30 hops max, 60 byte packets
+ 1  172.30.10.3 (172.30.10.3)  2.417 ms
+ 2  172.30.33.3 (172.30.33.3)  2.344 ms
+ 3  172.30.44.3 (172.30.44.3)  2.340 ms
+ 4  172.30.20.2 (172.30.20.2)  2.427 ms
+ 5  *
+ 6  _gateway (10.11.16.1)  2.916 ms
+ 7  opnfv-gateway.iol.unh.edu (132.177.125.249)  2.950 ms
+ 8  rcc-iol-gw.iol.unh.edu (132.177.123.1)  2.942 ms
+ 9  fatcat.unh.edu (132.177.100.4)  3.782 ms
+10  unh-cps-nox300gw1.nox.org (18.2.128.85)  54.561 ms
+11  192.5.89.38 (192.5.89.38)  60.236 ms
+12  18.2.145.18 (18.2.145.18)  60.196 ms
+13  108.170.248.65 (108.170.248.65)  60.480 ms
+14  142.251.60.181 (142.251.60.181)  61.927 ms
+15  lga25s77-in-f14.1e100.net (142.251.32.110)  61.907 ms
+```
+### Flow IV
+Let trace packet from pod to tm1-node server through SFC
+```
+$ kubectl exec -it nginx-right-deployment-965b96d57-65bvx -n sfc-tail -- traceroute -q 1 -I 172.30.10.101
+traceroute to 172.30.10.101 (172.30.10.101), 30 hops max, 46 byte packets
+ 1  172.30.22.3 (172.30.22.3)  0.996 ms
+ 2  172.30.44.2 (172.30.44.2)  0.689 ms
+ 3  172.30.33.2 (172.30.33.2)  0.717 ms
+ 4  172.30.10.101 (172.30.10.101)  1.137 ms
 ```
 ## License
 

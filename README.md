@@ -14,7 +14,7 @@ Nodus is latin word for "knot". Nodus converge multiple kubernetes networking us
 
 ## How it works
 
-OVN4NFV consist of 4 major components
+Nodus consist of 4 major components
 - OVN control plane
 - OVN controller
 - Network Function Network(NFN) k8s operator/controller
@@ -22,7 +22,7 @@ OVN4NFV consist of 4 major components
 
 OVN control plane and OVN controller take care of OVN configuration and installation in each node in Kubernetes. NFN operator runs in the Kubernetes master and NFN agent run as a daemonset in each node.
 
-### OVN4NFV architecture blocks
+### Nodus architecture blocks
 ![ovn4nfv k8s arc block](./images/ovn4nfv-k8s-arch-block.png)
 
 #### NFN Operator
@@ -52,14 +52,20 @@ There are general 3 sfc flows are there:
 * Packets from the pod to internal server in the corp network: Ingress (L7 LB) -> SLB -> M3 server
 * Packets from the internal server M3 to reach internet: M3 -> SLB -> NGFW -> SDWAN CNF -> External router -> Internet
 
-OVN4NFV SFC currently support all 3 follows. The detailed demo is include [demo/sfc-setup/README.md](./demo/sfc-setup/README.md)
+Nodus SFC currently support all 3 flows.
+
+#### Demos
+
+[Dynamic Network - SFC](.demo/calico-nodus-secondary-sfc-setup-II/README.md)
+[Secondary - SFC](.demo/calico-nodus-secondary-sfc-setup/README.md)
+[Primary Network - SFC](.demo/nodus-primary-sfc-setup/README.md)
 
 # Quickstart Installation Guide
 ### kubeadm
 
 Install the [docker](https://docs.docker.com/engine/install/ubuntu/) in the Kubernetes cluster node.
 Follow the steps in [create cluster kubeadm](https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/create-cluster-kubeadm/) to create kubernetes cluster in master
-In the master node run the `kubeadm init` as below. The ovn4nfv uses pod network cidr `10.210.0.0/16`
+In the master node run the `kubeadm init` as below. The Nodus uses pod network cidr `10.210.0.0/16`
 ```
     $ kubeadm init --kubernetes-version=1.23.3 --pod-network-cidr=10.210.0.0/16 --apiserver-advertise-address=<master_eth0_ip_address>
 ```
@@ -69,7 +75,7 @@ nodename=$(kubectl get node -o jsonpath='{.items[0].metadata.name}')
 kubectl taint node $nodename node-role.kubernetes.io/master:NoSchedule-
 kubectl label --overwrite node $nodename ovn4nfv-k8s-plugin=ovn-control-plane
 ```
-Deploy the ovn4nfv Pod network to the cluster.
+Deploy the Nodus Pod network to the cluster.
 ```
     $ kubectl apply -f deploy/ovn-daemonset.yaml
     $ kubectl apply -f deploy/ovn4nfv-k8s-plugin.yaml
@@ -80,7 +86,7 @@ Join worker node by running the `kubeadm join` on each node as root as mentioned
 
 ### kubespray
 
-Kubespray support the ovn4nfv as the network plugin- please follow the steps in [kubernetes-sigs/kubespray/docs/ovn4nfv.md](https://github.com/kubernetes-sigs/kubespray/blob/master/docs/ovn4nfv.md)
+Kubespray support the Nodus as the network plugin- please follow the steps in [kubernetes-sigs/kubespray/docs/ovn4nfv.md](https://github.com/kubernetes-sigs/kubespray/blob/master/docs/ovn4nfv.md)
 
 ## Comprehensive Documentation
 
@@ -90,9 +96,4 @@ Kubespray support the ovn4nfv as the network plugin- please follow the steps in 
 
 ## Contact Us
 
-For any questions about ovn4nfv k8s , feel free to ask a question in #general in the [ICN slack](https://akraino-icn-admin.herokuapp.com/), or open up a https://jira.opnfv.org/issues/.
-
-* Srinivasa Addepalli <srinivasa.r.addepalli@intel.com>
-* Ritu Sood <ritu.sood@intel.com>
-* Kuralamudhan Ramakrishnan <kuralamudhan.ramakrishnan@intel.com>
-
+For any questions about Nodus k8s , feel free to ask a question in #general in the [ICN slack](https://akraino-icn-admin.herokuapp.com/), or open up a https://jira.akraino.org/projects/ICN/issues.

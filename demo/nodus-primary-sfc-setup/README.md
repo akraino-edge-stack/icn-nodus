@@ -1,9 +1,26 @@
-# Service Function Chaining(SFC) - setup
+# Service Function Chaining(SFC) - Demo
 
-## Summary
+## Automate SFC Deployment
+
+Automate SFC testing is done in 3 steps
+
+Bring up the vagrant machines
+```
+vagrant up
+```
+Deploy k8s cluster with Nodus network controller
+```
+vagrant provision --provision-with deployment
+```
+Bring up the demo
+```
+vagrant provision --provision-with demo
+```
+
+## Demo Summary
 
 This project offers a means for deploying a Kubernetes cluster
-that satisfies the requirements of ovn4nfv sfc-setup
+that satisfies the requirements of Nodus sfc setup
 
 ## Virtual Machines
 
@@ -32,10 +49,10 @@ is available on the Vagrant site.
 
 Install the [docker](https://docs.docker.com/engine/install/ubuntu/) in the master, minion01 and minion02 vm.
 Follow the steps in [create cluster kubeadm](https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/create-cluster-kubeadm/) to create kubernetes cluster in master
-In the master vm run the `kubeadm init` as below. The ovn4nfv uses same pod network cidr `10.233.64.0/18`. 
+In the master vm run the `kubeadm init` as below. The nodus uses same pod network cidr `10.233.64.0/18`. 
 Join minion01 and minion02 by running the `kubeadm join` on each node as root as mentioned in [create cluster kubeadm](https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/create-cluster-kubeadm/)
 
-Please follow the ovn4nfv installation steps - [ovn4nfv installation](https://github.com/ovn4nfv/ovn4nfv-k8s-plugin#quickstart-installation-guide)
+Please follow the Nodus installation steps - [nodus installation](https://github.com/akraino-edge-stack/icn-nodus#quickstart-installation-guide)
 
 ### TM1 server
 

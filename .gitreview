@@ -1,5 +1,5 @@
 [gerrit]
 host=gerrit.akraino.org
 port=29418
-project=icn/ovn4nfv-k8s-network-controller
+project=icn/nodus
 defaultbranch=master

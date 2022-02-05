@@ -1,2 +1,4 @@
 .tox/
-demo/sfc-setup/.vagrant
+demo/nodus-primary-sfc-setup/.vagrant/
+demo/calico-nodus-secondary-sfc-setup/.vagrant/
+demo/calico-nodus-secondary-sfc-setup-II/.vagrant/

@@ -1,9 +1,9 @@
-# Service Function Chaining(SFC) - setup
+# Service Function Chaining(SFC) - Demo
 
 ## Summary
 
 This project offers a means for deploying a Kubernetes cluster
-that satisfies the requirements of ovn4nfv sfc-setup
+that satisfies the requirements of Nodus sfc-setup
 
 ## Virtual Machines
 
@@ -56,7 +56,7 @@ There will be multiple conf files, we have to make sure Multus file is in the Le
 Kubernetes kubelet is designed to pick the config file in the lexicograpchic order.
 
 In this example, we are using pod CIDR as `10.210.0.0/16`. The Calico will automatically detect the CIDR based on the running configuration.
-Since calico network going to the primary network in our case, ovn4nfv subnet should be a different network. Make sure you change the `ovn_subnet` and `ovn_gatewayip` in `deploy/ovn4nfv-k8s-plugin-sfc-setup-II.yaml`. Setup `Network` and `SubnetLen`as per user configuration.
+Since calico network going to the primary network in our case, nodus subnet should be a different network. Make sure you change the `ovn_subnet` and `ovn_gatewayip` in `deploy/ovn4nfv-k8s-plugin-sfc-setup-II.yaml`. Setup `Network` and `SubnetLen`as per user configuration.
 
 In this example, we customize the ovn network as follows.
 ```

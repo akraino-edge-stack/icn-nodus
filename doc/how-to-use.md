@@ -1,8 +1,8 @@
-# OVN4NFV Usage guide
+# Nodus Usage guide
 
 ## Quickstart Installation Guide
 
-Please follow the ovn4nfv installation steps - [ovn4nfv installation](https://github.com/ovn4nfv/ovn4nfv-k8s-plugin#quickstart-installation-guide)
+Please follow the Nodus installation steps - [nodus installation](https://github.com/akraino-edge-stack/icn-nodus#quickstart-installation-guide)
 
 ## Network Testing
 
@@ -234,7 +234,7 @@ will create two VMs and provide the required sandbox.
 
 ### VLAN Tagging Provider network testing
 
-The following setup have 2 VMs with one VM having Kubernetes setup with OVN4NFVk8s plugin and another VM act as provider networking to do
+The following setup have 2 VMs with one VM having Kubernetes setup with Nodus plugin and another VM act as provider networking to do
 testing.
 
 Run the following yaml file to test teh vlan tagging provider networking. User required to change the `providerInterfaceName` and
@@ -443,10 +443,10 @@ Since calico network going to the primary network in our case, ovn4nfv subnet sh
 In this example, we customize the ovn network as follows.
 ```
 data:
-  OVN_SUBNET: "10.154.142.0/16"
-  OVN_GATEWAYIP: "10.154.142.1/16"
+  OVN_SUBNET: "10.154.142.0/18"
+  OVN_GATEWAYIP: "10.154.142.1/18"
 ```
-Deploy the ovn4nfv Pod network to the cluster.
+Deploy the Nodus components
 ```
     $ kubectl apply -f deploy/ovn-daemonset.yaml
     $ kubectl apply -f deploy/ovn4nfv-k8s-plugin.yaml
@@ -463,7 +463,7 @@ NAME                 AGE
 ovn4nfv-k8s-plugin   9s
 ```
 
-Let check the multiple interface created from OVN4NFV and Calico
+Let check the multiple interface created from Nodus and Calico
 ```
 # kubectl create -f example/ovn4nfv-deployment-with-multus-annotation-sandbox.yaml
 deployment.apps/ovn4nfv-deployment-with-multus-annotation-sandbox created
@@ -495,7 +495,7 @@ net1      Link encap:Ethernet  HWaddr 7E:9C:C7:9A:8E:0D
           collisions:0 txqueuelen:0
           RX bytes:0 (0.0 B)  TX bytes:0 (0.0 B)
 ```
-Let check the OVN4NFV Multi-networking along with Multus
+Let check the Nodus Multi-networking along with Multus
 
 Create two ovn networks ovn-priv-net and ovn-port-net
 

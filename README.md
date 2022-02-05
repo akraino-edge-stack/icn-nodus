@@ -56,9 +56,9 @@ Nodus SFC currently support all 3 flows.
 
 #### Demos
 
-- [Dynamic Network - SFC](.demo/calico-nodus-secondary-sfc-setup-II/README.md)
-- [Secondary Network - SFC](.demo/calico-nodus-secondary-sfc-setup/README.md)
-- [Primary Network - SFC](.demo/nodus-primary-sfc-setup/README.md)
+- [Dynamic Network - SFC](./demo/calico-nodus-secondary-sfc-setup-II/README.md)
+- [Secondary Network - SFC](./demo/calico-nodus-secondary-sfc-setup/README.md)
+- [Primary Network - SFC](./demo/nodus-primary-sfc-setup/README.md)
 
 # Quickstart Installation Guide
 ### kubeadm

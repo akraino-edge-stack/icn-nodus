@@ -95,9 +95,9 @@
     - name: "Install kubeadm, kubelet, and kubectl : Install kubernetes packages"
       apt:
         name:
-        - kubelet=1.21.6-00
-        - kubeadm=1.21.6-00
-        - kubectl=1.21.6-00
+        - kubelet=1.23.3-00
+        - kubeadm=1.23.3-00
+        - kubectl=1.23.3-00
         update_cache: yes
     # TODO Kubernetes recommends: sudo apt-mark hold kubelet kubeadm kubectl (see dpkg_selections module)
 

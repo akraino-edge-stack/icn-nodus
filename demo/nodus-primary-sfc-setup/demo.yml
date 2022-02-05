@@ -5,7 +5,7 @@
   tasks:
   - name: Apply YAML files
     shell: |
-      kubectl apply -f https://github.com/jetstack/cert-manager/releases/download/v1.1.0/cert-manager.yaml --validate=false
+      kubectl apply -f https://github.com/jetstack/cert-manager/releases/download/v1.7.0/cert-manager.yaml --validate=false
       kubectl -n cert-manager wait pods --all --for=condition=ready --timeout=300s
       kubectl apply -f https://raw.githubusercontent.com/akraino-edge-stack/icn-sdwan/master/platform/crd-ctrlr/examples/sdewan-controller.yaml
       kubectl -n sdewan-system wait deployments/sdewan-controller-manager --for=condition=available --timeout=300s

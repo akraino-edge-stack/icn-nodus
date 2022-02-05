@@ -605,7 +605,7 @@ spec:
       serviceAccountName: k8s-nfn-sa
       containers:
         - name: nfn-operator
-          image: 192.168.121.22:5000/ovn4nfv-k8s-plugin:v5.0.0
+          image: docker.io/integratedcloudnative/ovn4nfv-k8s-plugin:v5.0.0
           command: ["/usr/local/bin/entrypoint", "operator"]
           imagePullPolicy: IfNotPresent
           envFrom:
@@ -677,7 +677,7 @@ spec:
       serviceAccountName: k8s-nfn-sa
       containers:
         - name: ovn4nfv
-          image: 192.168.121.22:5000/ovn4nfv-k8s-plugin:v5.0.0
+          image: docker.io/integratedcloudnative/ovn4nfv-k8s-plugin:v5.0.0
           command: ["/usr/local/bin/entrypoint", "cni"]
           imagePullPolicy: IfNotPresent
           resources:
@@ -751,7 +751,7 @@ spec:
       serviceAccountName: k8s-nfn-sa
       containers:
         - name: nfn-agent
-          image: 192.168.121.22:5000/ovn4nfv-k8s-plugin:v5.0.0
+          image: docker.io/integratedcloudnative/ovn4nfv-k8s-plugin:v5.0.0
           command: ["/usr/local/bin/entrypoint", "agent"]
           imagePullPolicy: IfNotPresent
           envFrom:

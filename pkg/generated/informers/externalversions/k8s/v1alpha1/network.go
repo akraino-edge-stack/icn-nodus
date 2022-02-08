@@ -19,12 +19,13 @@ limitations under the License.
 package v1alpha1
 
 import (
+	"context"
+	time "time"
+
 	k8sv1alpha1 "github.com/akraino-edge-stack/icn-nodus/pkg/apis/k8s/v1alpha1"
 	versioned "github.com/akraino-edge-stack/icn-nodus/pkg/generated/clientset/versioned"
 	internalinterfaces "github.com/akraino-edge-stack/icn-nodus/pkg/generated/informers/externalversions/internalinterfaces"
 	v1alpha1 "github.com/akraino-edge-stack/icn-nodus/pkg/generated/listers/k8s/v1alpha1"
-	time "time"
-
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	watch "k8s.io/apimachinery/pkg/watch"
@@ -61,13 +62,13 @@ func NewFilteredNetworkInformer(client versioned.Interface, namespace string, re
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.K8sV1alpha1().Networks(namespace).List(options)
+				return client.K8sV1alpha1().Networks(namespace).List(context.TODO(), options)
 			},
 			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.K8sV1alpha1().Networks(namespace).Watch(options)
+				return client.K8sV1alpha1().Networks(namespace).Watch(context.TODO(), options)
 			},
 		},
 		&k8sv1alpha1.Network{},

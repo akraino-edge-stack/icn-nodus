@@ -19,13 +19,14 @@ package ovn
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/vishvananda/netlink"
 	"math/big"
 	"math/rand"
 	"net"
-	logf "sigs.k8s.io/controller-runtime/pkg/runtime/log"
 	"strings"
 	"time"
+
+	"github.com/vishvananda/netlink"
+	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 var log = logf.Log.WithName("ovn")
@@ -49,11 +50,11 @@ func CreateVlan(vlanID, interfaceName, logicalInterfaceName string) error {
 		log.Error(err, "Failed to create Vlan", "stdout", stdout, "stderr", stderr)
 		return err
 	}
-        stdout, stderr, err = RunIP("link", "set", "dev", logicalInterfaceName, "up")
-        if err != nil {
-                log.Error(err, "Failed to enable Vlan", "stdout", stdout, "stderr", stderr)
-                return err
-        }
+	stdout, stderr, err = RunIP("link", "set", "dev", logicalInterfaceName, "up")
+	if err != nil {
+		log.Error(err, "Failed to enable Vlan", "stdout", stdout, "stderr", stderr)
+		return err
+	}
 	return nil
 }
 
@@ -342,58 +343,57 @@ func intToIP(i *big.Int) net.IP {
 
 // Get Subnet for a logical bridge
 func GetNetworkSubnet(nw string) (string, error) {
-        stdout, stderr, err := RunOVNNbctl("--if-exists",
-                "get", "logical_switch", nw,
-                "other_config:subnet")
-        if err != nil {
-                log.Error(err, "Failed to subnet for network", "stderr", stderr, "stdout", stdout)
-                return "", err
-        }
-        return stdout, nil
+	stdout, stderr, err := RunOVNNbctl("--if-exists",
+		"get", "logical_switch", nw,
+		"other_config:subnet")
+	if err != nil {
+		log.Error(err, "Failed to subnet for network", "stderr", stderr, "stdout", stdout)
+		return "", err
+	}
+	return stdout, nil
 }
 
 func GetIPAdressForPod(nw string, name string) (string, error) {
-        _, stderr, err := RunOVNNbctl("--data=bare", "--no-heading",
-                "--columns=name", "find", "logical_switch", "name="+nw)
-        if err != nil {
-                log.Error(err, "Error in obtaining list of logical switch", "stderr", stderr)
-                return "", err
-        }
-        stdout, stderr, err := RunOVNNbctl("lsp-list", nw)
-        if err != nil {
-                log.Error(err, "Failed to list ports", "stderr", stderr, "stdout", stdout)
-                return "", err
-        }
-        // stdout format
-        // <port-uuid> (<port-name>)
-        // <port-uuid> (<port-name>)
-        // ...
-        ll := strings.Split(stdout, "\n")
-        if len(ll) == 0 {
-                return "", fmt.Errorf("IPAdress Not Found")
-        }
-        for _, l := range ll {
-                pn := strings.Fields(l)
-                if len(pn) < 2 {
-                        return "", fmt.Errorf("IPAdress Not Found")
-                }
-                if strings.Contains(pn[1], name) {
-                        // Found Port
-                        s := strings.Replace(pn[1], "(", "", -1)
-                        s = strings.Replace(s, ")", "", -1)
-                        dna, stderr, err := RunOVNNbctl("get", "logical_switch_port", s, "dynamic_addresses")
-                        if err != nil {
-                                log.Error(err, "Failed to get dynamic_addresses", "stderr", stderr, "stdout", dna)
-                                return "", err
-                        }
-                        // format - mac:ip
-                        ipAddr := strings.Fields(dna)
-                        if len(ipAddr) < 2 {
-                                return "", fmt.Errorf("IPAdress Not Found")
-                        }
-                        return ipAddr[1], nil
-                }
-        }
-        return "", fmt.Errorf("IPAdress Not Found %s", name)
+	_, stderr, err := RunOVNNbctl("--data=bare", "--no-heading",
+		"--columns=name", "find", "logical_switch", "name="+nw)
+	if err != nil {
+		log.Error(err, "Error in obtaining list of logical switch", "stderr", stderr)
+		return "", err
+	}
+	stdout, stderr, err := RunOVNNbctl("lsp-list", nw)
+	if err != nil {
+		log.Error(err, "Failed to list ports", "stderr", stderr, "stdout", stdout)
+		return "", err
+	}
+	// stdout format
+	// <port-uuid> (<port-name>)
+	// <port-uuid> (<port-name>)
+	// ...
+	ll := strings.Split(stdout, "\n")
+	if len(ll) == 0 {
+		return "", fmt.Errorf("IPAdress Not Found")
+	}
+	for _, l := range ll {
+		pn := strings.Fields(l)
+		if len(pn) < 2 {
+			return "", fmt.Errorf("IPAdress Not Found")
+		}
+		if strings.Contains(pn[1], name) {
+			// Found Port
+			s := strings.Replace(pn[1], "(", "", -1)
+			s = strings.Replace(s, ")", "", -1)
+			dna, stderr, err := RunOVNNbctl("get", "logical_switch_port", s, "dynamic_addresses")
+			if err != nil {
+				log.Error(err, "Failed to get dynamic_addresses", "stderr", stderr, "stdout", dna)
+				return "", err
+			}
+			// format - mac:ip
+			ipAddr := strings.Fields(dna)
+			if len(ipAddr) < 2 {
+				return "", fmt.Errorf("IPAdress Not Found")
+			}
+			return ipAddr[1], nil
+		}
+	}
+	return "", fmt.Errorf("IPAdress Not Found %s", name)
 }
-

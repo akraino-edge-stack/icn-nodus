@@ -22,10 +22,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
+	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
-	logf "sigs.k8s.io/controller-runtime/pkg/runtime/log"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 )
 
@@ -41,7 +41,6 @@ type nfnNetwork struct {
 }
 
 var enableOvnDefaultIntf bool = true
-
 
 // Add creates a new Pod Controller and adds it to the Manager. The Manager will set fields on the Controller
 // and Start it when the Manager is Started.
@@ -66,7 +65,11 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	// Define Predicates On Create and Update function
 	p := predicate.Funcs{
 		UpdateFunc: func(e event.UpdateEvent) bool {
-			annotation := e.MetaNew.GetAnnotations()
+			obj, ok := e.ObjectNew.(*corev1.Pod)
+			if !ok {
+				return false
+			}
+			annotation := obj.GetAnnotations()
 			// The object doesn't contain annotation ,nfnNetworkAnnotation so the event will be
 			// ignored.
 			//if _, ok := annotation[nfnNetworkAnnotation]; !ok {
@@ -74,11 +77,6 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 			//}
 			// If pod is already processed by OVN don't add event
 			if _, ok := annotation[ovn.Ovn4nfvAnnotationTag]; ok {
-				obj, ok := e.ObjectNew.(*corev1.Pod)
-				if !ok {
-					return false
-				}
-
 				if obj.Status.Phase == corev1.PodRunning {
 					log.V(1).Info("Pod Status Phase", "Pod name", obj.GetName(), "obj.Status.Phase", obj.Status.Phase)
 					value, ok := annotation[chaining.SFCannotationTag]
@@ -154,13 +152,13 @@ type ReconcilePod struct {
 // Reconcile function
 // The Controller will requeue the Request to be processed again if the returned error is non-nil or
 // Result.Requeue is true, otherwise upon completion it will remove the work from the queue.
-func (r *ReconcilePod) Reconcile(request reconcile.Request) (reconcile.Result, error) {
+func (r *ReconcilePod) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
 	reqLogger := log.WithValues("Request.Namespace", request.Namespace, "Request.Name", request.Name)
 	reqLogger.Info("Enter Reconciling Pod")
 
 	// Fetch the Pod instance
 	instance := &corev1.Pod{}
-	err := r.client.Get(context.TODO(), request.NamespacedName, instance)
+	err := r.client.Get(ctx, request.NamespacedName, instance)
 
 	if err != nil {
 		if errors.IsNotFound(err) {
@@ -215,7 +213,7 @@ func (r *ReconcilePod) Reconcile(request reconcile.Request) (reconcile.Result, e
 func (r *ReconcilePod) setPodAnnotation(pod *corev1.Pod, key, value string) error {
 
 	patchData := fmt.Sprintf(`{"metadata":{"annotations":{"%s":"%s"}}}`, key, value)
-	err := r.client.Patch(context.TODO(), pod, client.ConstantPatch(types.MergePatchType, []byte(patchData)))
+	err := r.client.Patch(context.TODO(), pod, client.RawPatch(types.MergePatchType, []byte(patchData)))
 	if err != nil {
 		log.Error(err, "Updating pod failed", "pod", pod, "key", key, "value", value)
 		return err
@@ -232,7 +230,7 @@ func (r *ReconcilePod) checkforsfc(pod *corev1.Pod) error {
 		return err
 	}
 
-	p, err := k.CoreV1().Pods(pod.GetNamespace()).Get(pod.GetName(), v1.GetOptions{})
+	p, err := k.CoreV1().Pods(pod.GetNamespace()).Get(context.TODO(), pod.GetName(), v1.GetOptions{})
 	if err != nil {
 		return err
 	}

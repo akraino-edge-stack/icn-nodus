@@ -19,8 +19,9 @@ limitations under the License.
 package fake
 
 import (
-	v1alpha1 "github.com/akraino-edge-stack/icn-nodus/pkg/apis/k8s/v1alpha1"
+	"context"
 
+	v1alpha1 "github.com/akraino-edge-stack/icn-nodus/pkg/apis/k8s/v1alpha1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
@@ -40,7 +41,7 @@ var networkchainingsResource = schema.GroupVersionResource{Group: "k8s.plugin.op
 var networkchainingsKind = schema.GroupVersionKind{Group: "k8s.plugin.opnfv.org", Version: "v1alpha1", Kind: "NetworkChaining"}
 
 // Get takes name of the networkChaining, and returns the corresponding networkChaining object, and an error if there is any.
-func (c *FakeNetworkChainings) Get(name string, options v1.GetOptions) (result *v1alpha1.NetworkChaining, err error) {
+func (c *FakeNetworkChainings) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1alpha1.NetworkChaining, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewGetAction(networkchainingsResource, c.ns, name), &v1alpha1.NetworkChaining{})
 
@@ -51,7 +52,7 @@ func (c *FakeNetworkChainings) Get(name string, options v1.GetOptions) (result *
 }
 
 // List takes label and field selectors, and returns the list of NetworkChainings that match those selectors.
-func (c *FakeNetworkChainings) List(opts v1.ListOptions) (result *v1alpha1.NetworkChainingList, err error) {
+func (c *FakeNetworkChainings) List(ctx context.Context, opts v1.ListOptions) (result *v1alpha1.NetworkChainingList, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewListAction(networkchainingsResource, networkchainingsKind, c.ns, opts), &v1alpha1.NetworkChainingList{})
 
@@ -73,14 +74,14 @@ func (c *FakeNetworkChainings) List(opts v1.ListOptions) (result *v1alpha1.Netwo
 }
 
 // Watch returns a watch.Interface that watches the requested networkChainings.
-func (c *FakeNetworkChainings) Watch(opts v1.ListOptions) (watch.Interface, error) {
+func (c *FakeNetworkChainings) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
 		InvokesWatch(testing.NewWatchAction(networkchainingsResource, c.ns, opts))
 
 }
 
 // Create takes the representation of a networkChaining and creates it.  Returns the server's representation of the networkChaining, and an error, if there is any.
-func (c *FakeNetworkChainings) Create(networkChaining *v1alpha1.NetworkChaining) (result *v1alpha1.NetworkChaining, err error) {
+func (c *FakeNetworkChainings) Create(ctx context.Context, networkChaining *v1alpha1.NetworkChaining, opts v1.CreateOptions) (result *v1alpha1.NetworkChaining, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewCreateAction(networkchainingsResource, c.ns, networkChaining), &v1alpha1.NetworkChaining{})
 
@@ -91,7 +92,7 @@ func (c *FakeNetworkChainings) Create(networkChaining *v1alpha1.NetworkChaining)
 }
 
 // Update takes the representation of a networkChaining and updates it. Returns the server's representation of the networkChaining, and an error, if there is any.
-func (c *FakeNetworkChainings) Update(networkChaining *v1alpha1.NetworkChaining) (result *v1alpha1.NetworkChaining, err error) {
+func (c *FakeNetworkChainings) Update(ctx context.Context, networkChaining *v1alpha1.NetworkChaining, opts v1.UpdateOptions) (result *v1alpha1.NetworkChaining, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewUpdateAction(networkchainingsResource, c.ns, networkChaining), &v1alpha1.NetworkChaining{})
 
@@ -103,7 +104,7 @@ func (c *FakeNetworkChainings) Update(networkChaining *v1alpha1.NetworkChaining)
 
 // UpdateStatus was generated because the type contains a Status member.
 // Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-func (c *FakeNetworkChainings) UpdateStatus(networkChaining *v1alpha1.NetworkChaining) (*v1alpha1.NetworkChaining, error) {
+func (c *FakeNetworkChainings) UpdateStatus(ctx context.Context, networkChaining *v1alpha1.NetworkChaining, opts v1.UpdateOptions) (*v1alpha1.NetworkChaining, error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewUpdateSubresourceAction(networkchainingsResource, "status", c.ns, networkChaining), &v1alpha1.NetworkChaining{})
 
@@ -114,7 +115,7 @@ func (c *FakeNetworkChainings) UpdateStatus(networkChaining *v1alpha1.NetworkCha
 }
 
 // Delete takes name of the networkChaining and deletes it. Returns an error if one occurs.
-func (c *FakeNetworkChainings) Delete(name string, options *v1.DeleteOptions) error {
+func (c *FakeNetworkChainings) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
 		Invokes(testing.NewDeleteAction(networkchainingsResource, c.ns, name), &v1alpha1.NetworkChaining{})
 
@@ -122,15 +123,15 @@ func (c *FakeNetworkChainings) Delete(name string, options *v1.DeleteOptions) er
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *FakeNetworkChainings) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
-	action := testing.NewDeleteCollectionAction(networkchainingsResource, c.ns, listOptions)
+func (c *FakeNetworkChainings) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
+	action := testing.NewDeleteCollectionAction(networkchainingsResource, c.ns, listOpts)
 
 	_, err := c.Fake.Invokes(action, &v1alpha1.NetworkChainingList{})
 	return err
 }
 
 // Patch applies the patch and returns the patched networkChaining.
-func (c *FakeNetworkChainings) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1alpha1.NetworkChaining, err error) {
+func (c *FakeNetworkChainings) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1alpha1.NetworkChaining, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewPatchSubresourceAction(networkchainingsResource, c.ns, name, pt, data, subresources...), &v1alpha1.NetworkChaining{})
 

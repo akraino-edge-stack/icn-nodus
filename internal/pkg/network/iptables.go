@@ -5,7 +5,7 @@ import (
 	"os"
 	"strings"
 
-	logf "sigs.k8s.io/controller-runtime/pkg/runtime/log"
+	logf "sigs.k8s.io/controller-runtime/pkg/log"
 
 	"github.com/coreos/go-iptables/iptables"
 )

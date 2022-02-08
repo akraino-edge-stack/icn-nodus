@@ -19,13 +19,13 @@ limitations under the License.
 package externalversions
 
 import (
-	versioned "github.com/akraino-edge-stack/icn-nodus/pkg/generated/clientset/versioned"
-	internalinterfaces "github.com/akraino-edge-stack/icn-nodus/pkg/generated/informers/externalversions/internalinterfaces"
-	k8s "github.com/akraino-edge-stack/icn-nodus/pkg/generated/informers/externalversions/k8s"
 	reflect "reflect"
 	sync "sync"
 	time "time"
 
+	versioned "github.com/akraino-edge-stack/icn-nodus/pkg/generated/clientset/versioned"
+	internalinterfaces "github.com/akraino-edge-stack/icn-nodus/pkg/generated/informers/externalversions/internalinterfaces"
+	k8s "github.com/akraino-edge-stack/icn-nodus/pkg/generated/informers/externalversions/k8s"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"

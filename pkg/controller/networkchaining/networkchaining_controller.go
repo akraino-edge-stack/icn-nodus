@@ -70,22 +70,29 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		UpdateFunc: func(e event.UpdateEvent) bool {
 			// updates are ingored, if they are already in the "created"
 			obj, ok := e.ObjectNew.(*k8sv1alpha1.NetworkChaining)
+
 			if !ok {
 				return false
 			}
+
+			oldObj, ok := e.ObjectOld.(*k8sv1alpha1.NetworkChaining)
+			if !ok {
+				return false
+			}
+
 			if (obj.Status.State == k8sv1alpha1.CreateInternalError) || (obj.Status.State == k8sv1alpha1.DeleteInternalError) {
 				log.V(1).Info("obj.status.Status is internal error", "obj.Status.State", obj.Status.State)
 				return true
 			}
 
-			if e.MetaNew.GetGeneration() == e.MetaOld.GetGeneration() && reflect.DeepEqual(e.MetaOld.GetFinalizers(), e.MetaNew.GetFinalizers()) {
+			if obj.GetGeneration() == oldObj.GetGeneration() && reflect.DeepEqual(oldObj.GetFinalizers(), obj.GetFinalizers()) {
 				return false
 			}
 
-			log.V(1).Info("value of e.MetaNew.GetGeneration()", "e.MetaNew.GetGeneration()", e.MetaNew.GetGeneration())
-			log.V(1).Info("value of e.MetaOld.GetGeneration()", "e.MetaOld.GetGeneration()", e.MetaOld.GetGeneration())
-			log.V(1).Info("value of e.MetaOld.GetFinalizers()", "e.MetaOld.GetFinalizers()", e.MetaOld.GetFinalizers())
-			log.V(1).Info("value of e.MetaNew.GetFinalizers()", "e.MetaNew.GetFinalizers()", e.MetaNew.GetFinalizers())
+			log.V(1).Info("value of e.MetaNew.GetGeneration()", "e.MetaNew.GetGeneration()", obj.GetGeneration())
+			log.V(1).Info("value of e.MetaOld.GetGeneration()", "e.MetaOld.GetGeneration()", oldObj.GetGeneration())
+			log.V(1).Info("value of e.MetaOld.GetFinalizers()", "e.MetaOld.GetFinalizers()", obj.GetFinalizers())
+			log.V(1).Info("value of e.MetaNew.GetFinalizers()", "e.MetaNew.GetFinalizers()", oldObj.GetFinalizers())
 			return true
 		},
 		CreateFunc: func(e event.CreateEvent) bool {
@@ -125,13 +132,13 @@ type reconcileFun func(instance *k8sv1alpha1.NetworkChaining, reqLogger logr.Log
 // Note:
 // The Controller will requeue the Request to be processed again if the returned error is non-nil or
 // Result.Requeue is true, otherwise upon completion it will remove the work from the queue.
-func (r *ReconcileNetworkChaining) Reconcile(request reconcile.Request) (reconcile.Result, error) {
+func (r *ReconcileNetworkChaining) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
 	reqLogger := log.WithValues("Request.Namespace", request.Namespace, "Request.Name", request.Name)
 	reqLogger.Info("Reconciling NetworkChaining")
 	log.V(1).Info("Entering the reconile")
 	// Fetch the NetworkChaining instance
 	instance := &k8sv1alpha1.NetworkChaining{}
-	err := r.client.Get(context.TODO(), request.NamespacedName, instance)
+	err := r.client.Get(ctx, request.NamespacedName, instance)
 	if err != nil {
 		if errors.IsNotFound(err) {
 			// Request object not found, could have been deleted after reconcile request.

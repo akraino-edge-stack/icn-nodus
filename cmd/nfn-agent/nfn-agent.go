@@ -35,14 +35,12 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	kexec "k8s.io/utils/exec"
-	logf "sigs.k8s.io/controller-runtime/pkg/runtime/log"
 
-	//"google.golang.org/grpc/keepalive"
+	logf "sigs.k8s.io/controller-runtime/pkg/log"
 
 	"github.com/akraino-edge-stack/icn-nodus/cmd/ovn4nfvk8s-cni/app"
 
 	"google.golang.org/grpc/status"
-	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 )
 
 var log = logf.Log.WithName("nfn-agent")
@@ -390,7 +388,7 @@ func shutDownAgent(reason string) {
 }
 
 func main() {
-	logf.SetLogger(zap.Logger(true))
+	//logf.SetLogger(zap.Logger(true))
 	log.Info("nfn-agent Started")
 
 	serverAddr := os.Getenv("NFN_OPERATOR_SERVICE_HOST") + ":" + os.Getenv("NFN_OPERATOR_SERVICE_PORT")

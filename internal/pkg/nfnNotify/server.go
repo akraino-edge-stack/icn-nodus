@@ -17,6 +17,7 @@
 package nfn
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"strings"
@@ -33,7 +34,7 @@ import (
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
-	logf "sigs.k8s.io/controller-runtime/pkg/runtime/log"
+	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 var log = logf.Log.WithName("rpc-server")
@@ -76,7 +77,7 @@ func (s *serverDB) Subscribe(sc *pb.SubscribeContext, ss pb.NfnNotify_SubscribeS
 	}
 	s.clientList[nodeName] = cp
 
-	providerNetworklist, err := pnClientset.K8sV1alpha1().ProviderNetworks("default").List(v1.ListOptions{})
+	providerNetworklist, err := pnClientset.K8sV1alpha1().ProviderNetworks("default").List(context.TODO(), v1.ListOptions{})
 	if err == nil {
 		for _, pn := range providerNetworklist.Items {
 			log.Info("Send message", "Provider Network", pn.GetName())
@@ -115,7 +116,7 @@ func (s *serverDB) GetClient(nodeName string) client {
 func updatePnStatus(pn *v1alpha1.ProviderNetwork, status string) error {
 	pnCopy := pn.DeepCopy()
 	pnCopy.Status.State = status
-	_, err := pnClientset.K8sV1alpha1().ProviderNetworks(pn.Namespace).Update(pnCopy)
+	_, err := pnClientset.K8sV1alpha1().ProviderNetworks(pn.Namespace).Update(context.TODO(), pnCopy, v1.UpdateOptions{})
 	return err
 }
 
@@ -526,7 +527,7 @@ func nodeListIterator(labels string) <-chan string {
 
 	lo := v1.ListOptions{LabelSelector: labels}
 	// List the Nodes matching the Labels
-	nodes, err := kubeClientset.CoreV1().Nodes().List(lo)
+	nodes, err := kubeClientset.CoreV1().Nodes().List(context.TODO(), lo)
 	if err != nil {
 		log.Info("No Nodes found with labels", "list:", lo)
 		return nil

@@ -1,6 +1,7 @@
 package network
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"sync"
@@ -98,7 +99,7 @@ func CreateNetworkPool(np []k8sv1alpha1.NetworkPool) error {
 	}
 
 	log.Info("Value of the Virtual Network req", "req", req)
-	resp, err := k8sv1ClientSet.CoreV1().ConfigMaps(networkpoolns).Create(req)
+	resp, err := k8sv1ClientSet.CoreV1().ConfigMaps(networkpoolns).Create(context.TODO(), req, metav1.CreateOptions{})
 	if err != nil {
 		return err
 	}
@@ -140,14 +141,14 @@ func UpdateNetworkPool(np []k8sv1alpha1.NetworkPool) error {
 	var cm *corev1.ConfigMap
 
 	r := retry.RetryOnConflict(retry.DefaultRetry, func() error {
-		cm, err = kc.ConfigMaps(namespace).Get(name, metav1.GetOptions{})
+		cm, err = kc.ConfigMaps(namespace).Get(context.TODO(), name, metav1.GetOptions{})
 		if err != nil {
 			return err
 		}
 
 		cm.Data = npsmap
 
-		_, err = kc.ConfigMaps(namespace).Update(cm)
+		_, err = kc.ConfigMaps(namespace).Update(context.TODO(), cm, metav1.UpdateOptions{})
 		return err
 	})
 
@@ -155,7 +156,7 @@ func UpdateNetworkPool(np []k8sv1alpha1.NetworkPool) error {
 		return fmt.Errorf("status update failed for configmap %s/%s: %v", cm.Namespace, cm.Name, r)
 	}
 
-	cm, err = kc.ConfigMaps(cm.Namespace).Get(cm.Name, metav1.GetOptions{})
+	cm, err = kc.ConfigMaps(cm.Namespace).Get(context.TODO(), cm.Name, metav1.GetOptions{})
 	if err != nil {
 		return err
 	}
@@ -185,7 +186,7 @@ func CreateNetworkFromPool(ns, thread string) error {
 	}
 
 	log.Info("Before entering the shared resources: ", "calling thread", thread)
-	configmaps, err := k8sv1ClientSet.CoreV1().ConfigMaps(networkpoolns).Get(networkpoolconfig, metav1.GetOptions{})
+	configmaps, err := k8sv1ClientSet.CoreV1().ConfigMaps(networkpoolns).Get(context.TODO(), networkpoolconfig, metav1.GetOptions{})
 	if err != nil {
 		log.Error(err, "Error in getting k8s configmaps")
 		return fmt.Errorf("Error in getting k8s configmaps -%v", err)
@@ -309,7 +310,7 @@ func CreateNetwork(sn k8sv1alpha1.IpSubnet) error {
 	}
 
 	log.Info("Value of the Virtual Network req", "req", req)
-	resp, err = k8sv1alpha1Clientset.Networks("default").Create(req)
+	resp, err = k8sv1alpha1Clientset.Networks("default").Create(context.TODO(), req, metav1.CreateOptions{})
 	if err != nil {
 		return err
 	}
@@ -317,7 +318,7 @@ func CreateNetwork(sn k8sv1alpha1.IpSubnet) error {
 	log.Info("Value of the Virtual Network created", "resp", resp)
 
 	status := resp.Status
-	w, err = k8sv1alpha1Clientset.Networks("default").Watch(metav1.ListOptions{
+	w, err = k8sv1alpha1Clientset.Networks("default").Watch(context.TODO(), metav1.ListOptions{
 		Watch:           true,
 		ResourceVersion: resp.ResourceVersion,
 		FieldSelector:   fields.Set{"metadata.name": sn.Name}.AsSelector().String(),

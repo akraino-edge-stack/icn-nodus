@@ -42,7 +42,7 @@ import (
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/json"
-	logf "sigs.k8s.io/controller-runtime/pkg/runtime/log"
+	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 var log = logf.Log.WithName("chaining")
@@ -94,7 +94,7 @@ func CheckPodStatusFromPodLabel(podLabel string) (bool, string, error) {
 		return false, "", err
 	}
 
-	pods, err := clientset.CoreV1().Pods("default").List(v1.ListOptions{LabelSelector: podLabel})
+	pods, err := clientset.CoreV1().Pods("default").List(context.TODO(), v1.ListOptions{LabelSelector: podLabel})
 	if err != nil {
 		log.Error(err, "Error in kube clientset in listing the pods for default namespace with label", "podLabel", podLabel)
 		return false, "", err
@@ -143,7 +143,7 @@ func configurePodSelectorDeployment(ln k8sv1alpha1.RoutingNetwork, sfcEntryPodLa
 
 	if mode != k8sv1alpha1.VirtualMode {
 		if ln.NetworkName != "" {
-			pn, err := k8sv1alpha1Clientset.ProviderNetworks("default").Get(ln.NetworkName, v1.GetOptions{})
+			pn, err := k8sv1alpha1Clientset.ProviderNetworks("default").Get(context.TODO(), ln.NetworkName, v1.GetOptions{})
 			if err != nil {
 				log.Error(err, "Error in getting Provider Networks")
 				return nil, nil, err
@@ -158,7 +158,7 @@ func configurePodSelectorDeployment(ln k8sv1alpha1.RoutingNetwork, sfcEntryPodLa
 	}
 
 	if mode == k8sv1alpha1.VirtualMode {
-		vn, err := k8sv1alpha1Clientset.Networks("default").List(v1.ListOptions{LabelSelector: networklabel})
+		vn, err := k8sv1alpha1Clientset.Networks("default").List(context.TODO(), v1.ListOptions{LabelSelector: networklabel})
 		if err != nil {
 			log.Error(err, "Error in getting Provider Networks")
 			return nil, nil, err
@@ -173,7 +173,7 @@ func configurePodSelectorDeployment(ln k8sv1alpha1.RoutingNetwork, sfcEntryPodLa
 		networkname = vn.Items[0].GetName()
 	}
 
-	pods, err := clientset.CoreV1().Pods("default").List(v1.ListOptions{LabelSelector: sfcEntryPodLabel})
+	pods, err := clientset.CoreV1().Pods("default").List(context.TODO(), v1.ListOptions{LabelSelector: sfcEntryPodLabel})
 	if err != nil {
 		log.Error(err, "Error in kube clientset in listing the pods for default namespace with label", "sfcEntryPodLabel", sfcEntryPodLabel)
 		return nil, nil, err
@@ -214,7 +214,7 @@ func configurePodSelectorDeployment(ln k8sv1alpha1.RoutingNetwork, sfcEntryPodLa
 
 	nsLabel := labels.Set(ln.NamespaceSelector.MatchLabels)
 	podLabel := labels.Set(ln.PodSelector.MatchLabels)
-	nslist, err := clientset.CoreV1().Namespaces().List(v1.ListOptions{LabelSelector: nsLabel.AsSelector().String()})
+	nslist, err := clientset.CoreV1().Namespaces().List(context.TODO(), v1.ListOptions{LabelSelector: nsLabel.AsSelector().String()})
 	if err != nil {
 		log.Error(err, "Error in kube clientset in listing the namespaces")
 		return nil, nil, err
@@ -231,7 +231,7 @@ func configurePodSelectorDeployment(ln k8sv1alpha1.RoutingNetwork, sfcEntryPodLa
 		log.Info("Value of the ns.GetLabels", "ns.GetLabels()", ns.GetLabels())
 		set := labels.Set(ns.GetLabels())
 		log.Info("Value of the nslabel", "set", set)
-		pods, err := clientset.CoreV1().Pods(ns.GetName()).List(v1.ListOptions{LabelSelector: podLabel.AsSelector().String()})
+		pods, err := clientset.CoreV1().Pods(ns.GetName()).List(context.TODO(), v1.ListOptions{LabelSelector: podLabel.AsSelector().String()})
 		if err != nil {
 			log.Error(err, "Error in kube clientset in listing the pods for namespace", "namespace", ns.GetName())
 			return nil, nil, err
@@ -339,7 +339,7 @@ func calculateDeploymentRoutes(namespace, label string, pos int, num int, ln []k
 
 	lo := v1.ListOptions{LabelSelector: label}
 	// List the Pods matching the Labels
-	pods, err := k.CoreV1().Pods(namespace).List(lo)
+	pods, err := k.CoreV1().Pods(namespace).List(context.TODO(), lo)
 	if err != nil {
 		log.Error(err, "Deloyment with label not found", "label", label)
 		return RoutingInfo{}, err
@@ -460,7 +460,7 @@ func CheckNetFromLabel(label string) error {
 		return err
 	}
 
-	net, err := k8sv1alpha1Clientset.Networks("default").List(v1.ListOptions{LabelSelector: label})
+	net, err := k8sv1alpha1Clientset.Networks("default").List(context.TODO(), v1.ListOptions{LabelSelector: label})
 	if err != nil {
 		log.Error(err, "Error in kube clientset in listing the namespaces")
 		return err
@@ -585,13 +585,13 @@ func ValidateNetworkChaining(cr *k8sv1alpha1.NetworkChaining) (string, error) {
 		return "", err
 	}
 
-	sfcheadnet, err := k8sv1alpha1Clientset.Networks("default").List(v1.ListOptions{LabelSelector: chains[0]})
+	sfcheadnet, err := k8sv1alpha1Clientset.Networks("default").List(context.TODO(), v1.ListOptions{LabelSelector: chains[0]})
 	if err != nil {
 		log.Error(err, "Error in kube clientset in listing the namespaces")
 		return "", err
 	}
 
-	sfctailnet, err := k8sv1alpha1Clientset.Networks("default").List(v1.ListOptions{LabelSelector: chains[len(chains)-1]})
+	sfctailnet, err := k8sv1alpha1Clientset.Networks("default").List(context.TODO(), v1.ListOptions{LabelSelector: chains[len(chains)-1]})
 	if err != nil {
 		log.Error(err, "Error in kube clientset in listing the namespaces")
 		return "", err
@@ -614,7 +614,7 @@ func configureNetworkFromLabel(label string) (r k8sv1alpha1.RoutingNetwork, err 
 		return k8sv1alpha1.RoutingNetwork{}, err
 	}
 
-	net, err := k8sv1alpha1Clientset.Networks("default").List(v1.ListOptions{LabelSelector: label})
+	net, err := k8sv1alpha1Clientset.Networks("default").List(context.TODO(), v1.ListOptions{LabelSelector: label})
 	if err != nil {
 		log.Error(err, "Error in kube clientset in listing the namespaces")
 		return k8sv1alpha1.RoutingNetwork{}, err
@@ -635,7 +635,7 @@ func configureNetworkFromLabel(label string) (r k8sv1alpha1.RoutingNetwork, err 
 }
 
 func noSFCrequired(clientset *kubernetes.Clientset, podname string, podnamespace string) error {
-	pod, err := clientset.CoreV1().Pods(podnamespace).Get(podname, v1.GetOptions{})
+	pod, err := clientset.CoreV1().Pods(podnamespace).Get(context.TODO(), podname, v1.GetOptions{})
 	if err != nil {
 		return fmt.Errorf("noSFCrequired - Error in getting the pod - %s clientset get options - %v", podname, err)
 	}
@@ -687,12 +687,12 @@ func ConfigureforSFC(podname string, podnamespace string) (bool, []PodNetworkInf
 		return false, nil, nil, fmt.Errorf("ConfigureforSFC - Error in k8sv1alpha clientset - %v", err)
 	}
 
-	sfc, err := k8sv1alpha1Clientset.NetworkChainings("default").List(v1.ListOptions{})
+	sfc, err := k8sv1alpha1Clientset.NetworkChainings("default").List(context.TODO(), v1.ListOptions{})
 	if err != nil {
 		return false, nil, nil, fmt.Errorf("ConfigureforSFC - Error in listing the k8sv1alpha network chainings - %v", err)
 	}
 
-	pod, err := clientset.CoreV1().Pods(podnamespace).Get(podname, v1.GetOptions{})
+	pod, err := clientset.CoreV1().Pods(podnamespace).Get(context.TODO(), podname, v1.GetOptions{})
 	if err != nil {
 		return false, nil, nil, fmt.Errorf("ConfigureforSFC - Error in getting the pod - %s clientset get options - %v", podname, err)
 	}
@@ -707,7 +707,7 @@ func ConfigureforSFC(podname string, podnamespace string) (bool, []PodNetworkInf
 	}
 
 	pdlabel := pod.GetLabels()
-	namespace, err := clientset.CoreV1().Namespaces().Get(podnamespace, v1.GetOptions{})
+	namespace, err := clientset.CoreV1().Namespaces().Get(context.TODO(), podnamespace, v1.GetOptions{})
 	if err != nil {
 		return false, nil, nil, fmt.Errorf("ConfigureforSFC - Error in getting the pod namespace - %s clientset get options - %v", podnamespace, err)
 	}
@@ -773,7 +773,7 @@ func ConfigureforSFC(podname string, podnamespace string) (bool, []PodNetworkInf
 		return false, nil, nil, nil
 	}
 
-	cr, err := k8sv1alpha1Clientset.NetworkChainings("default").Get(sfcname, v1.GetOptions{})
+	cr, err := k8sv1alpha1Clientset.NetworkChainings("default").Get(context.TODO(), sfcname, v1.GetOptions{})
 	if err != nil {
 		return false, nil, nil, fmt.Errorf("ConfigureforSFC - Error in getting the network chaining - %s k8sv1alpha1 clientset get options - %v", sfcname, err)
 	}
@@ -799,7 +799,7 @@ func CalculateDstforTail(networklist []string) ([]string, error) {
 	}
 
 	for _, n := range networklist {
-		net, err := k8sv1alpha1Clientset.Networks("default").Get(n, v1.GetOptions{})
+		net, err := k8sv1alpha1Clientset.Networks("default").Get(context.TODO(), n, v1.GetOptions{})
 		if err != nil {
 			log.Error(err, "Error in kube clientset in listing the namespaces")
 			return nil, err
@@ -824,7 +824,7 @@ func DerivedNetworkFromNetworklist(networklabellist []string) ([]string, error) 
 
 	for _, networklabel := range networklabellist {
 
-		vn, err := k8sv1alpha1Clientset.Networks("default").List(v1.ListOptions{LabelSelector: networklabel})
+		vn, err := k8sv1alpha1Clientset.Networks("default").List(context.TODO(), v1.ListOptions{LabelSelector: networklabel})
 		if err != nil {
 			log.Error(err, "Error in getting Provider Networks")
 			return nil, err
@@ -851,7 +851,7 @@ func checkPodstatus(podname string) (*corev1.Pod, bool, error) {
 		return nil, false, err
 	}
 
-	pdState, err := clientset.CoreV1().Pods("default").Get(podname, v1.GetOptions{})
+	pdState, err := clientset.CoreV1().Pods("default").Get(context.TODO(), podname, v1.GetOptions{})
 	if err != nil {
 		log.Error(err, "Error in kube clientset in getting the pod status", "podname", podname)
 		return nil, false, err
@@ -896,14 +896,14 @@ func checkSFCPodSelectorStatus(nslabel, podlabel string) (*corev1.PodList, bool,
 		return nil, false, err
 	}
 
-	pods, err := clientset.CoreV1().Pods(nslabel).List(v1.ListOptions{LabelSelector: podlabel})
+	pods, err := clientset.CoreV1().Pods(nslabel).List(context.TODO(), v1.ListOptions{LabelSelector: podlabel})
 	if err != nil {
 		log.Error(err, "Error in kube clientset in listing the pods for default namespace with label", "podlabel", podlabel)
 		return nil, false, err
 	}
 
 	for i, pod := range pods.Items {
-		pdState, err := clientset.CoreV1().Pods(pod.GetNamespace()).Get(pod.GetName(), v1.GetOptions{})
+		pdState, err := clientset.CoreV1().Pods(pod.GetNamespace()).Get(context.TODO(), pod.GetName(), v1.GetOptions{})
 		if err != nil {
 			log.Error(err, "Error in kube clientset in getting the pod state for default namespace with label", "podlabel", podlabel, "pdState", pdState)
 			return nil, false, err
@@ -974,7 +974,7 @@ func CheckSFCPodLabelStatus(cr *k8sv1alpha1.NetworkChaining) (bool, error) {
 			return false, err
 		}
 
-		pods, err := clientset.CoreV1().Pods("default").List(v1.ListOptions{LabelSelector: sfcpodlabel})
+		pods, err := clientset.CoreV1().Pods("default").List(context.TODO(), v1.ListOptions{LabelSelector: sfcpodlabel})
 		if err != nil {
 			log.Error(err, "Error in kube clientset in listing the pods for default namespace with label", "sfcpodlabel", sfcpodlabel)
 			return false, err
@@ -993,7 +993,7 @@ func CheckSFCPodLabelStatus(cr *k8sv1alpha1.NetworkChaining) (bool, error) {
 
 		podName := pods.Items[0].GetName()
 
-		pdState, err := clientset.CoreV1().Pods("default").Get(podName, v1.GetOptions{})
+		pdState, err := clientset.CoreV1().Pods("default").Get(context.TODO(), podName, v1.GetOptions{})
 		if err != nil {
 			log.Error(err, "Error in kube clientset in getting the pod state for default namespace with label", "sfcpodlabel", sfcpodlabel, "pdState", pdState)
 			return false, err

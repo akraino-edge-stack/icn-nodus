@@ -19,8 +19,9 @@ limitations under the License.
 package fake
 
 import (
-	v1alpha1 "github.com/akraino-edge-stack/icn-nodus/pkg/apis/k8s/v1alpha1"
+	"context"
 
+	v1alpha1 "github.com/akraino-edge-stack/icn-nodus/pkg/apis/k8s/v1alpha1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
@@ -40,7 +41,7 @@ var providernetworksResource = schema.GroupVersionResource{Group: "k8s.plugin.op
 var providernetworksKind = schema.GroupVersionKind{Group: "k8s.plugin.opnfv.org", Version: "v1alpha1", Kind: "ProviderNetwork"}
 
 // Get takes name of the providerNetwork, and returns the corresponding providerNetwork object, and an error if there is any.
-func (c *FakeProviderNetworks) Get(name string, options v1.GetOptions) (result *v1alpha1.ProviderNetwork, err error) {
+func (c *FakeProviderNetworks) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1alpha1.ProviderNetwork, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewGetAction(providernetworksResource, c.ns, name), &v1alpha1.ProviderNetwork{})
 
@@ -51,7 +52,7 @@ func (c *FakeProviderNetworks) Get(name string, options v1.GetOptions) (result *
 }
 
 // List takes label and field selectors, and returns the list of ProviderNetworks that match those selectors.
-func (c *FakeProviderNetworks) List(opts v1.ListOptions) (result *v1alpha1.ProviderNetworkList, err error) {
+func (c *FakeProviderNetworks) List(ctx context.Context, opts v1.ListOptions) (result *v1alpha1.ProviderNetworkList, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewListAction(providernetworksResource, providernetworksKind, c.ns, opts), &v1alpha1.ProviderNetworkList{})
 
@@ -73,14 +74,14 @@ func (c *FakeProviderNetworks) List(opts v1.ListOptions) (result *v1alpha1.Provi
 }
 
 // Watch returns a watch.Interface that watches the requested providerNetworks.
-func (c *FakeProviderNetworks) Watch(opts v1.ListOptions) (watch.Interface, error) {
+func (c *FakeProviderNetworks) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
 		InvokesWatch(testing.NewWatchAction(providernetworksResource, c.ns, opts))
 
 }
 
 // Create takes the representation of a providerNetwork and creates it.  Returns the server's representation of the providerNetwork, and an error, if there is any.
-func (c *FakeProviderNetworks) Create(providerNetwork *v1alpha1.ProviderNetwork) (result *v1alpha1.ProviderNetwork, err error) {
+func (c *FakeProviderNetworks) Create(ctx context.Context, providerNetwork *v1alpha1.ProviderNetwork, opts v1.CreateOptions) (result *v1alpha1.ProviderNetwork, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewCreateAction(providernetworksResource, c.ns, providerNetwork), &v1alpha1.ProviderNetwork{})
 
@@ -91,7 +92,7 @@ func (c *FakeProviderNetworks) Create(providerNetwork *v1alpha1.ProviderNetwork)
 }
 
 // Update takes the representation of a providerNetwork and updates it. Returns the server's representation of the providerNetwork, and an error, if there is any.
-func (c *FakeProviderNetworks) Update(providerNetwork *v1alpha1.ProviderNetwork) (result *v1alpha1.ProviderNetwork, err error) {
+func (c *FakeProviderNetworks) Update(ctx context.Context, providerNetwork *v1alpha1.ProviderNetwork, opts v1.UpdateOptions) (result *v1alpha1.ProviderNetwork, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewUpdateAction(providernetworksResource, c.ns, providerNetwork), &v1alpha1.ProviderNetwork{})
 
@@ -103,7 +104,7 @@ func (c *FakeProviderNetworks) Update(providerNetwork *v1alpha1.ProviderNetwork)
 
 // UpdateStatus was generated because the type contains a Status member.
 // Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-func (c *FakeProviderNetworks) UpdateStatus(providerNetwork *v1alpha1.ProviderNetwork) (*v1alpha1.ProviderNetwork, error) {
+func (c *FakeProviderNetworks) UpdateStatus(ctx context.Context, providerNetwork *v1alpha1.ProviderNetwork, opts v1.UpdateOptions) (*v1alpha1.ProviderNetwork, error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewUpdateSubresourceAction(providernetworksResource, "status", c.ns, providerNetwork), &v1alpha1.ProviderNetwork{})
 
@@ -114,7 +115,7 @@ func (c *FakeProviderNetworks) UpdateStatus(providerNetwork *v1alpha1.ProviderNe
 }
 
 // Delete takes name of the providerNetwork and deletes it. Returns an error if one occurs.
-func (c *FakeProviderNetworks) Delete(name string, options *v1.DeleteOptions) error {
+func (c *FakeProviderNetworks) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
 		Invokes(testing.NewDeleteAction(providernetworksResource, c.ns, name), &v1alpha1.ProviderNetwork{})
 
@@ -122,15 +123,15 @@ func (c *FakeProviderNetworks) Delete(name string, options *v1.DeleteOptions) er
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *FakeProviderNetworks) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
-	action := testing.NewDeleteCollectionAction(providernetworksResource, c.ns, listOptions)
+func (c *FakeProviderNetworks) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
+	action := testing.NewDeleteCollectionAction(providernetworksResource, c.ns, listOpts)
 
 	_, err := c.Fake.Invokes(action, &v1alpha1.ProviderNetworkList{})
 	return err
 }
 
 // Patch applies the patch and returns the patched providerNetwork.
-func (c *FakeProviderNetworks) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1alpha1.ProviderNetwork, err error) {
+func (c *FakeProviderNetworks) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1alpha1.ProviderNetwork, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewPatchSubresourceAction(providernetworksResource, c.ns, name, pt, data, subresources...), &v1alpha1.ProviderNetwork{})
 

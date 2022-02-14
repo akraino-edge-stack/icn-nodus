@@ -18,12 +18,11 @@ RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 GO111MODULE=on go build -o build/bin/n
 
 FROM ubuntu:18.04
 
-ARG CNI_VERSION=v0.8.5
+ARG CNI_VERSION=v1.0.1
 ENV DEBIAN_FRONTEND=noninteractive 
 WORKDIR /
 COPY --from=builder /workspace/build/bin/* usr/local/bin/
-# apt-get upgrade -y 
-RUN apt-get update && \
+RUN apt-get update && apt-get upgrade -y && \
     apt-get install -y -qq apt-transport-https make curl net-tools iproute2 iptables \
     wget software-properties-common setpriv dpkg-dev netcat jq && \
     rm -rf /var/lib/apt/lists/*
@@ -46,7 +45,7 @@ ENV OPERATOR=/usr/local/bin/nfn-operator \
 ENV CNI_VERSION=$CNI_VERSION
 
 RUN mkdir -p /opt/cni/bin && \
-    curl --insecure --compressed -O -L https://github.com/containernetworking/plugins/releases/download/$CNI_VERSION/cni-plugins-linux-amd64-$CNI_VERSION.tgz && \
+    curl --insecure --compressed -O -L https://github.com/akraino-icn/plugins/releases/download/$CNI_VERSION/cni-plugins-linux-amd64-$CNI_VERSION.tgz && \
     tar -zxvf cni-plugins-linux-amd64-$CNI_VERSION.tgz -C /opt/cni/bin && \
     rm -rf cni-plugins-linux-amd64-$CNI_VERSION.tgz
 

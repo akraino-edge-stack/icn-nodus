@@ -25,6 +25,30 @@
     },
     {
       "key": {
+        "uuid": "eb998250_5866d062",
+        "filename": "cmd/ovn4nfvk8s-cni/app/helper_linux.go",
+        "patchSetId": 3
+      },
+      "lineNbr": 316,
+      "author": {
+        "id": 480
+      },
+      "writtenOn": "2022-02-24T11:32:18Z",
+      "side": 1,
+      "message": "We are disabling a parameter that disables IPv6 \u003d\u003e we are enabling IPv6.",
+      "parentUuid": "4f696f9f_1bee176f",
+      "range": {
+        "startLine": 316,
+        "startChar": 13,
+        "endLine": 316,
+        "endChar": 63
+      },
+      "revId": "4e9d58da22fdc5821edbd400ebfbc31d3c35b9ed",
+      "serverId": "4cada01b-0314-4fe0-84a1-f9ddc89863f9",
+      "unresolved": true
+    },
+    {
+      "key": {
         "uuid": "fba50b93_35209b5d",
         "filename": "internal/pkg/ovn/utils.go",
         "patchSetId": 3

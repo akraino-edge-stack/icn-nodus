@@ -1,0 +1,27 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "0d6a6228_dd3b6ab3",
+        "filename": "deploy/ovn-daemonset.yaml",
+        "patchSetId": 2
+      },
+      "lineNbr": 8,
+      "author": {
+        "id": 239
+      },
+      "writtenOn": "2022-03-14T14:30:49Z",
+      "side": 1,
+      "message": "Is this required to be in Upper case right ?",
+      "range": {
+        "startLine": 8,
+        "startChar": 2,
+        "endLine": 8,
+        "endChar": 11
+      },
+      "revId": "910a4ca7318a69c18e5bfe53b5ff84b1d006151b",
+      "serverId": "4cada01b-0314-4fe0-84a1-f9ddc89863f9",
+      "unresolved": true
+    }
+  ]
+}

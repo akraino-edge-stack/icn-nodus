@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/prometheus/common/log"
 	"github.com/sirupsen/logrus"
 
 	k8sv1alpha1 "github.com/akraino-edge-stack/icn-nodus/pkg/generated/clientset/versioned/typed/k8s/v1alpha1"
@@ -63,7 +62,7 @@ func GetKubev1alpha1Config() (*k8sv1alpha1.K8sV1alpha1Client, error) {
 
 	k, err = k8sv1alpha1.NewForConfig(cfg)
 	if err != nil {
-		log.Error(err, "Error building Kuberenetes clientset")
+		logrus.Error(err, "Error building Kuberenetes clientset")
 		return nil, err
 	}
 
@@ -81,7 +80,7 @@ func GetKubeConfig() (*kubernetes.Clientset, error) {
 
 	k, err = kubernetes.NewForConfig(cfg)
 	if err != nil {
-		log.Error(err, "Error building Kuberenetes clientset")
+		logrus.Error(err, "Error building Kuberenetes clientset")
 		return nil, err
 	}
 
@@ -94,13 +93,13 @@ func GetKubeConfigfromFile() (*kubernetes.Clientset, error) {
 
 	cfg, err := clientcmd.BuildConfigFromFlags("", nodusKubeConfigFile)
 	if err != nil {
-		log.Errorf("Error in getting the context for the kubeconfig - %v : %v", nodusKubeConfigFile, err)
+		logrus.Errorf("Error in getting the context for the kubeconfig - %v : %v", nodusKubeConfigFile, err)
 		return nil, err
 	}
 
 	k, err = kubernetes.NewForConfig(cfg)
 	if err != nil {
-		log.Error(err, "Error building Kuberenetes clientset")
+		logrus.Error(err, "Error building Kuberenetes clientset")
 		return nil, err
 	}
 

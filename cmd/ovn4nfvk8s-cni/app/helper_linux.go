@@ -1,3 +1,4 @@
+//go:build linux
 // +build linux
 
 package app
@@ -17,7 +18,6 @@ import (
 	"github.com/containernetworking/cni/pkg/types/current"
 	"github.com/containernetworking/plugins/pkg/ip"
 	"github.com/containernetworking/plugins/pkg/ns"
-	"github.com/prometheus/common/log"
 	"github.com/sirupsen/logrus"
 	"github.com/vishvananda/netlink"
 )
@@ -130,31 +130,31 @@ func setGateway(link netlink.Link, gatewayIP string) error {
 func setpodGWRoutes(hostNet, serviceSubnet, podSubnet, gatewayIP string) error {
 	podGW, err := network.GetDefaultGateway()
 	if err != nil {
-		log.Error(err, "Failed to get pod default gateway")
+		logrus.Error(err, "Failed to get pod default gateway")
 		return err
 	}
 
 	stdout, stderr, err := ovn.RunIP("route", "add", hostNet, "via", podGW)
 	if err != nil && !strings.Contains(stderr, "RTNETLINK answers: File exists") {
-		log.Error(err, "Failed to ip route add", "stdout", stdout, "stderr", stderr)
+		logrus.Error(err, "Failed to ip route add", "stdout", stdout, "stderr", stderr)
 		return err
 	}
 
 	stdout, stderr, err = ovn.RunIP("route", "add", serviceSubnet, "via", podGW)
 	if err != nil && !strings.Contains(stderr, "RTNETLINK answers: File exists") {
-		log.Error(err, "Failed to ip route add", "stdout", stdout, "stderr", stderr)
+		logrus.Error(err, "Failed to ip route add", "stdout", stdout, "stderr", stderr)
 		return err
 	}
 
 	stdout, stderr, err = ovn.RunIP("route", "add", podSubnet, "via", podGW)
 	if err != nil && !strings.Contains(stderr, "RTNETLINK answers: File exists") {
-		log.Error(err, "Failed to ip route add", "stdout", stdout, "stderr", stderr)
+		logrus.Error(err, "Failed to ip route add", "stdout", stdout, "stderr", stderr)
 		return err
 	}
 
 	stdout, stderr, err = ovn.RunIP("route", "replace", "default", "via", gatewayIP)
 	if err != nil {
-		log.Error(err, "Failed to ip route replace", "stdout", stdout, "stderr", stderr)
+		logrus.Error(err, "Failed to ip route replace", "stdout", stdout, "stderr", stderr)
 		return err
 	}
 
@@ -165,19 +165,19 @@ func setExtraRoutes(hostNet, serviceSubnet, podSubnet, gatewayIP string) error {
 
 	stdout, stderr, err := ovn.RunIP("route", "add", hostNet, "via", gatewayIP)
 	if err != nil && !strings.Contains(stderr, "RTNETLINK answers: File exists") {
-		log.Error(err, "Failed to ip route add", "stdout", stdout, "stderr", stderr)
+		logrus.Error(err, "Failed to ip route add", "stdout", stdout, "stderr", stderr)
 		return err
 	}
 
 	stdout, stderr, err = ovn.RunIP("route", "add", serviceSubnet, "via", gatewayIP)
 	if err != nil && !strings.Contains(stderr, "RTNETLINK answers: File exists") {
-		log.Error(err, "Failed to ip route add", "stdout", stdout, "stderr", stderr)
+		logrus.Error(err, "Failed to ip route add", "stdout", stdout, "stderr", stderr)
 		return err
 	}
 
 	stdout, stderr, err = ovn.RunIP("route", "add", podSubnet, "via", gatewayIP)
 	if err != nil && !strings.Contains(stderr, "RTNETLINK answers: File exists") {
-		log.Error(err, "Failed to ip route add", "stdout", stdout, "stderr", stderr)
+		logrus.Error(err, "Failed to ip route add", "stdout", stdout, "stderr", stderr)
 		return err
 	}
 
@@ -194,7 +194,7 @@ func setupInterface(netns ns.NetNS, containerID, ifName, macAddress, ipAddress, 
 
 	hostNet, err = network.GetHostNetwork()
 	if err != nil {
-		log.Error(err, "Failed to get host network")
+		logrus.Error(err, "Failed to get host network")
 		return nil, nil, fmt.Errorf("failed to get host network: %v", err)
 	}
 
@@ -247,7 +247,7 @@ func setupInterface(netns ns.NetNS, containerID, ifName, macAddress, ipAddress, 
 			return fmt.Errorf("failed to add IP addr %s to %s: %v", ipAddress, contIface.Name, err)
 		}
 
-		log.Infof("Value of defaultGateway- %v and ifname- %v", defaultGateway, ifName)
+		logrus.Infof("Value of defaultGateway- %v and ifname- %v", defaultGateway, ifName)
 		if defaultGateway == "true" && ifName == "eth0" {
 			err := setGateway(link, gatewayIP)
 			if err != nil {
@@ -264,7 +264,7 @@ func setupInterface(netns ns.NetNS, containerID, ifName, macAddress, ipAddress, 
 						return err
 					}
 				} else {
-					log.Error(err, "Error in getting the eth0 link in container ns")
+					logrus.Error(err, "Error in getting the eth0 link in container ns")
 					return err
 				}
 			} else {

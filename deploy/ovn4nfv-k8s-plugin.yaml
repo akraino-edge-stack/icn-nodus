@@ -579,6 +579,8 @@ metadata:
 data:
   OVN_SUBNET: "10.151.142.0/18"
   OVN_GATEWAYIP: "10.151.142.1/18"
+  # OVN_SUBNET_V6: "bef0:1234:a890:5678::/123"
+  # OVN_GATEWAYIP_V6: "bef0:1234:a890:5678::1/123"
 
 ---
 apiVersion: apps/v1

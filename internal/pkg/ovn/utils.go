@@ -4,12 +4,15 @@ import (
 	"bytes"
 	"fmt"
 	"hash/fnv"
-	kexec "k8s.io/utils/exec"
 	"os"
+	"path"
 	"reflect"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/akraino-edge-stack/icn-nodus/internal/pkg/auth"
+	kexec "k8s.io/utils/exec"
 )
 
 const (
@@ -131,12 +134,17 @@ func run(cmdPath string, args ...string) (*bytes.Buffer, *bytes.Buffer, error) {
 	return stdout, stderr, err
 }
 
+// -p /opt/certs/ovn-privkey.pem -c /opt/certs/ovn-cert.pem -C /opt/certs/cacert.pem
+
 // RunOVNNbctlWithTimeout runs command via ovn-nbctl with a specific timeout
 func RunOVNNbctlWithTimeout(timeout int, args ...string) (string, string, error) {
 	var cmdArgs []string
 	if len(runner.hostIP) > 0 {
 		cmdArgs = []string{
-			fmt.Sprintf("--db=tcp:%s:%s", runner.hostIP, runner.hostPort),
+			fmt.Sprintf("--db=ssl:%s:%s", runner.hostIP, runner.hostPort),
+			"-p", path.Join(auth.DefaultOvnCertDir, auth.KeyFile),
+			"-c", path.Join(auth.DefaultOvnCertDir, auth.CertFile),
+			"-C", path.Join(auth.DefaultOvnCertDir, auth.CAFile),
 		}
 	}
 	cmdArgs = append(cmdArgs, fmt.Sprintf("--timeout=%d", timeout))

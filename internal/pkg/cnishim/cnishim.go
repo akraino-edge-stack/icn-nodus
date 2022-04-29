@@ -10,8 +10,10 @@ import (
 	"os"
 	"strings"
 
+	"github.com/akraino-edge-stack/icn-nodus/internal/pkg/auth"
 	"github.com/akraino-edge-stack/icn-nodus/internal/pkg/cniserver"
 	"github.com/akraino-edge-stack/icn-nodus/internal/pkg/config"
+	"github.com/akraino-edge-stack/icn-nodus/internal/pkg/kube"
 
 	"github.com/containernetworking/cni/pkg/skel"
 	"github.com/containernetworking/cni/pkg/types"
@@ -19,7 +21,7 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-const CNIEndpointURLReq string = "http://dummy/"
+const CNIEndpointURLReq string = "https://dummy/"
 
 type Endpoint struct {
 	cniServerSocketPath string
@@ -53,11 +55,34 @@ func (ep *Endpoint) sendCNIServerReq(req *cniserver.CNIEndpointRequest) ([]byte,
 		return nil, fmt.Errorf("sendCNIServerReq: failed to Marshal CNIShim Req %v:%v", req, err)
 	}
 
+	// load kubeconfig from file
+	client, err := kube.GetKubeConfigfromFile()
+	if err != nil {
+		return nil, fmt.Errorf("sendCNIServerReq: error getting kubernetes config: %v", err)
+	}
+
+	// get certificate secret
+	kubecli := &kube.Kube{KClient: client}
+	sec, err := kubecli.GetSecret(config.Namespace, auth.DefaultCniCert)
+	if err != nil {
+		return nil, fmt.Errorf("sendCNIServerReq: unable to get CNI secret: %v", err)
+	}
+
+	// create TLS config from secret
+	tlsconfig, err := auth.CreateClientTLSConfig(sec)
+	if err != nil {
+		return nil, fmt.Errorf("sendCNIServerReq: error loading certificates: %v", err)
+	}
+
 	httpc := http.Client{
 		Transport: &http.Transport{
 			Dial: func(proto, addr string) (net.Conn, error) {
 				return net.Dial("unix", ep.cniServerSocketPath)
 			},
+			DialTLS: func(proto, addr string) (net.Conn, error) {
+				return net.Dial("unix", ep.cniServerSocketPath)
+			},
+			TLSClientConfig: tlsconfig,
 		},
 	}
 

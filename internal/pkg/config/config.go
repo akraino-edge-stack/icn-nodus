@@ -42,6 +42,9 @@ var (
 
 	// Kubernetes holds Kubernetes-related parsed config file parameters
 	Kubernetes = KubernetesConfig{}
+
+	// Namespace holds namespace in which Nodus is deployed
+	Namespace = "kube-system"
 )
 
 // DefaultConfig holds parsed config file parameters and command-line overrides
@@ -69,6 +72,7 @@ type CNIConfig struct {
 // KubernetesConfig holds Kubernetes-related parsed config file parameters and command-line overrides
 type KubernetesConfig struct {
 	Kubeconfig string `gcfg:"kubeconfig"`
+	Namespace string `gcfg:"namespace"`
 }
 
 // NetConf adds ovn4nfv plugin-specific fields to types.NetConf
@@ -165,6 +169,11 @@ var Flags = []cli.Flag{
 		Name:        "k8s-kubeconfig",
 		Usage:       "absolute path to the Kubernetes kubeconfig file",
 		Destination: &cliConfig.Kubernetes.Kubeconfig,
+	},
+	cli.StringFlag{
+		Name:        "k8s-namespace",
+		Usage:       "namespace in which Nodus is deployed",
+		Destination: &cliConfig.Kubernetes.Namespace,
 	},
 }
 

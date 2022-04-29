@@ -26,6 +26,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/akraino-edge-stack/icn-nodus/internal/pkg/auth"
 	cs "github.com/akraino-edge-stack/icn-nodus/internal/pkg/cniserver"
 	pb "github.com/akraino-edge-stack/icn-nodus/internal/pkg/nfnNotify/proto"
 	"github.com/akraino-edge-stack/icn-nodus/internal/pkg/ovn"
@@ -35,6 +36,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	kexec "k8s.io/utils/exec"
+	kapi "k8s.io/api/core/v1"
 
 	log "k8s.io/klog"
 
@@ -73,7 +75,7 @@ func subscribeNotif(client pb.NfnNotifyClient) error {
 				shutDownAgent("Stream closed from server")
 				return err
 			}
-			log.Infof("Got message - %v", in)
+
 			handleNotif(in)
 		}
 	}
@@ -396,15 +398,48 @@ func main() {
 	if strings.Contains(serverIP, ":") {
 		serverIP = "[" + serverIP + "]"
 	}
+
 	serverAddr := serverIP + ":" + os.Getenv("NFN_OPERATOR_SERVICE_PORT")
+
 	// Setup ovn utilities
 	exec := kexec.New()
 	err := ovn.SetExec(exec)
 	if err != nil {
+		fmt.Println(err.Error())
 		log.Error(err, "Unable to setup OVN Utils")
 		return
 	}
-	conn, err := grpc.Dial(serverAddr, grpc.WithInsecure())
+
+	namespace := os.Getenv(auth.NamespaceEnv)
+	nfnSvcIP := os.Getenv(auth.NfnOperatorHostEnv)
+
+	// obtain certifcates
+	kubecli, err := auth.GetKubeClient()
+	crt, err := auth.GetCert(namespace, auth.DefaultCert)
+	if err != nil {
+		log.Error(err, "Error while obtaining certificate")
+	}
+
+	// get secret associated with the certificate
+	var sec *kapi.Secret
+	if !auth.IsCertIPUpToDate(crt, nfnSvcIP) {
+		// update the IP address of the certificate if required
+		crt, sec, err = auth.UpdateCertIP(crt, nfnSvcIP)
+	} else {
+		// wait for secret to be updated by cert-manager
+		sec, err = auth.WaitForSecretIP(kubecli, crt)
+	}
+	if err != nil {
+		log.Error(err, "Error while obtaining secret")
+	}
+
+	// create TLS config using the obtained secret
+	clientTLS, err := auth.CreateClientTLSFromSecret(sec)
+	if err != nil {
+		log.Error(err, "Error while creating TLS configuration")
+	}
+
+	conn, err := grpc.Dial(serverAddr, grpc.WithTransportCredentials(*clientTLS))
 	if err != nil {
 		log.Error(err, "fail to dial")
 		return

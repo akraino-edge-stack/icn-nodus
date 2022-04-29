@@ -20,8 +20,11 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"os"
 	"strings"
 
+	"github.com/akraino-edge-stack/icn-nodus/internal/pkg/auth"
+	"github.com/akraino-edge-stack/icn-nodus/internal/pkg/kube"
 	"github.com/akraino-edge-stack/icn-nodus/internal/pkg/node"
 	chaining "github.com/akraino-edge-stack/icn-nodus/internal/pkg/utils"
 	v1alpha1 "github.com/akraino-edge-stack/icn-nodus/pkg/apis/k8s/v1alpha1"
@@ -34,7 +37,9 @@ import (
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
+	kapi "k8s.io/api/core/v1"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
+	
 )
 
 var log = logf.Log.WithName("rpc-server")
@@ -62,7 +67,6 @@ func newServer() *serverDB {
 
 // Subscribe stores the client information & sends data
 func (s *serverDB) Subscribe(sc *pb.SubscribeContext, ss pb.NfnNotify_SubscribeServer) error {
-	log.Info("server.go - Subscribe")
 	nodeName := sc.GetNodeName()
 	log.Info("Subscribe request from node", "Node Name", nodeName)
 	if nodeName == "" {
@@ -547,7 +551,6 @@ func nodeListIterator(labels string) <-chan string {
 
 //SetupNotifServer initilizes the gRpc nfn notif server
 func SetupNotifServer(kConfig *rest.Config) {
-
 	log.Info("Starting Notif Server")
 	var err error
 
@@ -569,7 +572,40 @@ func SetupNotifServer(kConfig *rest.Config) {
 		log.Error(err, "failed to listen")
 	}
 
-	s := grpc.NewServer()
+	namespace := os.Getenv(auth.NamespaceEnv)
+	nfnSvcIP := os.Getenv(auth.NfnOperatorHostEnv)
+
+	kubecli := &kube.Kube{KClient: kubeClientset}
+
+	// get certificate
+	crt, err := auth.GetCert(namespace, auth.DefaultCert)
+	if err != nil {
+		log.Error(err, "Error while obtaining the certificate")
+	}
+
+	// load secret associated with obtained certificate
+	var sec *kapi.Secret
+	if !auth.IsCertIPUpToDate(crt, nfnSvcIP) {
+		// update certificate IP if not up-to-date
+		crt, sec, err = auth.UpdateCertIP(crt, nfnSvcIP)
+		if err != nil {
+			log.Error(err, "Error while updating the certificate")
+		}
+	} else {
+		// wait for secret to be updated
+		sec, err = auth.WaitForSecretIP(kubecli, crt)
+	}
+	if err != nil {
+		log.Error(err, "Error while obtaining secret")
+	}
+
+	// create TLS config from secret
+	serverTLS, err := auth.CreateServerTLSFromSecret(sec)
+	if err != nil {
+		log.Error(err, "Error while creating TLS configuration")
+	}
+
+	s := grpc.NewServer(grpc.Creds(*serverTLS))
 	// Intialize Notify server
 	notifServer = newServer()
 	pb.RegisterNfnNotifyServer(s, notifServer)

@@ -472,6 +472,73 @@ spec:
       storage: true
       subresources:
         status: {}
+
+---
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: nodus-root-issuer
+spec:
+  selfSigned: {}
+
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: nodus-root-cert
+  namespace: kube-system
+spec:
+  commonName: "nodus"
+  duration: 17520h
+  isCA: true
+  issuerRef:
+    kind: ClusterIssuer
+    name: nodus-root-issuer
+  secretName: nodus-root-cert
+
+---
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: nodus-issuer
+  namespace: kube-system
+spec:
+  ca:
+    secretName: nodus-root-cert
+
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: nodus-cert
+  namespace: kube-system
+spec:
+  duration: 17520h
+  isCA: false
+  issuerRef:
+    kind: Issuer
+    name: nodus-issuer
+  secretName: nodus-cert
+  ipAddresses:
+    - 1.1.1.1
+
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: nodus-cni-cert
+  namespace: kube-system
+spec:
+  duration: 17520h
+  isCA: false
+  issuerRef:
+    kind: Issuer
+    name: nodus-issuer
+  secretName: nodus-cni-cert
+  commonName: "dummy"
+  dnsNames:
+  - "dummy"
+
 ---
 apiVersion: v1
 kind: ServiceAccount
@@ -540,6 +607,13 @@ rules:
      - get
      - list
      - watch
+  - apiGroups:
+      - cert-manager.io
+    resources:
+      - certificates
+    verbs:
+     - get
+     - update
 
 ---
 kind: ClusterRoleBinding
@@ -629,9 +703,12 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: metadata.name
+            - name: POD_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
             - name: OPERATOR_NAME
               value: "nfn-operator"
-
 ---
 kind: ConfigMap
 apiVersion: v1
@@ -652,6 +729,7 @@ data:
 
     [kubernetes]
     kubeconfig=/etc/cni/net.d/ovn4nfv-k8s.d/ovn4nfv-k8s.kubeconfig
+    namespace=kube-system
   20-network.conf: |
     {
       "name": "ovn4nfv-k8s-plugin",
@@ -710,6 +788,11 @@ spec:
               mountPath: /tmp/ovn4nfv-conf
             - name: ovn4nfv-cni-net-conf
               mountPath: /tmp/ovn4nfv-cni
+          env:
+            - name: POD_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
       volumes:
         - name: cni
           hostPath:
@@ -779,6 +862,10 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: spec.nodeName
+            - name: POD_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
           securityContext:
             runAsUser: 0
             capabilities:

@@ -69,6 +69,12 @@ data:
       "SubnetLen": 24
     }
 ```
+
+[Kustomize](https://kustomize.io/) and deploy [cert-manager](https://cert-manager.io/):
+```
+$ curl -Ls https://github.com/cert-manager/cert-manager/releases/download/v1.8.0/cert-manager.yaml -o deploy/cert-manager/cert-manager.yaml && kubectl apply -k deploy/cert-manager/
+```
+
 Deploy the Nodus Pod network to the cluster.
 ```
     $ kubectl apply -f deploy/ovn-daemonset.yaml
@@ -185,28 +191,28 @@ sfc-tail      nginx-right-deployment-965b96d57-zcw6t     1/1     Running   0    
 Let trace the packet from the left pod to right pod and left pod to internet
 ```
    $ kubectl exec -it nginx-right-deployment-965b96d57-v9twm -n sfc-tail -- ifconfig
-eth0      Link encap:Ethernet  HWaddr CE:5A:18:B1:65:07  
+eth0      Link encap:Ethernet  HWaddr CE:5A:18:B1:65:07
           inet addr:10.210.50.73  Bcast:10.210.50.73  Mask:255.255.255.255
           UP BROADCAST RUNNING MULTICAST  MTU:1440  Metric:1
           RX packets:0 errors:0 dropped:0 overruns:0 frame:0
           TX packets:0 errors:0 dropped:0 overruns:0 carrier:0
-          collisions:0 txqueuelen:0 
+          collisions:0 txqueuelen:0
           RX bytes:0 (0.0 B)  TX bytes:0 (0.0 B)
 
-lo        Link encap:Local Loopback  
+lo        Link encap:Local Loopback
           inet addr:127.0.0.1  Mask:255.0.0.0
           UP LOOPBACK RUNNING  MTU:65536  Metric:1
           RX packets:0 errors:0 dropped:0 overruns:0 frame:0
           TX packets:0 errors:0 dropped:0 overruns:0 carrier:0
-          collisions:0 txqueuelen:1000 
+          collisions:0 txqueuelen:1000
           RX bytes:0 (0.0 B)  TX bytes:0 (0.0 B)
 
-sn0       Link encap:Ethernet  HWaddr 1E:3E:B1:1E:13:05  
+sn0       Link encap:Ethernet  HWaddr 1E:3E:B1:1E:13:05
           inet addr:172.30.19.4  Bcast:172.30.19.255  Mask:255.255.255.0
           UP BROADCAST RUNNING MULTICAST  MTU:1400  Metric:1
           RX packets:0 errors:0 dropped:0 overruns:0 frame:0
           TX packets:0 errors:0 dropped:0 overruns:0 carrier:0
-          collisions:0 txqueuelen:0 
+          collisions:0 txqueuelen:0
           RX bytes:0 (0.0 B)  TX bytes:0 (0.0 B)
 
 $ kubectl exec -it nginx-left-deployment-7476fb75fc-g6gvj -n sfc-head -- traceroute -n -q 1 -I 172.30.19.4

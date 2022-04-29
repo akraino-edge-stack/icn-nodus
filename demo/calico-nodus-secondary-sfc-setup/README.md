@@ -33,40 +33,46 @@ is available on the Vagrant site.
 Install the [docker](https://docs.docker.com/engine/install/ubuntu/) in the master, minion01 and minion02 vm.
 Follow the steps in [create cluster kubeadm](https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/create-cluster-kubeadm/) to create kubernetes cluster in master
 
-### kubeadm                                                                    
+### kubeadm
 In the master node run the `kubeadm init` as below. The calico uses pod network cidr `10.210.0.0/16`
-```                                                                            
+```
     $ kubeadm init --kubernetes-version=1.23.3 --pod-network-cidr=10.210.0.0/16 --apiserver-advertise-address=<master_eth0_ip_address>
-```                                                                            
+```
 Ensure the master node taint for no schedule is removed and labelled with `ovn4nfv-k8s-plugin=ovn-control-plane`
-```                                                                            
-nodename=$(kubectl get node -o jsonpath='{.items[0].metadata.name}')           
-kubectl taint node $nodename node-role.kubernetes.io/master:NoSchedule-        
-kubectl label --overwrite node $nodename ovn4nfv-k8s-plugin=ovn-control-plane  
-```                                                                            
-Deploy the Calico and Multus CNI in the kubeadm master                         
-```                                                                            
-     $ kubectl apply -f deploy/calico.yaml                                     
-     $ kubectl apply -f deploy/multus-daemonset.yaml                           
-```                                                                            
+```
+nodename=$(kubectl get node -o jsonpath='{.items[0].metadata.name}')
+kubectl taint node $nodename node-role.kubernetes.io/master:NoSchedule-
+kubectl label --overwrite node $nodename ovn4nfv-k8s-plugin=ovn-control-plane
+```
+
+[Kustomize](https://kustomize.io/) and deploy [cert-manager](https://cert-manager.io/):
+```
+$ curl -Ls https://github.com/cert-manager/cert-manager/releases/download/v1.8.0/cert-manager.yaml -o deploy/cert-manager/cert-manager.yaml && kubectl apply -k deploy/cert-manager/
+```
+
+Deploy the Calico and Multus CNI in the kubeadm master
+```
+     $ kubectl apply -f deploy/calico.yaml
+     $ kubectl apply -f deploy/multus-daemonset.yaml
+```
 One of major change, we required to do for calico is to enable ip forwarding in the container network namespace.
 This is enabled by macro `allow_ip_forwarding` to `true` in the calico cni configuration file.
 
 There will be multiple conf files, we have to make sure Multus file is in the Lexicographic order.
 Kubernetes kubelet is designed to pick the config file in the lexicograpchic order.
-                                                                               
+
 In this example, we are using pod CIDR as `10.210.0.0/16`. The Calico will automatically detect the CIDR based on the running configuration.
 Since calico network going to the primary network in our case, nodus subnet should be a different network. Make sure you change the `OVN_SUBNET` and `OVN_GATEWAYIP` in `deploy/ovn4nfv-k8s-plugin.yaml`
-In this example, we customize the ovn network as follows.                      
-```                                                                            
-data:                                                                          
-  OVN_SUBNET: "10.154.141.0/18"                                                
-  OVN_GATEWAYIP: "10.154.141.1/18"                                    
-```                                                                            
-Deploy the Nodus Pod network to the cluster.                                 
-```                                                                            
-    $ kubectl apply -f deploy/ovn-daemonset.yaml                               
-    $ kubectl apply -f deploy/ovn4nfv-k8s-plugin.yaml                          
+In this example, we customize the ovn network as follows.
+```
+data:
+  OVN_SUBNET: "10.154.141.0/18"
+  OVN_GATEWAYIP: "10.154.141.1/18"
+```
+Deploy the Nodus Pod network to the cluster.
+```
+    $ kubectl apply -f deploy/ovn-daemonset.yaml
+    $ kubectl apply -f deploy/ovn4nfv-k8s-plugin.yaml
 ```
 
 Join minion01 and minion02 by running the `kubeadm join` on each node as root as mentioned in [create cluster kubeadm](https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/create-cluster-kubeadm/)
@@ -180,30 +186,30 @@ sfc-tail      nginx-right-deployment-965b96d57-ff7pg     1/1     Running   0    
 Let ping from the left pod to right pod and left pod to internet
 ```
 $ kubectl exec -it nginx-right-deployment-965b96d57-65bvx -n sfc-tail -- ifconfig
-eth0      Link encap:Ethernet  HWaddr EE:97:C9:3A:85:C3  
+eth0      Link encap:Ethernet  HWaddr EE:97:C9:3A:85:C3
           inet addr:10.210.50.79  Bcast:10.210.50.79  Mask:255.255.255.255
           UP BROADCAST RUNNING MULTICAST  MTU:1440  Metric:1
           RX packets:0 errors:0 dropped:0 overruns:0 frame:0
           TX packets:0 errors:0 dropped:0 overruns:0 carrier:0
-          collisions:0 txqueuelen:0 
+          collisions:0 txqueuelen:0
           RX bytes:0 (0.0 B)  TX bytes:0 (0.0 B)
 
-lo        Link encap:Local Loopback  
+lo        Link encap:Local Loopback
           inet addr:127.0.0.1  Mask:255.0.0.0
           UP LOOPBACK RUNNING  MTU:65536  Metric:1
           RX packets:0 errors:0 dropped:0 overruns:0 frame:0
           TX packets:0 errors:0 dropped:0 overruns:0 carrier:0
-          collisions:0 txqueuelen:1000 
+          collisions:0 txqueuelen:1000
           RX bytes:0 (0.0 B)  TX bytes:0 (0.0 B)
 
-sn0       Link encap:Ethernet  HWaddr 1E:3E:B1:1E:16:05  
+sn0       Link encap:Ethernet  HWaddr 1E:3E:B1:1E:16:05
           inet addr:172.30.22.4  Bcast:172.30.22.255  Mask:255.255.255.0
           UP BROADCAST RUNNING MULTICAST  MTU:1400  Metric:1
           RX packets:0 errors:0 dropped:0 overruns:0 frame:0
           TX packets:0 errors:0 dropped:0 overruns:0 carrier:0
-          collisions:0 txqueuelen:0 
+          collisions:0 txqueuelen:0
           RX bytes:0 (0.0 B)  TX bytes:0 (0.0 B)
-                                                                                                             
+
 $ kubectl exec -it nginx-left-deployment-7476fb75fc-g8brt -n sfc-head -- traceroute -q 1 -I 172.30.22.4
 traceroute to 172.30.22.4 (172.30.22.4), 30 hops max, 46 byte packets
  1  172.30.11.3 (172.30.11.3)  2.263 ms
@@ -216,7 +222,7 @@ traceroute to 172.30.22.4 (172.30.22.4), 30 hops max, 46 byte packets
 
 Let trace the packet from left pod to the Internet. The packet flow through the chain and then to virtual router(tm2) and reach the Internet.
 If your setup up is behind the proxy. Please take care of your proxy setup before running these testing.
- ```                                        
+ ```
 $ kubectl exec -it nginx-left-deployment-7476fb75fc-g8brt -n sfc-head -- traceroute -q 1 -I google.com
 traceroute to google.com (142.251.40.142), 30 hops max, 46 byte packets
  1  172.30.11.3 (172.30.11.3)  0.655 ms
@@ -233,7 +239,7 @@ traceroute to google.com (142.251.40.142), 30 hops max, 46 byte packets
 12  18.2.145.18 (18.2.145.18)  11.306 ms
 13  108.170.248.65 (108.170.248.65)  12.086 ms
 14  216.239.49.65 (216.239.49.65)  12.083 ms
-15  lga25s80-in-f14.1e100.net (142.251.40.142)  11.893 ms               
+15  lga25s80-in-f14.1e100.net (142.251.40.142)  11.893 ms
 ```
 ### Flow III
 Let trace the packet from the server tm1-node to Internet through SFC

@@ -77,6 +77,12 @@ nodename=$(kubectl get node -o jsonpath='{.items[0].metadata.name}')
 kubectl taint node $nodename node-role.kubernetes.io/master:NoSchedule-
 kubectl label --overwrite node $nodename ovn4nfv-k8s-plugin=ovn-control-plane
 ```
+
+[Kustomize](https://kustomize.io/) and deploy [cert-manager](https://cert-manager.io/):
+```
+$ curl -Ls https://github.com/cert-manager/cert-manager/releases/download/v1.8.0/cert-manager.yaml -o deploy/cert-manager/cert-manager.yaml && kubectl apply -k deploy/cert-manager/
+```
+
 Deploy the Nodus Pod network to the cluster.
 ```
     $ kubectl apply -f deploy/ovn-daemonset.yaml

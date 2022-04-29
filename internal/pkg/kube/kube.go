@@ -6,10 +6,13 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/prometheus/common/log"
+	// "github.com/prometheus/common/log"
 	"github.com/sirupsen/logrus"
 
 	k8sv1alpha1 "github.com/akraino-edge-stack/icn-nodus/pkg/generated/clientset/versioned/typed/k8s/v1alpha1"
+
+	cm "github.com/cert-manager/cert-manager/pkg/client/clientset/versioned/typed/certmanager/v1"
+	cmv1 "github.com/cert-manager/cert-manager/pkg/apis/certmanager/v1"
 
 	kapi "k8s.io/api/core/v1"
 	kapisnetworking "k8s.io/api/networking/v1"
@@ -45,6 +48,10 @@ type Interface interface {
 	GetNamespace(name string) (*kapi.Namespace, error)
 	GetNamespaces() (*kapi.NamespaceList, error)
 	GetNetworkPolicies(namespace string) (*kapisnetworking.NetworkPolicyList, error)
+	GetCertManagerClient() (*cm.CertmanagerV1Client, error)
+	GetSecret(namespace, name string) (*kapi.Secret, error)
+	GetSecrets(namespace string) (*kapi.SecretList, error)
+	GetCertificates(client *cm.CertmanagerV1Client, name string)
 }
 
 // Kube is the structure object upon which the Interface is implemented
@@ -63,7 +70,7 @@ func GetKubev1alpha1Config() (*k8sv1alpha1.K8sV1alpha1Client, error) {
 
 	k, err = k8sv1alpha1.NewForConfig(cfg)
 	if err != nil {
-		log.Error(err, "Error building Kuberenetes clientset")
+		logrus.Error(err, "Error building Kuberenetes clientset")
 		return nil, err
 	}
 
@@ -81,7 +88,7 @@ func GetKubeConfig() (*kubernetes.Clientset, error) {
 
 	k, err = kubernetes.NewForConfig(cfg)
 	if err != nil {
-		log.Error(err, "Error building Kuberenetes clientset")
+		logrus.Error(err, "Error building Kuberenetes clientset")
 		return nil, err
 	}
 
@@ -94,13 +101,13 @@ func GetKubeConfigfromFile() (*kubernetes.Clientset, error) {
 
 	cfg, err := clientcmd.BuildConfigFromFlags("", nodusKubeConfigFile)
 	if err != nil {
-		log.Errorf("Error in getting the context for the kubeconfig - %v : %v", nodusKubeConfigFile, err)
+		logrus.Errorf("Error in getting the context for the kubeconfig - %v : %v", nodusKubeConfigFile, err)
 		return nil, err
 	}
 
 	k, err = kubernetes.NewForConfig(cfg)
 	if err != nil {
-		log.Error(err, "Error building Kuberenetes clientset")
+		logrus.Error(err, "Error building Kuberenetes clientset")
 		return nil, err
 	}
 
@@ -310,4 +317,36 @@ func (k *Kube) GetNamespaces() (*kapi.NamespaceList, error) {
 // GetNetworkPolicies returns all network policy objects from kubernetes
 func (k *Kube) GetNetworkPolicies(namespace string) (*kapisnetworking.NetworkPolicyList, error) {
 	return k.KClient.NetworkingV1().NetworkPolicies(namespace).List(context.TODO(), metav1.ListOptions{})
+}
+
+// GetSecrets returns list of all secrets within the namespace
+func (k *Kube) GetSecrets(namespace string) (*kapi.SecretList, error) {
+	return k.KClient.CoreV1().Secrets(namespace).List(context.TODO(), metav1.ListOptions{})
+}
+
+// GetSecret returns selected secret in the provided namespace
+func (k *Kube) GetSecret(namespace, name string) (*kapi.Secret, error) {
+	return k.KClient.CoreV1().Secrets(namespace).Get(context.TODO(), name, metav1.GetOptions{})
+}
+
+// GetCertManagerClient returns a client for cert-manager
+func (k *Kube) GetCertManagerClient() (*cm.CertmanagerV1Client, error) {
+	cfg, err := config.GetConfig()
+	if err != nil {
+		return nil, err
+	}
+	client, err := cm.NewForConfig(cfg)
+	if err != nil {
+		return nil, err
+	}
+	return client, nil
+}
+
+func (k *Kube) GetCertificate(client *cm.CertmanagerV1Client, namespace, name string) (*cmv1.Certificate, error) {
+	crts := client.Certificates(namespace)
+	c, err := crts.Get(context.TODO(), name, metav1.GetOptions{})
+	if err != nil {
+		return nil, err
+	}
+	return c, nil
 }

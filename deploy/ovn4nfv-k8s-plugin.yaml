@@ -473,6 +473,40 @@ spec:
       subresources:
         status: {}
 ---
+
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: nodus-root-issuer
+spec:
+  selfSigned: {}
+
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: nodus-root-cert
+  namespace: kube-system
+spec:
+  commonName: "nodus"
+  duration: 17520h
+  isCA: true
+  issuerRef:
+    kind: ClusterIssuer
+    name: nodus-root-issuer
+  secretName: nodus-root-cert
+
+---
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: nodus-issuer
+  namespace: kube-system
+spec:
+  ca:
+    secretName: nodus-root-cert
+---
+
 apiVersion: v1
 kind: ServiceAccount
 metadata:
@@ -540,6 +574,14 @@ rules:
      - get
      - list
      - watch
+  - apiGroups:
+      - cert-manager.io
+    resources:
+      - certificates
+    verbs:
+     - get
+     - create
+     - list
 
 ---
 kind: ClusterRoleBinding
@@ -629,9 +671,12 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: metadata.name
+            - name: POD_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
             - name: OPERATOR_NAME
               value: "nfn-operator"
-
 ---
 kind: ConfigMap
 apiVersion: v1
@@ -706,10 +751,17 @@ spec:
               mountPath: /host/opt/cni/bin
             - name: cniconf
               mountPath: /host/etc/openvswitch
+            - name: nodus-certs
+              mountPath: /host/opt/nodus/certs
             - name: ovn4nfv-cfg
               mountPath: /tmp/ovn4nfv-conf
             - name: ovn4nfv-cni-net-conf
               mountPath: /tmp/ovn4nfv-cni
+          env:
+            - name: POD_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
       volumes:
         - name: cni
           hostPath:
@@ -720,6 +772,9 @@ spec:
         - name: cniconf
           hostPath:
             path: /etc/openvswitch
+        - name: nodus-certs
+          hostPath:
+            path: /opt/nodus/certs
         - name: ovn4nfv-cfg
           configMap:
             name: ovn4nfv-cni-config
@@ -779,6 +834,10 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: spec.nodeName
+            - name: POD_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
           securityContext:
             runAsUser: 0
             capabilities:
@@ -800,6 +859,8 @@ spec:
               name: host-sys
             - mountPath: /var/run/ovn4nfv-k8s-plugin
               name: host-var-cniserver-socket-dir
+            - mountPath: /host/opt/nodus/certs
+              name: nodus-certs
       volumes:
         - name: host-run-ovs
           hostPath:
@@ -822,3 +883,6 @@ spec:
         - name: host-sys
           hostPath:
             path: /sys
+        - name: nodus-certs
+          hostPath:
+            path: /opt/nodus/certs

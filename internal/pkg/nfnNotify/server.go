@@ -20,8 +20,11 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"os"
 	"strings"
 
+	"github.com/akraino-edge-stack/icn-nodus/internal/pkg/auth"
+	"github.com/akraino-edge-stack/icn-nodus/internal/pkg/kube"
 	"github.com/akraino-edge-stack/icn-nodus/internal/pkg/node"
 	chaining "github.com/akraino-edge-stack/icn-nodus/internal/pkg/utils"
 	v1alpha1 "github.com/akraino-edge-stack/icn-nodus/pkg/apis/k8s/v1alpha1"
@@ -62,7 +65,6 @@ func newServer() *serverDB {
 
 // Subscribe stores the client information & sends data
 func (s *serverDB) Subscribe(sc *pb.SubscribeContext, ss pb.NfnNotify_SubscribeServer) error {
-	log.Info("server.go - Subscribe")
 	nodeName := sc.GetNodeName()
 	log.Info("Subscribe request from node", "Node Name", nodeName)
 	if nodeName == "" {
@@ -569,7 +571,29 @@ func SetupNotifServer(kConfig *rest.Config) {
 		log.Error(err, "failed to listen")
 	}
 
-	s := grpc.NewServer()
+	namespace := os.Getenv(auth.NamespaceEnv)
+	nfnSvcIP := os.Getenv(auth.NfnOperatorHostEnv)
+
+	kubecli := &kube.Kube{KClient: kubeClientset}
+	sec, err := kubecli.GetSecret(namespace, auth.DefaultCert)
+	if err != nil {
+		log.Error(err, "Error while obtaining certificate secret")
+	}
+	if sec == nil || err != nil{
+		log.Info("Creating new TLS certificate")
+		_, sec, err = auth.CreateNodusCert(auth.DefaultCert, namespace, nfnSvcIP)
+		if err != nil {
+			log.Error(err, "Cerificate not created")
+		}
+	}
+
+	serverTLS, err := auth.CreateServerTLSFromSecret(sec)
+	if err != nil {
+		log.Error(err, "Error while creating TLS configuration")
+	}
+
+	fmt.Println("New GRPC server")
+	s := grpc.NewServer(grpc.Creds(*serverTLS))
 	// Intialize Notify server
 	notifServer = newServer()
 	pb.RegisterNfnNotifyServer(s, notifServer)

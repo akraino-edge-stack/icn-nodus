@@ -26,6 +26,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/akraino-edge-stack/icn-nodus/internal/pkg/auth"
 	cs "github.com/akraino-edge-stack/icn-nodus/internal/pkg/cniserver"
 	pb "github.com/akraino-edge-stack/icn-nodus/internal/pkg/nfnNotify/proto"
 	"github.com/akraino-edge-stack/icn-nodus/internal/pkg/ovn"
@@ -238,6 +239,8 @@ func createNodeOVSInternalPort(payload *pb.Notification_InSync) error {
 }
 
 func handleNotif(msg *pb.Notification) {
+	log.Info("Got massage")
+	log.Info(msg.String())
 	switch msg.GetCniType() {
 	case "ovn4nfv":
 		switch payload := msg.Payload.(type) {
@@ -341,6 +344,7 @@ func handleNotif(msg *pb.Notification) {
 			}
 
 		case *pb.Notification_InSync:
+			log.Info("Got InSync massage")
 			inSyncVlanProvidernetwork()
 			inSyncDirectProvidernetwork()
 			pnCreateStore = nil
@@ -391,21 +395,69 @@ func shutDownAgent(reason string) {
 func main() {
 	//logf.SetLogger(zap.Logger(true))
 	log.Info("nfn-agent Started")
+	fmt.Println("nfn-agent Started")
 
 	serverIP := os.Getenv("NFN_OPERATOR_SERVICE_HOST")
+	// nodusNamespace := os.Getenv("POD_NAMESPACE")
 	if strings.Contains(serverIP, ":") {
 		serverIP = "[" + serverIP + "]"
 	}
+	// serverFQN := strings.Replace(serverIP, ".", "-", -1) + "." + nodusNamespace + ".pod.cluster.local"
+	// serverAddr := serverFQN + ":" + os.Getenv("NFN_OPERATOR_SERVICE_PORT")
 	serverAddr := serverIP + ":" + os.Getenv("NFN_OPERATOR_SERVICE_PORT")
+	fmt.Println("Server FQN")
+	fmt.Println(serverAddr)
 	// Setup ovn utilities
 	exec := kexec.New()
 	err := ovn.SetExec(exec)
 	if err != nil {
+		fmt.Println(err.Error())
 		log.Error(err, "Unable to setup OVN Utils")
 		return
 	}
-	conn, err := grpc.Dial(serverAddr, grpc.WithInsecure())
+
+	namespace := os.Getenv(auth.NamespaceEnv)
+	// nfnSvcIP := os.Getenv(auth.NfnOperatorHostEnv)
+
+	kubecli, err := auth.GetKubeClient()
 	if err != nil {
+		fmt.Println(err,"Error obtaining k8s client")
+		log.Error(err,"Error obtaining k8s client")
+	}
+	// sec, err := kubecli.GetSecret(namespace, auth.DefaultCert)
+	// if err != nil {
+	// 	fmt.Println(err, "Error while obtaining certificate secret")
+	// 	log.Error(err, "Error while obtaining certificate secret")
+	// }
+	// if sec == nil || err != nil{
+	// 	log.Info("Creating new TLS certificate")
+	// 	fmt.Println("Creating new TLS certificate")
+	// 	auth.CreateNodusCert(auth.DefaultCert, namespace, nfnSvcIP)
+	// 	sec, err = kubecli.GetSecret(namespace, auth.DefaultCert)
+	// 	if err != nil {
+	// 		fmt.Println(err, "Cerificate not created")
+	// 		log.Error(err, "Cerificate not created")
+	// 	}
+	// }
+
+	sec, err := auth.WaitForSecret(kubecli, namespace, auth.DefaultCert)
+	if err != nil {
+		fmt.Println(err, "Error while obtaining secret")
+		fmt.Println(err.Error())
+		log.Error(err, "Error while obtaining secret")
+	}
+	
+	clientTLS, err := auth.CreateClientTLSFromSecret(sec)
+	if err != nil {
+		fmt.Println(err, "Error while creating TLS configuration")
+		fmt.Println(err.Error())
+		log.Error(err, "Error while creating TLS configuration")
+	}
+
+	conn, err := grpc.Dial(serverAddr, grpc.WithTransportCredentials(*clientTLS))
+	if err != nil {
+		fmt.Println("Fail to dial")
+		fmt.Println(err.Error())
 		log.Error(err, "fail to dial")
 		return
 	}
@@ -427,6 +479,7 @@ func main() {
 		return
 	}
 
+	fmt.Println("NewCNIServer")
 	cniserver := cs.NewCNIServer("", clientset)
 	err = cniserver.Start(cs.HandleCNIcommandRequest)
 	if err != nil {
@@ -434,6 +487,7 @@ func main() {
 		return
 	}
 	// Run client in background
+	fmt.Println("NewCNIServer started")
 	go subscribeNotif(client)
 	shutdownHandler(errorChannel)
 

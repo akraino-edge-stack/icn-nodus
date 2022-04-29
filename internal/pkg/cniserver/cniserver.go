@@ -13,6 +13,7 @@ import (
 
 	"k8s.io/klog"
 
+	"github.com/akraino-edge-stack/icn-nodus/internal/pkg/auth"
 	"github.com/akraino-edge-stack/icn-nodus/internal/pkg/config"
 
 	"github.com/gorilla/mux"
@@ -54,18 +55,41 @@ type CNIServer struct {
 	k8sclient    kubernetes.Interface
 }
 
-func NewCNIServer(serverRunSir string, k8sclient kubernetes.Interface) *CNIServer {
+func NewCNIServer(serverRunDir string, k8sclient kubernetes.Interface) *CNIServer {
 	klog.Infof("Setting up CNI server in nfn-agent")
-	if len(serverRunSir) == 0 {
-		serverRunSir = CNIServerRunDir
+	if len(serverRunDir) == 0 {
+		serverRunDir = CNIServerRunDir
+	}
+
+	namespace := os.Getenv(auth.NamespaceEnv)
+
+	kubecli, err := auth.GetKubeClient()
+	if err != nil {
+		klog.Errorf("Error getting kube client: %v", err)
+		return nil
+	}
+
+	// wait for secret to be created
+	sec, err := auth.WaitForSecret(kubecli, namespace, auth.DefaultCniCert)
+	if sec == nil || err != nil {
+		klog.Errorf("Unable to obtain the secret: %v", err)
+		return nil
+	}
+
+	// load certificates from obtained secret
+	cert, pool, err := auth.LoadCertsFromSecret(sec)
+	if err != nil {
+		klog.Errorf("Error while loading certificate data from secret: %v", err)
+		return nil
 	}
 
 	router := mux.NewRouter()
 	cs := &CNIServer{
 		Server: http.Server{
 			Handler: router,
+			TLSConfig: auth.CreateTLSConfig(cert, pool, true),
 		},
-		serverrundir: serverRunSir,
+		serverrundir: serverRunDir,
 		k8sclient:    k8sclient,
 	}
 	router.NotFoundHandler = http.HandlerFunc(http.NotFound)

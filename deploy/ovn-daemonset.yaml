@@ -46,6 +46,56 @@ spec:
   sessionAffinity: None
 
 ---
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: nodus-root-issuer
+spec:
+  selfSigned: {}
+
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: nodus-root-cert
+  namespace: kube-system
+spec:
+  commonName: "nodus"
+  duration: 17520h
+  isCA: true
+  issuerRef:
+    kind: ClusterIssuer
+    name: nodus-root-issuer
+  secretName: nodus-root-cert
+
+---
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: nodus-issuer
+  namespace: kube-system
+spec:
+  ca:
+    secretName: nodus-root-cert
+
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: nodus-ovn-cert
+  namespace: kube-system
+spec:
+  duration: 17520h
+  isCA: false
+  issuerRef:
+    kind: Issuer
+    name: nodus-issuer
+  secretName: nodus-ovn-cert
+  commonName: "ovn"
+  dnsNames:
+  - "ovn"
+
+---
 kind: Deployment
 apiVersion: apps/v1
 metadata:
@@ -120,6 +170,9 @@ spec:
               name: host-log-ovs
             - mountPath: /var/log/ovn
               name: host-log-ovn
+            - mountPath: /etc/openvswitch/certs
+              name: cert
+              readOnly: true
           readinessProbe:
             exec:
               command: ["ovn4nfv-k8s", "check_ovn_control_plane"]
@@ -152,6 +205,10 @@ spec:
         - name: host-log-ovn
           hostPath:
             path: /var/log/ovn
+        - name: cert
+          secret:
+            defaultMode: 420
+            secretName: nodus-ovn-cert
 
 ---
 kind: DaemonSet
@@ -216,6 +273,9 @@ spec:
               name: host-log-ovs
             - mountPath: /var/log/ovn
               name: host-log-ovn
+            - mountPath: /etc/openvswitch/certs
+              name: cert
+              readOnly: true
           readinessProbe:
             exec:
               command: ["ovn4nfv-k8s", "check_ovn_controller"]
@@ -257,3 +317,7 @@ spec:
         - name: host-log-ovn
           hostPath:
             path: /var/log/ovn
+        - name: cert
+          secret:
+            defaultMode: 420
+            secretName: nodus-ovn-cert

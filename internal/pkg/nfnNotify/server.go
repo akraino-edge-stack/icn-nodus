@@ -90,8 +90,8 @@ func (s *serverDB) Subscribe(sc *pb.SubscribeContext, ss pb.NfnNotify_SubscribeS
 		CniType: "ovn4nfv",
 		Payload: &pb.Notification_InSync{
 			InSync: &pb.InSync{
-				NodeIntfIpAddress:  nodeIntfIPAddr,
-				NodeIntfMacAddress: nodeIntfMacAddr,
+				NodeIntfIpAddress:   nodeIntfIPAddr,
+				NodeIntfMacAddress:  nodeIntfMacAddr,
 				NodeIntfIpv6Address: nodeIntfIPv6Addr,
 			},
 		},

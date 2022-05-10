@@ -36,14 +36,13 @@ import (
 	"k8s.io/client-go/rest"
 	kexec "k8s.io/utils/exec"
 
-	logf "sigs.k8s.io/controller-runtime/pkg/log"
+	log "k8s.io/klog"
 
 	"github.com/akraino-edge-stack/icn-nodus/cmd/ovn4nfvk8s-cni/app"
 
 	"google.golang.org/grpc/status"
 )
 
-var log = logf.Log.WithName("nfn-agent")
 var errorChannel chan string
 var inSync bool
 var pnCreateStore []*pb.Notification_ProviderNwCreate
@@ -74,8 +73,7 @@ func subscribeNotif(client pb.NfnNotifyClient) error {
 				shutDownAgent("Stream closed from server")
 				return err
 			}
-			log.Info("Got Err message", "err", err)
-			log.Info("Got message", "msg", in)
+			log.Infof("Got message - %v", in)
 			handleNotif(in)
 		}
 	}
@@ -290,20 +288,21 @@ func handleNotif(msg *pb.Notification) {
 			id := payload.PodAddNetwork.GetContainerId()
 			pid, err := chaining.GetPidForContainer(id)
 			if err != nil {
-				log.Error(err, "Failed to get pid", "containerID", id)
+				log.Errorf("Failed to get pid - containerID - %v | err-%v", id, err)
 				return
 			}
 
 			err = chaining.ContainerAddInteface(pid, payload.PodAddNetwork)
 			if err != nil {
+				log.Errorf("Failed to add interface for containerID-%v & podaddnetwork-%v | err-%v", id, payload.PodAddNetwork, err)
 				return
 			}
 
 			var route []*pb.RouteData
 			route = append(route, payload.PodAddNetwork.GetRoute()...)
-			log.Info("route information from msg", "route", route)
 			err = chaining.ContainerAddRoute(pid, route)
 			if err != nil {
+				log.Errorf("Failed to add route for containerID-%v & route-%v | err-%v", id, route, err)
 				return
 			}
 
@@ -345,13 +344,14 @@ func handleNotif(msg *pb.Notification) {
 			inSyncDirectProvidernetwork()
 			pnCreateStore = nil
 			inSync = true
-			if (payload.InSync.GetNodeIntfIpAddress() != "" || payload.InSync.GetNodeIntfIpv6Address() != "" ) && payload.InSync.GetNodeIntfMacAddress() != "" {
+			if (payload.InSync.GetNodeIntfIpAddress() != "" || payload.InSync.GetNodeIntfIpv6Address() != "") && payload.InSync.GetNodeIntfMacAddress() != "" {
 				err := createNodeOVSInternalPort(payload)
 				if err != nil {
 					return
 				}
 			}
-
+		default:
+			log.Infof("Not supported Payload type - %v", payload)
 		}
 	// Add other Types here
 	default:

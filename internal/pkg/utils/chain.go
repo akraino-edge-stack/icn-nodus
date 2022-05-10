@@ -31,6 +31,7 @@ import (
 	k8sv1alpha1 "github.com/akraino-edge-stack/icn-nodus/pkg/apis/k8s/v1alpha1"
 
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/klog"
 
 	"k8s.io/client-go/kubernetes"
 
@@ -1197,18 +1198,24 @@ func CalculateRoutes(cr *k8sv1alpha1.NetworkChaining, cs bool, onlyPodSelector b
 
 //ContainerAddInteface return
 func ContainerAddInteface(containerPid int, payload *pb.PodAddNetwork) error {
-	log.Info("Container pid", "containerPid", containerPid)
-	log.Info("payload network", "payload.GetNet()", payload.GetNet())
-	log.Info("payload pod", "payload.GetPod()", payload.GetPod())
-	log.Info("payload route", "payload.GetRoute()", payload.GetRoute())
+	klog.Infof("Value of ContainerAddInteface containerPid - %v", containerPid)
+	klog.Infof("Value of ContainerAddInteface payload.GetNet() - %v", payload.GetNet())
+	klog.Infof("Value of ContainerAddInteface payload.GetPod() - %v", payload.GetPod())
+	klog.Infof("Value of ContainerAddInteface payload.GetRoute()- %v", payload.GetRoute())
 
 	podinfo := payload.GetPod()
 	podnetconf := payload.GetNet()
+	klog.Infof("Value of ContainerAddInteface podnetconf.GetData()- %s", podnetconf.GetData())
+	klog.Infof("Value of ContainerAddInteface podnetconf.Data- %s", podnetconf.Data)
 
-	var netconfs []map[string]string
-	err := json.Unmarshal([]byte(podnetconf.Data), &netconfs)
+	var nets []cniserver.OvnNetwork
+	err := json.Unmarshal([]byte(podnetconf.Data), &nets)
 	if err != nil {
 		return fmt.Errorf("Error in unmarshal podnet conf=%v", err)
+	}
+
+	if len(nets) != 1 {
+		return fmt.Errorf("Only support one interface addition")
 	}
 
 	cnishimreq := &cniserver.CNIServerRequest{
@@ -1217,7 +1224,7 @@ func ContainerAddInteface(containerPid int, payload *pb.PodAddNetwork) error {
 		PodName:      podinfo.Name,
 		SandboxID:    config.GeneratePodNameID(podinfo.Name),
 		Netns:        fmt.Sprintf("/host/proc/%d/ns/net", containerPid),
-		IfName:       netconfs[0]["interface"],
+		IfName:       nets[len(nets)-1].Interface,
 		CNIConf:      nil,
 	}
 
@@ -1231,18 +1238,22 @@ func ContainerAddInteface(containerPid int, payload *pb.PodAddNetwork) error {
 
 //ContainerDelInteface return
 func ContainerDelInteface(containerPid int, payload *pb.PodDelNetwork) error {
-	log.Info("Container pid", "containerPid", containerPid)
-	log.Info("payload network", "payload.GetNet()", payload.GetNet())
-	log.Info("payload pod", "payload.GetPod()", payload.GetPod())
-	log.Info("payload route", "payload.GetRoute()", payload.GetRoute())
+	klog.Infof("Value of ContainerDelInteface containerPid - %v", containerPid)
+	klog.Infof("Value of ContainerDelInteface payload.GetNet() - %v", payload.GetNet())
+	klog.Infof("Value of ContainerDelInteface payload.GetPod() - %v", payload.GetPod())
+	klog.Infof("Value of ContainerDelInteface payload.GetRoute()- %v", payload.GetRoute())
 
 	podinfo := payload.GetPod()
 	podnetconf := payload.GetNet()
 
-	var netconfs []map[string]string
-	err := json.Unmarshal([]byte(podnetconf.Data), &netconfs)
+	var nets []cniserver.OvnNetwork
+	err := json.Unmarshal([]byte(podnetconf.Data), &nets)
 	if err != nil {
 		return fmt.Errorf("Error in unmarshal podnet conf=%v", err)
+	}
+
+	if len(nets) != 1 {
+		return fmt.Errorf("Only support one interface addition")
 	}
 
 	cnishimreq := &cniserver.CNIServerRequest{
@@ -1251,7 +1262,7 @@ func ContainerDelInteface(containerPid int, payload *pb.PodDelNetwork) error {
 		PodName:      podinfo.Name,
 		SandboxID:    config.GeneratePodNameID(podinfo.Name),
 		Netns:        fmt.Sprintf("/host/proc/%d/ns/net", containerPid),
-		IfName:       netconfs[0]["interface"],
+		IfName:       nets[len(nets)-1].Interface,
 		CNIConf:      nil,
 	}
 

@@ -656,7 +656,7 @@ spec:
       serviceAccountName: k8s-nfn-sa
       containers:
         - name: nfn-operator
-          image: docker.io/integratedcloudnative/ovn4nfv-k8s-plugin:v5.3.0
+          image: docker.io/integratedcloudnative/ovn4nfv-k8s-plugin:v6.0.0
           command: ["/usr/local/bin/entrypoint", "operator"]
           imagePullPolicy: IfNotPresent
           envFrom:
@@ -741,7 +741,7 @@ spec:
       serviceAccountName: k8s-nfn-sa
       containers:
         - name: ovn4nfv
-          image: docker.io/integratedcloudnative/ovn4nfv-k8s-plugin:v5.3.0
+          image: docker.io/integratedcloudnative/ovn4nfv-k8s-plugin:v6.0.0
           command: ["/usr/local/bin/entrypoint", "cni"]
           imagePullPolicy: IfNotPresent
           resources:
@@ -752,7 +752,9 @@ spec:
               cpu: 100m
               memory: 50Mi
           securityContext:
-            privileged: true
+            capabilities:
+              add:
+                - NET_ADMIN
           volumeMounts:
             - name: cni
               mountPath: /host/etc/cni/net.d
@@ -820,7 +822,7 @@ spec:
       serviceAccountName: k8s-nfn-sa
       containers:
         - name: nfn-agent
-          image: docker.io/integratedcloudnative/ovn4nfv-k8s-plugin:v5.3.0
+          image: docker.io/integratedcloudnative/ovn4nfv-k8s-plugin:v6.0.0
           command: ["/usr/local/bin/entrypoint", "agent"]
           imagePullPolicy: IfNotPresent
           envFrom:
@@ -846,7 +848,6 @@ spec:
             runAsUser: 0
             capabilities:
               add: ["NET_ADMIN", "SYS_ADMIN", "SYS_PTRACE"]
-            privileged: true
           volumeMounts:
             - mountPath: /var/run/dbus/
               name: host-var-run-dbus

@@ -1223,7 +1223,7 @@ func ContainerAddInteface(containerPid int, payload *pb.PodAddNetwork) error {
 		PodNamespace: podinfo.Namespace,
 		PodName:      podinfo.Name,
 		SandboxID:    config.GeneratePodNameID(podinfo.Name),
-		Netns:        fmt.Sprintf("/host/proc/%d/ns/net", containerPid),
+		Netns:        fmt.Sprintf("/proc/%d/ns/net", containerPid),
 		IfName:       nets[len(nets)-1].Interface,
 		CNIConf:      nil,
 	}
@@ -1261,7 +1261,7 @@ func ContainerDelInteface(containerPid int, payload *pb.PodDelNetwork) error {
 		PodNamespace: podinfo.Namespace,
 		PodName:      podinfo.Name,
 		SandboxID:    config.GeneratePodNameID(podinfo.Name),
-		Netns:        fmt.Sprintf("/host/proc/%d/ns/net", containerPid),
+		Netns:        fmt.Sprintf("/proc/%d/ns/net", containerPid),
 		IfName:       nets[len(nets)-1].Interface,
 		CNIConf:      nil,
 	}
@@ -1276,7 +1276,7 @@ func ContainerDelInteface(containerPid int, payload *pb.PodDelNetwork) error {
 
 // ContainerDelRoute return containerPid and route
 func ContainerDelRoute(containerPid int, route []*pb.RouteData) error {
-	str := fmt.Sprintf("/host/proc/%d/ns/net", containerPid)
+	str := fmt.Sprintf("/proc/%d/ns/net", containerPid)
 
 	hostNet, err := network.GetHostNetwork()
 	if err != nil {
@@ -1364,7 +1364,7 @@ func ContainerDelRoute(containerPid int, route []*pb.RouteData) error {
 
 // ContainerAddRoute return containerPid and route
 func ContainerAddRoute(containerPid int, route []*pb.RouteData) error {
-	str := fmt.Sprintf("/host/proc/%d/ns/net", containerPid)
+	str := fmt.Sprintf("/proc/%d/ns/net", containerPid)
 
 	hostNet, err := network.GetHostNetwork()
 	if err != nil {

@@ -109,6 +109,7 @@ func loadCNIRequestToCNIServer(r *CNIEndpointRequest) (*CNIServerRequest, error)
 	if !ok {
 		return nil, fmt.Errorf("cnishim req missing CNI_NETNS")
 	}
+	klog.Infof("reading from cnishimreq Netns %s", cnishimreq.Netns)
 
 	cnishimreq.IfName, ok = r.ArgEnv["CNI_IFNAME"]
 	if !ok {

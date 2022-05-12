@@ -16,6 +16,24 @@
       "revId": "e79978eed9dccc10ebedd2d67706ccf317f4cbd8",
       "serverId": "4cada01b-0314-4fe0-84a1-f9ddc89863f9",
       "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "8b80bba4_7b459de3",
+        "filename": "build/Dockerfile.ubuntu",
+        "patchSetId": 6
+      },
+      "lineNbr": 34,
+      "author": {
+        "id": 480
+      },
+      "writtenOn": "2022-05-12T13:51:29Z",
+      "side": 1,
+      "message": "OK, we\u0027ll discuss it on today\u0027s meeting.",
+      "parentUuid": "e97ee70b_834fd9b1",
+      "revId": "e79978eed9dccc10ebedd2d67706ccf317f4cbd8",
+      "serverId": "4cada01b-0314-4fe0-84a1-f9ddc89863f9",
+      "unresolved": true
     }
   ]
 }

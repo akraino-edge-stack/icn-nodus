@@ -7,6 +7,8 @@ Nodus is Network controller in Kubernetes that address multiple network use case
 - Dynamic creation of virtual networks
 - Route management across virtual networks and external networks
 - Service Function chaining(SFC) support in Kubernetes
+- OVN ACL based Network Policy
+- Secure Nodus and OVN Network Traffic([WIP](https://gerrit.akraino.org/r/c/icn/nodus/+/4838))
 - SRIOV Overlay networking (WIP)
 - OVN load balancer (WIP)
 
@@ -90,9 +92,9 @@ Kubespray support the Nodus as the network plugin- please follow the steps in [k
 
 ### Nodus K8s security requirements
 #### ETCD
-Apply the secure practice to protect Nodus ovn-controller-network configmap with K8s API Server with the secure connection to protect the k8s etcd- [link](https://www.aquasec.com/cloud-native-academy/kubernetes-in-production/kubernetes-security-best-practices-10-steps-to-securing-k8s/)
+The etcd store data such as cluster state and k8s secrets. The best approach is to set up a firewall between the Kubernetes API server in the control plane node and etcd in a different node, the access to the etcd is limited by the firewall for the API server in the control plane only. The user must always ensure the mutual auth via TLS client certificate. More information to setup can be found in the [etcd documentation](https://etcd.io/docs/v3.2/op-guide/security/#basic-setup)
 ####  Encryption of secret data at rest
-By default k8s secret data stored in the etcd is stored without encryption. The user must use the KMS encryption provider for strong encryption - [link](https://kubernetes.io/docs/tasks/administer-cluster/encrypt-data/). The sser should not use any other provider mechanisms
+By default k8s secret data stored in the etcd are not encrypted. The user must use the KMS encryption provider for strong encryption - [link](https://kubernetes.io/docs/tasks/administer-cluster/encrypt-data/). The user should not use other encryption provider mechanisms such as secretbox(XSalsa20 and Poly1305 encryption), aesgcm(AES-GCM with random nonce), aescbc(AES-CBC with PKCS#7 padding) as they are show vulnerability/not recommended in the [Kubernetes documentations](https://kubernetes.io/docs/tasks/administer-cluster/encrypt-data/#providers)
 #### File in Monitoring for Nodus logs
 Add `/var/log/openvswitch/ovn4k8s.log` in the audit.rules to monitor the log files and ensure the logs are not tampered - [link](https://docs.rapid7.com/insightidr/fim-for-linux/)
 
@@ -102,7 +104,7 @@ Add `/var/log/openvswitch/ovn4k8s.log` in the audit.rules to monitor the log fil
 - [Configuration](doc/configuration.md)
 - [Development](doc/development.md)
 - [Validation & testcase](https://wiki.akraino.org/display/AK/ICN+R6+Test+Document#ICNR6TestDocument-NodusValidationandtestcaseresults)
-- [Recommended Operating system security tools](https://wiki.akraino.org/display/AK/ICN+R6+Test+Document#ICNR6TestDocument-BluValTesting)
+- [Akraino ICN Recommended Operating system security tools](https://wiki.akraino.org/display/AK/ICN+R6+Test+Document#ICNR6TestDocument-BluValTesting)
 
 ## Contact Us
 

@@ -88,11 +88,21 @@ Join worker node by running the `kubeadm join` on each node as root as mentioned
 
 Kubespray support the Nodus as the network plugin- please follow the steps in [kubernetes-sigs/kubespray/docs/ovn4nfv.md](https://github.com/kubernetes-sigs/kubespray/blob/master/docs/ovn4nfv.md)
 
+### Nodus K8s security requirements
+#### ETCD
+Apply the secure practice to protect Nodus ovn-controller-network configmap with K8s API Server with the secure connection to protect the k8s etcd- [link](https://www.aquasec.com/cloud-native-academy/kubernetes-in-production/kubernetes-security-best-practices-10-steps-to-securing-k8s/)
+####  Encryption of secret data at rest
+By default k8s secret data stored in the etcd is stored without encryption. The user must use the KMS encryption provider for strong encryption - [link](https://kubernetes.io/docs/tasks/administer-cluster/encrypt-data/). The sser should not use any other provider mechanisms
+#### File in Monitoring for Nodus logs
+Add `/var/log/openvswitch/ovn4k8s.log` in the audit.rules to monitor the log files and ensure the logs are not tampered - [link](https://docs.rapid7.com/insightidr/fim-for-linux/)
+
 ## Comprehensive Documentation
 
 - [How to use](doc/how-to-use.md)
 - [Configuration](doc/configuration.md)
 - [Development](doc/development.md)
+- [Validation & testcase](https://wiki.akraino.org/display/AK/ICN+R6+Test+Document#ICNR6TestDocument-NodusValidationandtestcaseresults)
+- [Recommended Operating system security tools](https://wiki.akraino.org/display/AK/ICN+R6+Test+Document#ICNR6TestDocument-BluValTesting)
 
 ## Contact Us
 

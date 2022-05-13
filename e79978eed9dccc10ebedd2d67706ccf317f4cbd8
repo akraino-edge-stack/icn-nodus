@@ -34,6 +34,29 @@
       "revId": "e79978eed9dccc10ebedd2d67706ccf317f4cbd8",
       "serverId": "4cada01b-0314-4fe0-84a1-f9ddc89863f9",
       "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "3b059bdd_e2273569",
+        "filename": "build/Dockerfile.ubuntu",
+        "patchSetId": 6
+      },
+      "lineNbr": 42,
+      "author": {
+        "id": 239
+      },
+      "writtenOn": "2022-05-13T00:15:46Z",
+      "side": 1,
+      "message": "This should be a separate Docker file, create the image and host it in the https://hub.docker.com/u/integratedcloudnative dockerhub.\nI will Krzysztof to help in this process\n\nWe change to change the #19 to \"FROM integratedcloudnative/ubuntu-base:20.04\" instead of \"FROM ubuntu:20.04\"\n\nFor now change the curl version as Patryk suggested, let solve all the connectivity issue and come back to this problem.",
+      "range": {
+        "startLine": 30,
+        "startChar": 0,
+        "endLine": 42,
+        "endChar": 45
+      },
+      "revId": "e79978eed9dccc10ebedd2d67706ccf317f4cbd8",
+      "serverId": "4cada01b-0314-4fe0-84a1-f9ddc89863f9",
+      "unresolved": true
     }
   ]
 }

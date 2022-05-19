@@ -37,6 +37,24 @@
     },
     {
       "key": {
+        "uuid": "6e2d533f_07e2386b",
+        "filename": "build/Dockerfile.ubuntu",
+        "patchSetId": 6
+      },
+      "lineNbr": 34,
+      "author": {
+        "id": 239
+      },
+      "writtenOn": "2022-05-19T16:38:00Z",
+      "side": 1,
+      "message": "Ack",
+      "parentUuid": "8b80bba4_7b459de3",
+      "revId": "e79978eed9dccc10ebedd2d67706ccf317f4cbd8",
+      "serverId": "4cada01b-0314-4fe0-84a1-f9ddc89863f9",
+      "unresolved": false
+    },
+    {
+      "key": {
         "uuid": "3b059bdd_e2273569",
         "filename": "build/Dockerfile.ubuntu",
         "patchSetId": 6
@@ -57,6 +75,30 @@
       "revId": "e79978eed9dccc10ebedd2d67706ccf317f4cbd8",
       "serverId": "4cada01b-0314-4fe0-84a1-f9ddc89863f9",
       "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "5c6d09ba_a744df7f",
+        "filename": "build/Dockerfile.ubuntu",
+        "patchSetId": 6
+      },
+      "lineNbr": 42,
+      "author": {
+        "id": 239
+      },
+      "writtenOn": "2022-05-19T16:38:00Z",
+      "side": 1,
+      "message": "Ack",
+      "parentUuid": "3b059bdd_e2273569",
+      "range": {
+        "startLine": 30,
+        "startChar": 0,
+        "endLine": 42,
+        "endChar": 45
+      },
+      "revId": "e79978eed9dccc10ebedd2d67706ccf317f4cbd8",
+      "serverId": "4cada01b-0314-4fe0-84a1-f9ddc89863f9",
+      "unresolved": false
     }
   ]
 }

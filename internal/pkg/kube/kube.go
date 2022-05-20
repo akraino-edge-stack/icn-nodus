@@ -44,6 +44,7 @@ type Interface interface {
 	GetNode(name string) (*kapi.Node, error)
 	GetService(namespace, name string) (*kapi.Service, error)
 	GetEndpoints(namespace string) (*kapi.EndpointsList, error)
+	GetEndpoint(namespace, endpoint string) (*kapi.Endpoints, error)
 	GetNamespace(name string) (*kapi.Namespace, error)
 	GetNamespaces() (*kapi.NamespaceList, error)
 	GetNetworkPolicies(namespace string) (*kapisnetworking.NetworkPolicyList, error)
@@ -92,6 +93,17 @@ func GetKubeConfig() (*kubernetes.Clientset, error) {
 	}
 
 	return k, nil
+}
+
+// GetKubeClient can be used to obtain a pointer to k8s client
+func GetKubeClient() (*Kube, error) {
+	clientset, err := GetKubeConfig()
+	if err != nil {
+		return nil, err
+	}
+
+	kubecli := &Kube{KClient: clientset}
+	return kubecli, nil
 }
 
 // GetKubeConfigfromFile return kubernetes Clientset
@@ -294,6 +306,12 @@ func (k *Kube) GetNode(name string) (*kapi.Node, error) {
 // GetService returns the Service resource from kubernetes apiserver, given its name and namespace
 func (k *Kube) GetService(namespace, name string) (*kapi.Service, error) {
 	return k.KClient.CoreV1().Services(namespace).Get(context.TODO(), name, metav1.GetOptions{})
+}
+
+// GetEndpoint returns an Endpoint resource from kubernetes
+// apiserver, given namespace and endpoint name
+func (k *Kube) GetEndpoint(namespace, endpoint string) (*kapi.Endpoints, error) {
+	return k.KClient.CoreV1().Endpoints(namespace).Get(context.TODO(), endpoint, metav1.GetOptions{})
 }
 
 // GetEndpoints returns all the Endpoint resources from kubernetes

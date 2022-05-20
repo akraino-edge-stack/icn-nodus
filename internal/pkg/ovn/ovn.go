@@ -89,12 +89,12 @@ type NetInterface struct {
 var ovnCtl *Controller
 
 // NewOvnController creates a new OVN controller for creating logical networks
-func NewOvnController(exec kexec.Interface) (*Controller, error) {
+func NewOvnController(exec kexec.Interface, isOpenshift bool) (*Controller, error) {
 
 	if exec == nil {
 		exec = kexec.New()
 	}
-	if err := SetExec(exec); err != nil {
+	if err := SetExec(exec, isOpenshift); err != nil {
 		log.Error(err, "Failed to initialize exec helper")
 		return nil, err
 	}

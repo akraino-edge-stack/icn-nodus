@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/akraino-edge-stack/icn-nodus/internal/pkg/auth"
+	"github.com/akraino-edge-stack/icn-nodus/internal/pkg/kube"
 	kexec "k8s.io/utils/exec"
 )
 
@@ -60,7 +61,7 @@ var SetupOvnUtils = func() error {
 
 // SetExec validates executable paths and saves the given exec interface
 // to be used for running various OVS and OVN utilites
-func SetExec(exec kexec.Interface) error {
+func SetExec(exec kexec.Interface, isOpenshift bool) error {
 	var err error
 
 	runner = &execHelper{exec: exec}
@@ -76,9 +77,18 @@ func SetExec(exec kexec.Interface) error {
 	if err != nil {
 		return err
 	}
-	runner.hostIP = getHostIP()
-	// OVN Host Port
-	runner.hostPort = "6641"
+
+	if !isOpenshift {
+		runner.hostIP = getHostIP()
+		// OVN Host Port
+		runner.hostPort = os.Getenv("OVN_NB_TCP_SERVICE_PORT")
+	} else {
+		runner.hostIP, err = getOpenshiftOVNHostIP()
+		if err != nil {
+			return err
+		}
+		runner.hostPort = "9641"
+	}
 	log.Info("Host Port", "IP", runner.hostIP, "Port", runner.hostPort)
 
 	return nil
@@ -91,6 +101,28 @@ func getHostIP() string {
 		hostIP = "[" + hostIP + "]"
 	}
 	return hostIP
+}
+
+func getOpenshiftOVNHostIP() (string, error) {
+	kubecli, err := kube.GetKubeClient()
+	if err != nil {
+		return "", err
+	}
+
+	ep, err := kubecli.GetEndpoint(auth.OpenshiftNamespace, auth.OpenshiftOVNSvc)
+	if err != nil {
+		return "", err
+	}
+
+	if len(ep.Subsets) < 1 {
+		return "", fmt.Errorf("No endpoints found for %s service", auth.OpenshiftOVNSvc)
+	}
+
+	if len(ep.Subsets[0].Addresses) < 1 {
+		return "", fmt.Errorf("No ready endpoints found for %s service", auth.OpenshiftOVNSvc)
+	}
+
+	return ep.Subsets[0].Addresses[0].IP, nil
 }
 
 // Run the ovn-ctl command and retry if "Connection refused"

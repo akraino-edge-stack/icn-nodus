@@ -72,10 +72,14 @@ data:
 
 [Kustomize](https://kustomize.io/) and deploy [cert-manager](https://cert-manager.io/):
 ```
-$ curl -Ls https://github.com/cert-manager/cert-manager/releases/download/v1.8.0/cert-manager.yaml -o deploy/cert-manager/cert-manager.yaml && kubectl apply -k deploy/cert-manager/
+    $ curl -Ls https://github.com/cert-manager/cert-manager/releases/download/v1.8.0/cert-manager.yaml -o deploy/cert-manager/cert-manager.yaml && kubectl apply -k deploy/cert-manager/
 ```
 
 Deploy the Nodus Pod network to the cluster.
+```
+    [Kustomize](https://kustomize.io/) and deploy [cert-manager](https://cert-manager.io/):
+```
+$ curl -Ls https://github.com/cert-manager/cert-manager/releases/download/v1.8.0/cert-manager.yaml -o deploy/cert-manager/cert-manager.yaml && kubectl apply -k deploy/cert-manager/
 ```
     $ kubectl apply -f deploy/ovn-daemonset.yaml
     $ kubectl apply -f deploy/ovn4nfv-k8s-plugin-sfc-setup-II.yaml

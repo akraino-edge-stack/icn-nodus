@@ -7,21 +7,24 @@ import (
 	"runtime"
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
+	"k8s.io/client-go/kubernetes"
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
-	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
-	notif "github.com/akraino-edge-stack/icn-nodus/internal/pkg/nfnNotify"
-	"github.com/akraino-edge-stack/icn-nodus/internal/pkg/ovn"
 	"github.com/akraino-edge-stack/icn-nodus/pkg/apis"
 	"github.com/akraino-edge-stack/icn-nodus/pkg/controller"
+	"github.com/akraino-edge-stack/icn-nodus/internal/pkg/auth"
+	"github.com/akraino-edge-stack/icn-nodus/internal/pkg/kube"
+	notif "github.com/akraino-edge-stack/icn-nodus/internal/pkg/nfnNotify"
+	"github.com/akraino-edge-stack/icn-nodus/internal/pkg/ovn"
+	"github.com/akraino-edge-stack/icn-nodus/internal/pkg/openshift"
 
 	"github.com/spf13/pflag"
+	
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
-
-	logf "sigs.k8s.io/controller-runtime/pkg/log"
-
 	"sigs.k8s.io/controller-runtime/pkg/manager/signals"
+	logf "sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 )
 
 var log = logf.Log.WithName("nfn-operator")
@@ -51,20 +54,48 @@ func main() {
 
 	printVersion()
 
-	// Create an OVN Controller
-	_, err := ovn.NewOvnController(nil)
-	if err != nil {
-		log.Error(err, "")
-		os.Exit(1)
-	}
-	//Initialize all the controllers that are supported here
-
 	// Get a config to talk to the apiserver
 	cfg, err := config.GetConfig()
 	if err != nil {
 		log.Error(err, "")
 		os.Exit(1)
 	}
+
+	kubeClientset, err := kubernetes.NewForConfig(cfg)
+	if err != nil {
+		log.Error(err, "Error building Kuberenetes clientset")
+	}
+
+	var clustercli kube.Interface
+	isOpenshift := false
+
+	// Checks if eiteher k8s or OpenShift cluster is in use and creates proper client for it
+	if kube.CheckIfKubernetesCluster(kubeClientset) {
+		clustercli, err = kube.GetKubeClient()
+		if err != nil {
+			log.Error(err, "error getting kube client")
+		}
+	} else {
+		isOpenshift = true
+		clustercli, err = openshift.GetOpenShiftClient()
+		if err != nil {
+			log.Error(err, "error getting kube client: %v")
+		}
+	}
+
+	namespace := os.Getenv(auth.NamespaceEnv)
+	if err := auth.PrepareOVNSecrets(namespace, clustercli); err != nil {
+		log.Error(err, "")
+		os.Exit(1)
+	}
+
+	// Create an OVN Controller
+	_, err = ovn.NewOvnController(nil, isOpenshift)
+	if err != nil {
+		log.Error(err, "")
+		os.Exit(1)
+	}
+	//Initialize all the controllers that are supported here
 
 	// Start GRPC Notification Server
 	go notif.SetupNotifServer(cfg)

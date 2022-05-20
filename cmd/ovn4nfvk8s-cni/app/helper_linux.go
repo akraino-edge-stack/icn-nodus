@@ -214,7 +214,7 @@ func setExtraRoutes(hostNet, serviceSubnet, podSubnet, gatewayIP string) error {
 	return nil
 }
 
-func setupInterface(netns ns.NetNS, containerID, ifName, macAddress string, ipAddress, gatewayIP []string, defaultGateway string, idx, mtu int, isDefaultGW bool) (*current.Interface, *current.Interface, error) {
+func setupInterface(netns ns.NetNS, containerID, ifName, macAddress string, ipAddress, gatewayIP []string, defaultGateway string, idx, mtu int, isDefaultGW bool, clusterclient kube.Interface) (*current.Interface, *current.Interface, error) {
 	hostIface := &current.Interface{}
 	contIface := &current.Interface{}
 	var hostNet string
@@ -228,15 +228,9 @@ func setupInterface(netns ns.NetNS, containerID, ifName, macAddress string, ipAd
 		return nil, nil, fmt.Errorf("failed to get host network: %v", err)
 	}
 
-	k, err := kube.GetKubeConfig()
+	kn, err := clusterclient.GetControlPlaneServiceIPRange()
 	if err != nil {
-		return nil, nil, fmt.Errorf("Error in kubeclientset:%v", err)
-	}
-
-	kubecli := &kube.Kube{KClient: k}
-	kn, err := kubecli.GetControlPlaneServiceIPRange()
-	if err != nil {
-		return nil, nil, fmt.Errorf("Error in getting svc cidr range")
+		return nil, nil, fmt.Errorf("Error in getting svc cidr range: %v", err)
 	}
 	serviceSubnet = kn.ServiceSubnet
 	podSubnet = kn.PodSubnet
@@ -398,7 +392,7 @@ var ConfigureDeleteInterface = func(containerNetns, ifName string) error {
 }
 
 // ConfigureInterface sets up the container interface
-var ConfigureInterface = func(containerNetns, containerID, ifName, namespace, podName, macAddress string, ipAddress, gatewayIP []string, interfaceName, defaultGateway string, idx, mtu int, isDefaultGW bool) ([]*current.Interface, error) {
+var ConfigureInterface = func(containerNetns, containerID, ifName, namespace, podName, macAddress string, ipAddress, gatewayIP []string, interfaceName, defaultGateway string, idx, mtu int, isDefaultGW bool, clusterclient kube.Interface) ([]*current.Interface, error) {
 	netns, err := ns.GetNS(containerNetns)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open netns %q: %v", containerNetns, err)
@@ -412,7 +406,7 @@ var ConfigureInterface = func(containerNetns, containerID, ifName, namespace, po
 		ifaceID = fmt.Sprintf("%s_%s", namespace, podName)
 		interfaceName = ifName
 	}
-	hostIface, contIface, err := setupInterface(netns, containerID, interfaceName, macAddress, ipAddress, gatewayIP, defaultGateway, idx, mtu, isDefaultGW)
+	hostIface, contIface, err := setupInterface(netns, containerID, interfaceName, macAddress, ipAddress, gatewayIP, defaultGateway, idx, mtu, isDefaultGW, clusterclient)
 	if err != nil {
 		return nil, err
 	}

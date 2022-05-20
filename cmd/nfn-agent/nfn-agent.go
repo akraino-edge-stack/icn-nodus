@@ -28,10 +28,11 @@ import (
 
 	"github.com/akraino-edge-stack/icn-nodus/internal/pkg/auth"
 	cs "github.com/akraino-edge-stack/icn-nodus/internal/pkg/cniserver"
+	"github.com/akraino-edge-stack/icn-nodus/internal/pkg/kube"
 	pb "github.com/akraino-edge-stack/icn-nodus/internal/pkg/nfnNotify/proto"
 	"github.com/akraino-edge-stack/icn-nodus/internal/pkg/ovn"
 	chaining "github.com/akraino-edge-stack/icn-nodus/internal/pkg/utils"
-
+	
 	"google.golang.org/grpc"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
@@ -401,20 +402,25 @@ func main() {
 
 	serverAddr := serverIP + ":" + os.Getenv("NFN_OPERATOR_SERVICE_PORT")
 
+	namespace := os.Getenv(auth.NamespaceEnv)
+	isOpenshift, err := auth.PrepareOVNSecrets(namespace)
+	if err != nil {
+		log.Error(err, "")
+		os.Exit(1)
+	}
+
 	// Setup ovn utilities
 	exec := kexec.New()
-	err := ovn.SetExec(exec)
+	err = ovn.SetExec(exec, isOpenshift)
 	if err != nil {
-		fmt.Println(err.Error())
 		log.Error(err, "Unable to setup OVN Utils")
 		return
 	}
 
-	namespace := os.Getenv(auth.NamespaceEnv)
 	nfnSvcIP := os.Getenv(auth.NfnOperatorHostEnv)
 
 	// obtain certifcates
-	kubecli, err := auth.GetKubeClient()
+	kubecli, err := kube.GetKubeClient()
 	crt, err := auth.GetCert(namespace, auth.DefaultCert)
 	if err != nil {
 		log.Error(err, "Error while obtaining certificate")

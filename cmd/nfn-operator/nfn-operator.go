@@ -10,6 +10,7 @@ import (
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
+	"github.com/akraino-edge-stack/icn-nodus/internal/pkg/auth"
 	notif "github.com/akraino-edge-stack/icn-nodus/internal/pkg/nfnNotify"
 	"github.com/akraino-edge-stack/icn-nodus/internal/pkg/ovn"
 	"github.com/akraino-edge-stack/icn-nodus/pkg/apis"
@@ -51,8 +52,15 @@ func main() {
 
 	printVersion()
 
+	namespace := os.Getenv(auth.NamespaceEnv)
+	isOpenshift, err := auth.PrepareOVNSecrets(namespace)
+	if err != nil {
+		log.Error(err, "")
+		os.Exit(1)
+	}
+
 	// Create an OVN Controller
-	_, err := ovn.NewOvnController(nil)
+	_, err = ovn.NewOvnController(nil, isOpenshift)
 	if err != nil {
 		log.Error(err, "")
 		os.Exit(1)

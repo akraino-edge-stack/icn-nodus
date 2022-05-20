@@ -581,6 +581,12 @@ rules:
     verbs:
      - get
      - update
+  - apiGroups:
+      - config.openshift.io
+    resources:
+      - networks
+    verbs:
+      - get
 
 ---
 kind: ClusterRoleBinding
@@ -676,15 +682,6 @@ spec:
                   fieldPath: metadata.namespace
             - name: OPERATOR_NAME
               value: "nfn-operator"
-          volumeMounts:
-            - mountPath: /opt/ovn-certs
-              name: cert
-              readOnly: true
-      volumes:
-        - name: cert
-          secret:
-            defaultMode: 420
-            secretName: nodus-ovn-cert
 ---
 kind: ConfigMap
 apiVersion: v1
@@ -747,10 +744,10 @@ spec:
           resources:
             requests:
               cpu: 100m
-              memory: 50Mi
+              memory: 128Mi
             limits:
               cpu: 100m
-              memory: 50Mi
+              memory: 128Mi
           securityContext:
             capabilities:
               add:
@@ -774,10 +771,10 @@ spec:
       volumes:
         - name: cni
           hostPath:
-            path: /etc/cni/net.d
+            path: /etc/kubernetes/cni/net.d/
         - name: cnibin
           hostPath:
-            path: /opt/cni/bin
+            path: /var/lib/cni/bin
         - name: cniconf
           hostPath:
             path: /etc/openvswitch
@@ -864,9 +861,6 @@ spec:
               name: host-sys
             - mountPath: /var/run/ovn4nfv-k8s-plugin
               name: host-var-cniserver-socket-dir
-            - mountPath: /opt/ovn-certs
-              name: cert
-              readOnly: true
       volumes:
         - name: host-run-ovs
           hostPath:
@@ -889,7 +883,3 @@ spec:
         - name: host-sys
           hostPath:
             path: /sys
-        - name: cert
-          secret:
-            defaultMode: 420
-            secretName: nodus-ovn-cert

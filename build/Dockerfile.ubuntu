@@ -29,9 +29,9 @@ WORKDIR /
 COPY --from=builder /workspace/build/bin/* usr/local/bin/
 RUN apt-get update && apt-get upgrade -y && \
     apt-get install -y -qq \
-      apt-transport-https=2.0.8 \
+      apt-transport-https=2.0.2ubuntu0.2 \
       make=4.2.1-1.2 \
-      curl=7.68.0-1ubuntu2.11 \
+      curl=7.68.0-1ubuntu2.12 \
       net-tools=1.60+git20180626.aebd88e-1ubuntu1 \
       iproute2=5.5.0-1ubuntu1 \
       iptables=1.8.4-3ubuntu2 \

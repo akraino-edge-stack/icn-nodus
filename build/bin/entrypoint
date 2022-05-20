@@ -68,9 +68,14 @@ set_snat_default_inteface() {
         iptables -t nat -A POSTROUTING -o $default_interface -j MASQUERADE
     fi
 
-    # Checking the SNAT for default interfaces - IPv6
-    if ! ip6tables -t nat -C POSTROUTING -o $default_interface -j MASQUERADE 2>/dev/null ; then
-        ip6tables -t nat -A POSTROUTING -o $default_interface -j MASQUERADE 2>/dev/null
+    # Cheking if ip6_tables module is loaded
+    if lsmod | grep ip6_tables; then
+        # Checking the SNAT for default interfaces - IPv6
+        if ! ip6tables -t nat -C POSTROUTING -o $default_interface -j MASQUERADE 2>/dev/null; then
+            ip6tables -t nat -A POSTROUTING -o $default_interface -j MASQUERADE
+        fi
+    else
+        echo "Info: Module ip6_tables is not loaded. To enable IPv6 support please load this module."
     fi
 }
 

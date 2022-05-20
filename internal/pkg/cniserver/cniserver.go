@@ -15,6 +15,7 @@ import (
 
 	"github.com/akraino-edge-stack/icn-nodus/internal/pkg/auth"
 	"github.com/akraino-edge-stack/icn-nodus/internal/pkg/config"
+	"github.com/akraino-edge-stack/icn-nodus/internal/pkg/kube"
 
 	"github.com/gorilla/mux"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -42,7 +43,7 @@ type CNIServerRequest struct {
 	CNIConf      *config.NetConf
 }
 
-type cniServerRequestFunc func(request *CNIServerRequest, k8sclient kubernetes.Interface) ([]byte, error)
+type cniServerRequestFunc func(request *CNIServerRequest, k8sclient kubernetes.Interface, clusterclient kube.Interface) ([]byte, error)
 
 type CNIEndpointRequest struct {
 	ArgEnv    map[string]string `json:"env,omitempty"`
@@ -50,12 +51,13 @@ type CNIEndpointRequest struct {
 }
 type CNIServer struct {
 	http.Server
-	requestFunc  cniServerRequestFunc
-	serverrundir string
-	k8sclient    kubernetes.Interface
+	requestFunc   cniServerRequestFunc
+	serverrundir  string
+	k8sclient     kubernetes.Interface
+	clusterclient kube.Interface
 }
 
-func NewCNIServer(serverRunDir string, k8sclient kubernetes.Interface) *CNIServer {
+func NewCNIServer(serverRunDir string, k8sclient kubernetes.Interface, clusterclient kube.Interface) *CNIServer {
 	klog.Infof("Setting up CNI server in nfn-agent")
 	if len(serverRunDir) == 0 {
 		serverRunDir = CNIServerRunDir
@@ -63,14 +65,8 @@ func NewCNIServer(serverRunDir string, k8sclient kubernetes.Interface) *CNIServe
 
 	namespace := os.Getenv(auth.NamespaceEnv)
 
-	kubecli, err := auth.GetKubeClient()
-	if err != nil {
-		klog.Errorf("Error getting kube client: %v", err)
-		return nil
-	}
-
 	// wait for secret to be created
-	sec, err := auth.WaitForSecret(kubecli, namespace, auth.DefaultCniCert)
+	sec, err := auth.WaitForSecret(namespace, auth.DefaultCniCert, clusterclient)
 	if sec == nil || err != nil {
 		klog.Errorf("Unable to obtain the secret: %v", err)
 		return nil
@@ -89,8 +85,9 @@ func NewCNIServer(serverRunDir string, k8sclient kubernetes.Interface) *CNIServe
 			Handler: router,
 			TLSConfig: auth.CreateTLSConfig(cert, pool, true),
 		},
-		serverrundir: serverRunDir,
-		k8sclient:    k8sclient,
+		serverrundir:  serverRunDir,
+		k8sclient:     k8sclient,
+		clusterclient: clusterclient,
 	}
 	router.NotFoundHandler = http.HandlerFunc(http.NotFound)
 	router.HandleFunc("/", cs.handleCNIShimRequest).Methods("POST")
@@ -178,7 +175,7 @@ func (cs *CNIServer) handleCNIShimRequest(w http.ResponseWriter, r *http.Request
 	}
 
 	klog.Infof("Waiting for %s result for CNI server pod %s/%s", req.Command, req.PodNamespace, req.PodName)
-	result, err := cs.requestFunc(req, cs.k8sclient)
+	result, err := cs.requestFunc(req, cs.k8sclient, cs.clusterclient)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("%v", err), http.StatusBadRequest)
 	} else {
@@ -189,14 +186,14 @@ func (cs *CNIServer) handleCNIShimRequest(w http.ResponseWriter, r *http.Request
 	}
 }
 
-func HandleCNIcommandRequest(request *CNIServerRequest, k8sclient kubernetes.Interface) ([]byte, error) {
+func HandleCNIcommandRequest(request *CNIServerRequest, k8sclient kubernetes.Interface, clusterclient kube.Interface) ([]byte, error) {
 	var result []byte
 	var err error
 	klog.Infof("[PodNamespace:%s/PodName:%s] dispatching pod network request %v", request.PodNamespace, request.PodName, request)
 	klog.Infof("k8sclient  %s", fmt.Sprintf("%v", k8sclient))
 	switch request.Command {
 	case CNIAdd:
-		result, err = request.cmdAdd(k8sclient)
+		result, err = request.cmdAdd(k8sclient, clusterclient)
 	case CNIDel:
 		result, err = request.cmdDel()
 	default:
@@ -256,4 +253,9 @@ func (cs *CNIServer) Start(requestFunc cniServerRequestFunc) error {
 		}
 	}, 0)
 	return nil
+}
+
+// GetClusterClient returns cluster client associated with CNIServer
+func (cs *CNIServer) GetClusterClient() kube.Interface {
+	return cs.clusterclient
 }

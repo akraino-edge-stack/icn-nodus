@@ -89,12 +89,12 @@ type NetInterface struct {
 var ovnCtl *Controller
 
 // NewOvnController creates a new OVN controller for creating logical networks
-func NewOvnController(exec kexec.Interface) (*Controller, error) {
+func NewOvnController(exec kexec.Interface, isOpenshift bool) (*Controller, error) {
 
 	if exec == nil {
 		exec = kexec.New()
 	}
-	if err := SetExec(exec); err != nil {
+	if err := SetExec(exec, isOpenshift); err != nil {
 		log.Error(err, "Failed to initialize exec helper")
 		return nil, err
 	}
@@ -188,9 +188,11 @@ func (oc *Controller) AddLogicalPorts(pod *kapi.Pod, ovnNetObjs []map[string]int
 		}
 		var portName string
 		if ns.Interface != "" {
-			portName = fmt.Sprintf("%s_%s_%s", pod.Namespace, pod.Name, ns.Interface)
+			//portName = fmt.Sprintf("%s_%s_%s", pod.Namespace, pod.Name, ns.Interface)
+			portName = PreparePortName(pod.Namespace, pod.Name, ns.Interface)
 		} else {
-			portName = fmt.Sprintf("%s_%s", pod.Namespace, pod.Name)
+			// portName = fmt.Sprintf("%s_%s", pod.Namespace, pod.Name)
+			portName = PreparePortName(pod.Namespace, pod.Name)
 			ns.Interface = "*"
 		}
 		outStr = oc.addLogicalPortWithSwitch(pod, ns.Name, ns.IPAddress, ns.MacAddress, ns.GWIPaddress, portName)
@@ -207,7 +209,7 @@ func (oc *Controller) AddLogicalPorts(pod *kapi.Pod, ovnNetObjs []map[string]int
 	var last int
 	if defaultInterface == false && !IsExtraInterfaces {
 		// Add Default interface
-		portName := fmt.Sprintf("%s_%s", pod.Namespace, pod.Name)
+		portName := PreparePortName(pod.Namespace, pod.Name)
 		outStr = oc.addLogicalPortWithSwitch(pod, Ovn4nfvDefaultNw, "", "", "", portName)
 		if outStr == "" {
 			return
@@ -230,7 +232,7 @@ func (oc *Controller) AddLogicalPorts(pod *kapi.Pod, ovnNetObjs []map[string]int
 func (oc *Controller) DeleteLogicalPorts(name, namespace string) {
 
 	log.Info("DeleteLogicalPorts")
-	logicalPort := fmt.Sprintf("%s_%s", namespace, name)
+	logicalPort := PreparePortName(namespace, name)
 
 	// get the list of logical ports from OVN
 	stdout, stderr, err := RunOVNNbctl("--data=bare", "--no-heading",

@@ -15,6 +15,7 @@ import (
 
 	"github.com/akraino-edge-stack/icn-nodus/internal/pkg/auth"
 	"github.com/akraino-edge-stack/icn-nodus/internal/pkg/config"
+	"github.com/akraino-edge-stack/icn-nodus/internal/pkg/kube"
 
 	"github.com/gorilla/mux"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -63,7 +64,7 @@ func NewCNIServer(serverRunDir string, k8sclient kubernetes.Interface) *CNIServe
 
 	namespace := os.Getenv(auth.NamespaceEnv)
 
-	kubecli, err := auth.GetKubeClient()
+	kubecli, err := kube.GetKubeClient()
 	if err != nil {
 		klog.Errorf("Error getting kube client: %v", err)
 		return nil

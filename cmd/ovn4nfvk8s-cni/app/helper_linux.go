@@ -236,7 +236,7 @@ func setupInterface(netns ns.NetNS, containerID, ifName, macAddress string, ipAd
 	kubecli := &kube.Kube{KClient: k}
 	kn, err := kubecli.GetControlPlaneServiceIPRange()
 	if err != nil {
-		return nil, nil, fmt.Errorf("Error in getting svc cidr range")
+		return nil, nil, fmt.Errorf("Error in getting svc cidr range: %v", err)
 	}
 	serviceSubnet = kn.ServiceSubnet
 	podSubnet = kn.PodSubnet

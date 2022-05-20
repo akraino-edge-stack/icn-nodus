@@ -198,7 +198,7 @@ func listPods(mgr *manager.Manager, policy *networkingv1.NetworkPolicy, namespac
 }
 
 func getPortName(pod *corev1.Pod) string {
-	return pod.Namespace + "_" + pod.Name
+	return ovn.PreparePortName(pod.Namespace,pod.Name)
 }
 
 func getPorts(podList *corev1.PodList) []string {

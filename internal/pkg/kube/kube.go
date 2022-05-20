@@ -6,12 +6,13 @@ import (
 	"fmt"
 	"strings"
 
+	// "github.com/docker/docker/api/types/network"
 	"github.com/sirupsen/logrus"
 
 	k8sv1alpha1 "github.com/akraino-edge-stack/icn-nodus/pkg/generated/clientset/versioned/typed/k8s/v1alpha1"
 
-	cm "github.com/cert-manager/cert-manager/pkg/client/clientset/versioned/typed/certmanager/v1"
 	cmv1 "github.com/cert-manager/cert-manager/pkg/apis/certmanager/v1"
+	cm "github.com/cert-manager/cert-manager/pkg/client/clientset/versioned/typed/certmanager/v1"
 
 	kapi "k8s.io/api/core/v1"
 	kapisnetworking "k8s.io/api/networking/v1"
@@ -21,14 +22,27 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/util/retry"
-	kubeadmtypes "sigs.k8s.io/cluster-api/bootstrap/kubeadm/types/v1beta1"
+	kubeadmtypes "sigs.k8s.io/cluster-api/bootstrap/kubeadm/types/upstreamv1beta1"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
 	"sigs.k8s.io/yaml"
+
+	// netopclient "github.com/openshift/cluster-network-operator/pkg/client"
+	// "github.com/openshift/cluster-network-operator/pkg/controller/operconfig"
+
+	crclient "sigs.k8s.io/controller-runtime/pkg/client"
+	operv1 "github.com/openshift/api/operator/v1"
 )
 
-const kubeconfigmap = "kubeadm-config"
-const kubesystemNamespace = "kube-system"
-const nodusKubeConfigFile = "/etc/cni/net.d/ovn4nfv-k8s.d/ovn4nfv-k8s.kubeconfig"
+const (
+	kubeconfigmap = "kubeadm-config"
+	kubesystemNamespace = "kube-system"
+	nodusKubeConfigFile = "/etc/cni/net.d/ovn4nfv-k8s.d/ovn4nfv-k8s.kubeconfig"
+
+	openshiftConfigName = "cluster"
+	openshiftConfigNamespace = "openshift-network-operator"
+	openshiftKubeConfigFile = "/etc/kubernetes/cni/net.d/ovn4nfv-k8s.d/ovn4nfv-k8s.kubeconfig"
+)
+
 
 // Interface represents the exported methods for dealing with getting/setting
 // kubernetes resources
@@ -44,6 +58,7 @@ type Interface interface {
 	GetNode(name string) (*kapi.Node, error)
 	GetService(namespace, name string) (*kapi.Service, error)
 	GetEndpoints(namespace string) (*kapi.EndpointsList, error)
+	GetEndpoint(namespace, endpoint string) (*kapi.Endpoints, error)
 	GetNamespace(name string) (*kapi.Namespace, error)
 	GetNamespaces() (*kapi.NamespaceList, error)
 	GetNetworkPolicies(namespace string) (*kapisnetworking.NetworkPolicyList, error)
@@ -94,14 +109,31 @@ func GetKubeConfig() (*kubernetes.Clientset, error) {
 	return k, nil
 }
 
+// GetKubeClient can be used to obtain a pointer to k8s client
+func GetKubeClient() (*Kube, error) {
+	clientset, err := GetKubeConfig()
+	if err != nil {
+		return nil, err
+	}
+
+	kubecli := &Kube{KClient: clientset}
+	return kubecli, nil
+}
+
 // GetKubeConfigfromFile return kubernetes Clientset
 func GetKubeConfigfromFile() (*kubernetes.Clientset, error) {
 	var k *kubernetes.Clientset
 
 	cfg, err := clientcmd.BuildConfigFromFlags("", nodusKubeConfigFile)
 	if err != nil {
-		logrus.Errorf("Error in getting the context for the kubeconfig - %v : %v", nodusKubeConfigFile, err)
-		return nil, err
+		logrus.Infof("Error in getting the context for the kubeconfig - %v : %v", nodusKubeConfigFile, err)
+		logrus.Info("Will try openshift configuration now")
+		cfg, err = clientcmd.BuildConfigFromFlags("", openshiftKubeConfigFile)
+		if err != nil {
+			logrus.Errorf("Error in getting the context for the kubeconfig - %v : %v", openshiftKubeConfigFile, err)
+			return nil, err
+		}
+		
 	}
 
 	k, err = kubernetes.NewForConfig(cfg)
@@ -220,38 +252,65 @@ func (k *Kube) SetAnnotationOnNamespace(ns *kapi.Namespace, key,
 
 // GetControlPlaneServiceIPRange return the service IP
 func (k *Kube) GetControlPlaneServiceIPRange() (kubeadmtypes.Networking, error) {
+	isKubernetes := true
+	var operConfig *operv1.Network
 
 	configmap, err := k.KClient.CoreV1().ConfigMaps(kubesystemNamespace).Get(context.TODO(), kubeconfigmap, metav1.GetOptions{})
 	if err != nil {
-		return kubeadmtypes.Networking{}, fmt.Errorf("Error in gettin the config %s on the namespace %s - %v", kubeconfigmap, kubesystemNamespace, err)
-	}
-	var clusterconf kubeadmtypes.ClusterConfiguration
+		logrus.Infof("Error in getting the config %s on the namespace %s - %v", kubeconfigmap, kubesystemNamespace, err)
+		logrus.Info("This might be an OpenShift cluster. Will try to get OpenShift's conifguration now.")
+		isKubernetes = false
+		config, err := config.GetConfig()
+		if err != nil {
+			return kubeadmtypes.Networking{},  fmt.Errorf("Error in getting kubernetes config: %v", err)
+		}
 
-	//fmt.Printf("Value of the config Data - %v\n", configmap.Data)
-	//fmt.Printf("Value of the config Data[ClusterConfiguration] as string - %v\n", configmap.Data["ClusterConfiguration"])
+		crcli, err := crclient.New(config, crclient.Options{})
+		if err != nil {
+			return kubeadmtypes.Networking{},  fmt.Errorf("Error while creating controller-runtime client: %v", err)
+		}
 
-	j1, err := yaml.YAMLToJSON([]byte(configmap.Data["ClusterConfiguration"]))
-	if err != nil {
-		return kubeadmtypes.Networking{}, fmt.Errorf("YAMLToJSON err: %v", err)
-	}
-
-	//fmt.Printf("Value of j1 =%s\n", string(j1))
-
-	err = json.Unmarshal(j1, &clusterconf)
-	if err != nil {
-		return kubeadmtypes.Networking{}, fmt.Errorf("Error in un marshalling the config %s on the namespace %s - %v", kubeconfigmap, kubesystemNamespace, err)
-	}
-
-	if clusterconf.Networking == (kubeadmtypes.Networking{}) {
-		return kubeadmtypes.Networking{}, fmt.Errorf(" %s in the namespace %s - kubeadm network value is empty", kubeconfigmap, kubesystemNamespace)
+		operConfig = &operv1.Network{TypeMeta: metav1.TypeMeta{APIVersion: operv1.GroupVersion.String(), Kind: "Network"}}
+		if err = crcli.Get(context.TODO(), types.NamespacedName{Namespace: openshiftConfigNamespace, Name: openshiftConfigName}, operConfig); err != nil {
+			return kubeadmtypes.Networking{},  fmt.Errorf("Error while getting OpenShift cluster configuration: %v", err)
+		}
 	}
 
-	//fmt.Printf("Value of the clusterconf Networking ServiceSubnet=%+v\n", clusterconf)
-	//svcCidr = controlplaneNetwork.ServiceSubnet
-	//podCidr = controlplaneNetwork.PodSubnet
+	if isKubernetes {
+		var clusterconf kubeadmtypes.ClusterConfiguration
 
-	return clusterconf.Networking, nil
+		//fmt.Printf("Value of the config Data - %v\n", configmap.Data)
+		//fmt.Printf("Value of the config Data[ClusterConfiguration] as string - %v\n", configmap.Data["ClusterConfiguration"])
 
+		j1, err := yaml.YAMLToJSON([]byte(configmap.Data["ClusterConfiguration"]))
+		if err != nil {
+			return kubeadmtypes.Networking{}, fmt.Errorf("YAMLToJSON err: %v", err)
+		}
+
+		//fmt.Printf("Value of j1 =%s\n", string(j1))
+
+		err = json.Unmarshal(j1, &clusterconf)
+		if err != nil {
+			return kubeadmtypes.Networking{}, fmt.Errorf("Error in un marshalling the config %s on the namespace %s - %v", kubeconfigmap, kubesystemNamespace, err)
+		}
+
+		if clusterconf.Networking == (kubeadmtypes.Networking{}) {
+			return kubeadmtypes.Networking{}, fmt.Errorf(" %s in the namespace %s - kubeadm network value is empty", kubeconfigmap, kubesystemNamespace)
+		}
+
+		//fmt.Printf("Value of the clusterconf Networking ServiceSubnet=%+v\n", clusterconf)
+		//svcCidr = controlplaneNetwork.ServiceSubnet
+		//podCidr = controlplaneNetwork.PodSubnet
+
+		return clusterconf.Networking, nil
+
+	}
+
+	// return if OpenShift is being used
+	return kubeadmtypes.Networking{
+		PodSubnet: operConfig.Spec.ClusterNetwork[0].CIDR,
+		ServiceSubnet: operConfig.Spec.ServiceNetwork[0],
+	}, nil
 }
 
 // GetAnnotationsOnPod obtains the pod annotations from kubernetes apiserver, given the name and namespace
@@ -294,6 +353,12 @@ func (k *Kube) GetNode(name string) (*kapi.Node, error) {
 // GetService returns the Service resource from kubernetes apiserver, given its name and namespace
 func (k *Kube) GetService(namespace, name string) (*kapi.Service, error) {
 	return k.KClient.CoreV1().Services(namespace).Get(context.TODO(), name, metav1.GetOptions{})
+}
+
+// GetEndpoint returns an Endpoint resource from kubernetes
+// apiserver, given namespace and endpoint name
+func (k *Kube) GetEndpoint(namespace, endpoint string) (*kapi.Endpoints, error) {
+	return k.KClient.CoreV1().Endpoints(namespace).Get(context.TODO(), endpoint, metav1.GetOptions{})
 }
 
 // GetEndpoints returns all the Endpoint resources from kubernetes

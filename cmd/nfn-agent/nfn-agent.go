@@ -28,6 +28,7 @@ import (
 
 	"github.com/akraino-edge-stack/icn-nodus/internal/pkg/auth"
 	cs "github.com/akraino-edge-stack/icn-nodus/internal/pkg/cniserver"
+	"github.com/akraino-edge-stack/icn-nodus/internal/pkg/kube"
 	pb "github.com/akraino-edge-stack/icn-nodus/internal/pkg/nfnNotify/proto"
 	"github.com/akraino-edge-stack/icn-nodus/internal/pkg/ovn"
 	chaining "github.com/akraino-edge-stack/icn-nodus/internal/pkg/utils"
@@ -238,10 +239,12 @@ func createNodeOVSInternalPort(payload *pb.Notification_InSync) error {
 }
 
 func handleNotif(msg *pb.Notification) {
+	log.Info("Notif received: ", msg)
 	switch msg.GetCniType() {
 	case "ovn4nfv":
 		switch payload := msg.Payload.(type) {
 		case *pb.Notification_ProviderNwCreate:
+			log.Info("Notification_ProviderNwCreate")
 			if !inSync {
 				// Store Msgs
 				pnCreateStore = append(pnCreateStore, payload)
@@ -261,6 +264,7 @@ func handleNotif(msg *pb.Notification) {
 				}
 			}
 		case *pb.Notification_ProviderNwRemove:
+			log.Info("Notification_ProviderNwRemove")
 			if !inSync {
 				// Unexpected Remove message
 				return
@@ -275,6 +279,7 @@ func handleNotif(msg *pb.Notification) {
 			}
 
 		case *pb.Notification_ContainterRtInsert:
+			log.Info("Notification_ContainterRtInsert")
 			id := payload.ContainterRtInsert.GetContainerId()
 			pid, err := chaining.GetPidForContainer(id)
 			if err != nil {
@@ -287,6 +292,7 @@ func handleNotif(msg *pb.Notification) {
 			}
 
 		case *pb.Notification_PodAddNetwork:
+			log.Info("Notification_PodAddNetwork")
 			id := payload.PodAddNetwork.GetContainerId()
 			pid, err := chaining.GetPidForContainer(id)
 			if err != nil {
@@ -309,6 +315,7 @@ func handleNotif(msg *pb.Notification) {
 			}
 
 		case *pb.Notification_ContainterRtRemove:
+			log.Info("Notification_ContainterRtRemove")
 			id := payload.ContainterRtRemove.GetContainerId()
 			pid, err := chaining.GetPidForContainer(id)
 			if err != nil {
@@ -321,6 +328,7 @@ func handleNotif(msg *pb.Notification) {
 			}
 
 		case *pb.Notification_PodDelNetwork:
+			log.Info("Notification_PodDelNetwork")
 			id := payload.PodDelNetwork.GetContainerId()
 			pid, err := chaining.GetPidForContainer(id)
 			if err != nil {
@@ -342,6 +350,7 @@ func handleNotif(msg *pb.Notification) {
 			}
 
 		case *pb.Notification_InSync:
+			log.Info("Notification_InSync")
 			inSyncVlanProvidernetwork()
 			inSyncDirectProvidernetwork()
 			pnCreateStore = nil
@@ -401,20 +410,25 @@ func main() {
 
 	serverAddr := serverIP + ":" + os.Getenv("NFN_OPERATOR_SERVICE_PORT")
 
+	namespace := os.Getenv(auth.NamespaceEnv)
+	isOpenshift, err := auth.PrepareOVNSecrets(namespace)
+	if err != nil {
+		log.Error(err, "")
+		os.Exit(1)
+	}
+
 	// Setup ovn utilities
 	exec := kexec.New()
-	err := ovn.SetExec(exec)
+	err = ovn.SetExec(exec, isOpenshift)
 	if err != nil {
-		fmt.Println(err.Error())
 		log.Error(err, "Unable to setup OVN Utils")
 		return
 	}
 
-	namespace := os.Getenv(auth.NamespaceEnv)
 	nfnSvcIP := os.Getenv(auth.NfnOperatorHostEnv)
 
 	// obtain certifcates
-	kubecli, err := auth.GetKubeClient()
+	kubecli, err := kube.GetKubeClient()
 	crt, err := auth.GetCert(namespace, auth.DefaultCert)
 	if err != nil {
 		log.Error(err, "Error while obtaining certificate")

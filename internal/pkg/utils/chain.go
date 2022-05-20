@@ -288,11 +288,17 @@ func configurePodSelectorDeployment(ln k8sv1alpha1.RoutingNetwork, sfcEntryPodLa
 			}
 
 			log.Info("Status of the network attached", "pod", pod, "networkname", networkname, "IsNetworkattached", IsNetworkattached)
+
+			containerID, err := removeIDPrefix(pod.Status.ContainerStatuses[0].ContainerID)
+			if err != nil {
+				log.Error(err, "Error while selecting container's ID", err)
+			}
+
 			if IsNetworkattached {
 				// Get the containerID of the first container
 				var r RoutingInfo
 				log.Info("Value of the pod container status", "pod container ID", pod.Status.ContainerStatuses[0].ContainerID, "pod container ready state", pod.Status.ContainerStatuses[0].Ready)
-				r.Id = strings.TrimPrefix(pod.Status.ContainerStatuses[0].ContainerID, "docker://")
+				r.Id = containerID
 				r.Namespace = pod.GetNamespace()
 				r.Name = pod.GetName()
 				r.Node = pod.Spec.NodeName
@@ -301,7 +307,7 @@ func configurePodSelectorDeployment(ln k8sv1alpha1.RoutingNetwork, sfcEntryPodLa
 			} else {
 				var p PodNetworkInfo
 				log.Info("Value of the pod container status", "pod container ID", pod.Status.ContainerStatuses[0].ContainerID, "pod container ready state", pod.Status.ContainerStatuses[0].Ready)
-				p.Id = strings.TrimPrefix(pod.Status.ContainerStatuses[0].ContainerID, "docker://")
+				p.Id = containerID
 				p.Namespace = pod.GetNamespace()
 				p.Name = pod.GetName()
 				p.Node = pod.Spec.NodeName
@@ -350,8 +356,14 @@ func calculateDeploymentRoutes(namespace, label string, pos int, num int, ln []k
 		log.Error(err, "Deloyment with label not found", "label", label)
 		return RoutingInfo{}, fmt.Errorf("Pod not found")
 	}
+	
 	// Get the containerID of the first container
-	r.Id = strings.TrimPrefix(pods.Items[0].Status.ContainerStatuses[0].ContainerID, "docker://")
+	containerID, err := removeIDPrefix(pods.Items[0].Status.ContainerStatuses[0].ContainerID)
+	if err != nil {
+		log.Error(err, "Error while selecting container's ID", err)
+	}
+
+	r.Id = containerID
 	r.Name = pods.Items[0].GetName()
 	r.Node = pods.Items[0].Spec.NodeName
 
@@ -1197,7 +1209,7 @@ func CalculateRoutes(cr *k8sv1alpha1.NetworkChaining, cs bool, onlyPodSelector b
 }
 
 //ContainerAddInteface return
-func ContainerAddInteface(containerPid int, payload *pb.PodAddNetwork) error {
+func ContainerAddInteface(containerPid int, payload *pb.PodAddNetwork, clusterclient kube.Interface) error {
 	klog.Infof("Value of ContainerAddInteface containerPid - %v", containerPid)
 	klog.Infof("Value of ContainerAddInteface payload.GetNet() - %v", payload.GetNet())
 	klog.Infof("Value of ContainerAddInteface payload.GetPod() - %v", payload.GetPod())
@@ -1228,7 +1240,7 @@ func ContainerAddInteface(containerPid int, payload *pb.PodAddNetwork) error {
 		CNIConf:      nil,
 	}
 
-	result := cnishimreq.AddMultipleInterfaces("", podnetconf.Data, podinfo.Namespace, podinfo.Name)
+	result := cnishimreq.AddMultipleInterfaces("", podnetconf.Data, podinfo.Namespace, podinfo.Name, clusterclient)
 	if result == nil {
 		return fmt.Errorf("result is nil from cni server for adding interface in the existing pod")
 	}
@@ -1275,7 +1287,7 @@ func ContainerDelInteface(containerPid int, payload *pb.PodDelNetwork) error {
 }
 
 // ContainerDelRoute return containerPid and route
-func ContainerDelRoute(containerPid int, route []*pb.RouteData) error {
+func ContainerDelRoute(containerPid int, route []*pb.RouteData, clusterclient kube.Interface) error {
 	str := fmt.Sprintf("/proc/%d/ns/net", containerPid)
 
 	hostNet, err := network.GetHostNetwork()
@@ -1284,14 +1296,7 @@ func ContainerDelRoute(containerPid int, route []*pb.RouteData) error {
 		return err
 	}
 
-	k, err := kube.GetKubeConfig()
-	if err != nil {
-		log.Error(err, "Error in kube clientset")
-		return err
-	}
-
-	kubecli := &kube.Kube{KClient: k}
-	kn, err := kubecli.GetControlPlaneServiceIPRange()
+	kn, err := clusterclient.GetControlPlaneServiceIPRange()
 	if err != nil {
 		log.Error(err, "Error in getting svc cidr range")
 		return err
@@ -1363,7 +1368,7 @@ func ContainerDelRoute(containerPid int, route []*pb.RouteData) error {
 }
 
 // ContainerAddRoute return containerPid and route
-func ContainerAddRoute(containerPid int, route []*pb.RouteData) error {
+func ContainerAddRoute(containerPid int, route []*pb.RouteData, clusterclient kube.Interface) error {
 	str := fmt.Sprintf("/proc/%d/ns/net", containerPid)
 
 	hostNet, err := network.GetHostNetwork()
@@ -1372,14 +1377,7 @@ func ContainerAddRoute(containerPid int, route []*pb.RouteData) error {
 		return err
 	}
 
-	k, err := kube.GetKubeConfig()
-	if err != nil {
-		log.Error(err, "Error in kube clientset")
-		return err
-	}
-
-	kubecli := &kube.Kube{KClient: k}
-	kn, err := kubecli.GetControlPlaneServiceIPRange()
+	kn, err := clusterclient.GetControlPlaneServiceIPRange()
 	if err != nil {
 		log.Error(err, "Error in getting svc cidr range")
 		return err
@@ -1634,4 +1632,12 @@ func AddPodNetworkAnnotations(pod corev1.Pod, networkname string, toDelete bool)
 		return "", err
 	}
 	return networkInfo, nil
+}
+
+func removeIDPrefix(id string) (string, error) {
+	index := strings.LastIndex(id, "/")
+	if index < 0 {
+		return id, fmt.Errorf("Unable to find prefix in the ID: %s", id)
+	}
+	return id[index+1:], nil
 }

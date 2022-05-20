@@ -138,7 +138,7 @@ func isNotFoundError(err error) bool {
 	return ok && statusErr.Status().Code == http.StatusNotFound
 }
 
-func (cr *CNIServerRequest) AddMultipleInterfaces(nfnAnnotation, ovnAnnotation, namespace, podName string) types.Result {
+func (cr *CNIServerRequest) AddMultipleInterfaces(nfnAnnotation, ovnAnnotation, namespace, podName string, clusterclient kube.Interface) types.Result {
 	klog.Infof("ovn4nfvk8s-cni: addMultipleInterfaces ovn annotation %v namespace %v podName %v", ovnAnnotation, namespace, podName)
 	var nfnNetworks *nfnNetwork
 	var networkname string
@@ -232,7 +232,7 @@ func (cr *CNIServerRequest) AddMultipleInterfaces(nfnAnnotation, ovnAnnotation, 
 		}
 
 		klog.Infof("addMultipleInterfaces: ipAddress-%v ovn4nfv-interface-%v cni-ifname-%v", ipAddress, interfaceName, cr.IfName)
-		interfacesArray, err = app.ConfigureInterface(cr.Netns, cr.SandboxID, cr.IfName, namespace, podName, macAddress, ipAddress, gatewayIP, interfaceName, defaultGateway, index, config.Default.MTU, isDefaultGW)
+		interfacesArray, err = app.ConfigureInterface(cr.Netns, cr.SandboxID, cr.IfName, namespace, podName, macAddress, ipAddress, gatewayIP, interfaceName, defaultGateway, index, config.Default.MTU, isDefaultGW, clusterclient)
 		if err != nil {
 			klog.Errorf("Failed to configure interface in pod: %v", err)
 			return nil
@@ -348,7 +348,7 @@ func (cr *CNIServerRequest) addRoutes(ovnAnnotation string, dstResult types.Resu
 	return dstResult
 }
 
-func (cr *CNIServerRequest) cmdAdd(kclient kubernetes.Interface) ([]byte, error) {
+func (cr *CNIServerRequest) cmdAdd(kclient kubernetes.Interface, clusterclient kube.Interface) ([]byte, error) {
 	klog.Infof("ovn4nfvk8s-cni: cmdAdd")
 	namespace := cr.PodNamespace
 	podname := cr.PodName
@@ -356,13 +356,12 @@ func (cr *CNIServerRequest) cmdAdd(kclient kubernetes.Interface) ([]byte, error)
 		return nil, fmt.Errorf("required CNI variable missing")
 	}
 	klog.Infof("ovn4nfvk8s-cni: cmdAdd for pod podname:%s and namespace:%s", podname, namespace)
-	kubecli := &kube.Kube{KClient: kclient}
 	// Get the IP address and MAC address from the API server.
 	var annotationBackoff = wait.Backoff{Duration: 1 * time.Second, Steps: 14, Factor: 1.5, Jitter: 0.1}
 	var annotation map[string]string
 	var err error
 	if err = wait.ExponentialBackoff(annotationBackoff, func() (bool, error) {
-		annotation, err = kubecli.GetAnnotationsOnPod(namespace, podname)
+		annotation, err = clusterclient.GetAnnotationsOnPod(namespace, podname)
 		if err != nil {
 			if isNotFoundError(err) {
 				return false, fmt.Errorf("Error - pod not found - %v", err)
@@ -397,7 +396,7 @@ func (cr *CNIServerRequest) cmdAdd(kclient kubernetes.Interface) ([]byte, error)
 		klog.Infof("ovn4nfvk8s-cni: cmdAdd Annotation Found is %v", ovnAnnotation)
 	}
 
-	result := cr.AddMultipleInterfaces(nfnAnnotation, ovnAnnotation, namespace, podname)
+	result := cr.AddMultipleInterfaces(nfnAnnotation, ovnAnnotation, namespace, podname, clusterclient)
 	//Add Routes to the pod if annotation found for routes
 	ovnRouteAnnotation, ok := annotation["ovnNetworkRoutes"]
 	if ok {

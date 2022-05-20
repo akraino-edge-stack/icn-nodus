@@ -61,6 +61,11 @@ This is enabled by macro `allow_ip_forwarding` to `true` in the calico cni confi
 There will be multiple conf files, we have to make sure Multus file is in the Lexicographic order.
 Kubernetes kubelet is designed to pick the config file in the lexicograpchic order.
 
+[Kustomize](https://kustomize.io/) and deploy [cert-manager](https://cert-manager.io/):
+```
+    $ curl -Ls https://github.com/cert-manager/cert-manager/releases/download/v1.8.0/cert-manager.yaml -o deploy/cert-manager/cert-manager.yaml && kubectl apply -k deploy/cert-manager/
+```
+
 In this example, we are using pod CIDR as `10.210.0.0/16`. The Calico will automatically detect the CIDR based on the running configuration.
 Since calico network going to the primary network in our case, nodus subnet should be a different network. Make sure you change the `OVN_SUBNET` and `OVN_GATEWAYIP` in `deploy/ovn4nfv-k8s-plugin.yaml`
 In this example, we customize the ovn network as follows.
@@ -71,6 +76,7 @@ data:
 ```
 Deploy the Nodus Pod network to the cluster.
 ```
+    $ kubectl apply -f deploy/certificate-issuers.yaml
     $ kubectl apply -f deploy/ovn-daemonset.yaml
     $ kubectl apply -f deploy/ovn4nfv-k8s-plugin.yaml
 ```

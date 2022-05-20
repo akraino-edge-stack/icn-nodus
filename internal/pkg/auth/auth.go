@@ -4,6 +4,8 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
+	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -24,8 +26,10 @@ const (
 	DefaultCert        = "nodus-cert"
 	// DefaultCniCert is a name of the certificate and the secret used by cniserver and cnishim
 	DefaultCniCert     = "nodus-cni-cert"
+	// DefaultOVNCert is a name of the certificate and the secret used by OVN
+	DefaultOVNCert     = "nodus-ovn-cert"
 	// DefaultOvnCertDir is a directory where OVN certificates are stored
-	DefaultOvnCertDir = "/opt/ovn-certs"
+	DefaultOvnCertDir  = "/opt/ovn-certs"
 	// NamespaceEnv is a name of env variable that holds namespace Nodus is deployed in
 	NamespaceEnv       = "POD_NAMESPACE"
 	// NfnOperatorHostEnv is a name of env variable that holds nfn-operator's service IP address
@@ -40,6 +44,15 @@ const (
 	KeyFile  = "tls.key"
 
 	ipAddrSecretAnnotationKey = "cert-manager.io/ip-sans"
+
+	// OpenshiftNamespace is a namespace where OVN secret is available when deployed on Openshift
+	OpenshiftNamespace = "openshift-ovn-kubernetes"
+	// OpenshiftCAName is a name of OVN CA cert secret in Openshift deployment
+	OpenshiftCAName = "ovn-ca"
+	// OpenshiftCertName is a name of OVN cert secret in Openshift deployment
+	OpenshiftCertName = "ovn-cert"
+	// OpenshiftOVNSvc is a name of OVN service in Openshift deployment
+	OpenshiftOVNSvc = "ovnkube-db"
 )
 
 // LoadCertsFromSecret creates TLS certificate using provided secret
@@ -59,7 +72,7 @@ func LoadCertsFromSecret(secret *kapi.Secret) (*tls.Certificate, *x509.CertPool,
 	return &peerCert, caCertPool, nil
 }
 
-// CreateClientTLSFromSecret creates TLS credentials for the GRPC server
+// CreateServerTLSFromSecret creates TLS credentials for the GRPC server
 func CreateServerTLSFromSecret(secret *kapi.Secret) (*credentials.TransportCredentials, error) {
 	return createTLS(secret, true)
 }
@@ -79,20 +92,9 @@ func CreateClientTLSConfig(secret *kapi.Secret) (*tls.Config, error) {
 	return CreateTLSConfig(peerCert, caCertPool, false), nil
 }
 
-// GetKubeClient can be used to obtain a pointer to k8s client
-func GetKubeClient() (*kube.Kube, error) {
-	clientset, err := kube.GetKubeConfig()
-	if err != nil {
-		return nil, err
-	}
-
-	kubecli := &kube.Kube{KClient: clientset}
-	return kubecli, nil
-}
-
 // GetCert is used to get the certificate from specific namespace
-func GetCert(namespace, name string) (*cmv1.Certificate, error) {
-	client, err := getCertClient(namespace)
+func GetCert(namespace, name string, clusterclient kube.Interface) (*cmv1.Certificate, error) {
+	client, err := getCertClient(namespace, clusterclient)
 	if err != nil {
 		return nil, err
 	}
@@ -106,17 +108,17 @@ func GetCert(namespace, name string) (*cmv1.Certificate, error) {
 }
 
 // UpdateCertIP updates IP that certificate is issued for
-func UpdateCertIP(cert *cmv1.Certificate, ipAddr string) (*cmv1.Certificate, *kapi.Secret, error) {
+func UpdateCertIP(cert *cmv1.Certificate, ipAddr string, clusterclient kube.Interface) (*cmv1.Certificate, *kapi.Secret, error) {
 	cert.Spec.IPAddresses = []string{ipAddr}
-	return updateCertAndWait(cert)
+	return updateCertAndWait(cert, clusterclient)
 }
 
 // WaitForSecret waits for secret to be created
-func WaitForSecret(kubecli *kube.Kube, namespace, name string) (*kapi.Secret, error) {
+func WaitForSecret(namespace, name string, clusterclient kube.Interface) (*kapi.Secret, error) {
 	var s *kapi.Secret
 	var err error
 	for i:= 0; i < maxTries; i++ {
-		s, err = kubecli.GetSecret(namespace, name)
+		s, err = clusterclient.GetSecret(namespace, name)
 		if err != nil || s == nil {
 			if i >= maxTries - 1 {
 				return nil, err
@@ -130,11 +132,11 @@ func WaitForSecret(kubecli *kube.Kube, namespace, name string) (*kapi.Secret, er
 }
 
 // WaitForSecretIP waits for secret to have proper IP address
-func WaitForSecretIP(kubecli *kube.Kube, cert *cmv1.Certificate) (*kapi.Secret, error) {
+func WaitForSecretIP(cert *cmv1.Certificate, clusterclient kube.Interface) (*kapi.Secret, error) {
 	var s *kapi.Secret
 	var err error
 	for i:= 0; i < maxTries; i++ {
-		s, err = kubecli.GetSecret(cert.Namespace, cert.Spec.SecretName)
+		s, err = clusterclient.GetSecret(cert.Namespace, cert.Spec.SecretName)
 		if err != nil || s == nil {
 			if i >= maxTries - 1 {
 				return nil, err
@@ -169,13 +171,38 @@ func IsCertIPUpToDate(crt *cmv1.Certificate, ipAddr string) bool {
 	return false
 }
 
-func getCertClient(namespace string) (*cm.CertificateInterface, error) {
-	kubecli, err := GetKubeClient()
-	if err != nil {
-		return nil, err
+// PrepareOVNSecrets gets and saves OVN related secrets on k8s/Openshift cluster if possible
+func PrepareOVNSecrets(namespace string, clusterclient kube.Interface) error {
+	if err := os.MkdirAll(DefaultOvnCertDir, 0420); err != nil {
+		return err
 	}
 
-	client, err := kubecli.GetCertManagerClient()
+	s, err := clusterclient.GetSecret(namespace, DefaultOVNCert)
+
+	if s == nil || err != nil {
+		s, err = clusterclient.GetSecret(OpenshiftNamespace, OpenshiftCAName)
+		if err != nil {
+			return err
+		}
+
+		ss, err := clusterclient.GetSecret(OpenshiftNamespace, OpenshiftCertName)
+		if err != nil {
+			return err
+		}
+
+		if err = saveOpenshiftOVNSecret(s, ss, DefaultOvnCertDir); err != nil {
+			return err
+		}
+	} else {
+		if err = saveKubernetesOVNSecret(s, DefaultOvnCertDir); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func getCertClient(namespace string, clusterclient kube.Interface) (*cm.CertificateInterface, error) {
+	client, err := clusterclient.GetCertManagerClient()
 	if err != nil {
 		return nil, err
 	}
@@ -217,8 +244,8 @@ func CreateTLSConfig(peerCert *tls.Certificate, caCertPool *x509.CertPool, isSer
 	}
 }
 
-func applyCertAndWait(cert *cmv1.Certificate) (*cmv1.Certificate, *kapi.Secret, error) {
-	client, err := getCertClient(cert.ObjectMeta.Namespace)
+func applyCertAndWait(cert *cmv1.Certificate, clusterclient kube.Interface) (*cmv1.Certificate, *kapi.Secret, error) {
+	client, err := getCertClient(cert.ObjectMeta.Namespace, clusterclient)
 	if err != nil {
 		return  nil, nil, err
 	}
@@ -228,12 +255,7 @@ func applyCertAndWait(cert *cmv1.Certificate) (*cmv1.Certificate, *kapi.Secret, 
 		return  nil, nil, err
 	}
 
-	kubecli, err := GetKubeClient()
-	if err != nil {
-		return cc, nil, err
-	}
-
-	s, err := WaitForSecret(kubecli, cc.Namespace, cc.Spec.SecretName)
+	s, err := WaitForSecret(cc.Namespace, cc.Spec.SecretName, clusterclient)
 	if err != nil {
 		return cc, nil, err
 	}
@@ -241,8 +263,8 @@ func applyCertAndWait(cert *cmv1.Certificate) (*cmv1.Certificate, *kapi.Secret, 
 	return cc, s, nil
 }
 
-func updateCertAndWait(cert *cmv1.Certificate) (*cmv1.Certificate, *kapi.Secret, error) {
-	client, err := getCertClient(cert.ObjectMeta.Namespace)
+func updateCertAndWait(cert *cmv1.Certificate, clusterclient kube.Interface) (*cmv1.Certificate, *kapi.Secret, error) {
+	client, err := getCertClient(cert.ObjectMeta.Namespace, clusterclient)
 	if err != nil {
 		return  nil, nil, err
 	}
@@ -252,15 +274,56 @@ func updateCertAndWait(cert *cmv1.Certificate) (*cmv1.Certificate, *kapi.Secret,
 		return  nil, nil, err
 	}
 
-	kubecli, err := GetKubeClient()
-	if err != nil {
-		return cc, nil, err
-	}
-
-	s, err := WaitForSecretIP(kubecli, cc)
+	s, err := WaitForSecretIP(cc, clusterclient)
 	if err != nil {
 		return cc, nil, err
 	}
 
 	return cc, s, nil
+}
+
+// saveOpenshiftOVNSecret saves secret to files in provided path when deployed on Openshift
+func saveOpenshiftOVNSecret(caSecret, ovnSecret *kapi.Secret, path string) error {
+	ca := caSecret.Data[CertFile]
+	cert := ovnSecret.Data[CertFile]
+	key := ovnSecret.Data[KeyFile]
+
+	return saveFiles(ca, cert, key, path)
+}
+
+// saveKubernetesOVNSecret saves secret to files in provided path when deployed on Kubernetes
+func saveKubernetesOVNSecret(secret *kapi.Secret, path string) error {
+	ca := secret.Data[CAFile]
+	cert := secret.Data[CertFile]
+	key := secret.Data[KeyFile]
+
+	return saveFiles(ca, cert, key, path)
+}
+
+func saveFiles(ca, cert, key []byte, path string) error {
+	if err := saveFile(ca, path, CAFile); err != nil {
+		return err
+	}
+
+	if err := saveFile(cert, path, CertFile); err != nil {
+		return err
+	}
+
+	if err := saveFile(key, path, KeyFile); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func saveFile(data []byte, path, filename string) error {
+	f, err := os.Create(filepath.Join(path, filename))
+	defer f.Close()
+	if err != nil {
+		return err
+	}
+	if _, err = f.Write(data); err != nil {
+		return err
+	}
+	return nil
 }

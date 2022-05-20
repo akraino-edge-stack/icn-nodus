@@ -80,11 +80,12 @@ kubectl label --overwrite node $nodename ovn4nfv-k8s-plugin=ovn-control-plane
 
 [Kustomize](https://kustomize.io/) and deploy [cert-manager](https://cert-manager.io/):
 ```
-$ curl -Ls https://github.com/cert-manager/cert-manager/releases/download/v1.8.0/cert-manager.yaml -o deploy/cert-manager/cert-manager.yaml && kubectl apply -k deploy/cert-manager/
+    $ curl -Ls https://github.com/cert-manager/cert-manager/releases/download/v1.8.0/cert-manager.yaml -o deploy/cert-manager/cert-manager.yaml && kubectl apply -k deploy/cert-manager/
 ```
 
 Deploy the Nodus Pod network to the cluster.
 ```
+    $ kubectl apply -f deploy/certificate-issuers.yaml
     $ kubectl apply -f deploy/ovn-daemonset.yaml
     $ kubectl apply -f deploy/ovn4nfv-k8s-plugin.yaml
 ```
@@ -95,6 +96,28 @@ Join worker node by running the `kubeadm join` on each node as root as mentioned
 ### kubespray
 
 Kubespray support the Nodus as the network plugin- please follow the steps in [kubernetes-sigs/kubespray/docs/ovn4nfv.md](https://github.com/kubernetes-sigs/kubespray/blob/master/docs/ovn4nfv.md)
+
+### OpenShift
+
+Nodus can be configured as secondary CNI using [Multus CNI](https://github.com/k8snetworkplumbingwg/multus-cni) in OpenShift deployment with [ovn-kubernetes](https://github.com/ovn-org/ovn-kubernetes) as primary CNI . To deploy Nodus in this particular setup you will need to adhere to the following procedure.
+
+Ensure the master node taint for no schedule is removed and labelled with `ovn4nfv-k8s-plugin=ovn-control-plane`
+```
+nodename=$(kubectl get node -o jsonpath='{.items[0].metadata.name}')
+kubectl taint node $nodename node-role.kubernetes.io/master:NoSchedule-
+kubectl label --overwrite node $nodename ovn4nfv-k8s-plugin=ovn-control-plane
+```
+
+[Kustomize](https://kustomize.io/) and deploy [cert-manager](https://cert-manager.io/):
+```
+    $ curl -Ls https://github.com/cert-manager/cert-manager/releases/download/v1.8.0/cert-manager.yaml -o deploy/cert-manager/cert-manager.yaml && kubectl apply -k deploy/cert-manager/
+```
+
+Deploy the Nodus Pod network to the cluster.
+```
+    $ kubectl apply -f deploy/certificate-issuers.yaml
+    $ kubectl apply -f deploy/ovn4nfv-k8s-plugin.yaml
+```
 
 ### Nodus K8s security requirements
 #### ETCD

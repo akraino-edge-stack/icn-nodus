@@ -26,17 +26,26 @@ import (
 	"syscall"
 	"time"
 
+	// confv1 "github.com/openshift/api/config"
+	// operv1 "github.com/openshift/api/operator/v1"
+	// metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	// "k8s.io/apimachinery/pkg/runtime"
+	// "k8s.io/apimachinery/pkg/runtime/schema"
+
 	"github.com/akraino-edge-stack/icn-nodus/internal/pkg/auth"
 	cs "github.com/akraino-edge-stack/icn-nodus/internal/pkg/cniserver"
+	"github.com/akraino-edge-stack/icn-nodus/internal/pkg/kube"
+	"github.com/akraino-edge-stack/icn-nodus/internal/pkg/openshift"
 	pb "github.com/akraino-edge-stack/icn-nodus/internal/pkg/nfnNotify/proto"
 	"github.com/akraino-edge-stack/icn-nodus/internal/pkg/ovn"
 	chaining "github.com/akraino-edge-stack/icn-nodus/internal/pkg/utils"
 
 	"google.golang.org/grpc"
+	kapi "k8s.io/api/core/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
+	kubescheme "k8s.io/client-go/kubernetes/scheme"
 	kexec "k8s.io/utils/exec"
-	kapi "k8s.io/api/core/v1"
 
 	log "k8s.io/klog"
 
@@ -50,7 +59,7 @@ var inSync bool
 var pnCreateStore []*pb.Notification_ProviderNwCreate
 
 // subscribe Notifications
-func subscribeNotif(client pb.NfnNotifyClient) error {
+func subscribeNotif(client pb.NfnNotifyClient, clusterclient kube.Interface) error {
 	log.Info("Subscribe Notification from server")
 	ctx := context.Background()
 	var n pb.SubscribeContext
@@ -76,7 +85,7 @@ func subscribeNotif(client pb.NfnNotifyClient) error {
 				return err
 			}
 
-			handleNotif(in)
+			handleNotif(in, clusterclient)
 		}
 	}
 }
@@ -237,11 +246,13 @@ func createNodeOVSInternalPort(payload *pb.Notification_InSync) error {
 	return nil
 }
 
-func handleNotif(msg *pb.Notification) {
+func handleNotif(msg *pb.Notification, clusterclient kube.Interface) {
+	log.Info("Notif received: ", msg)
 	switch msg.GetCniType() {
 	case "ovn4nfv":
 		switch payload := msg.Payload.(type) {
 		case *pb.Notification_ProviderNwCreate:
+			log.Info("Notification_ProviderNwCreate")
 			if !inSync {
 				// Store Msgs
 				pnCreateStore = append(pnCreateStore, payload)
@@ -261,6 +272,7 @@ func handleNotif(msg *pb.Notification) {
 				}
 			}
 		case *pb.Notification_ProviderNwRemove:
+			log.Info("Notification_ProviderNwRemove")
 			if !inSync {
 				// Unexpected Remove message
 				return
@@ -275,18 +287,20 @@ func handleNotif(msg *pb.Notification) {
 			}
 
 		case *pb.Notification_ContainterRtInsert:
+			log.Info("Notification_ContainterRtInsert")
 			id := payload.ContainterRtInsert.GetContainerId()
 			pid, err := chaining.GetPidForContainer(id)
 			if err != nil {
 				log.Error(err, "Failed to get pid", "containerID", id)
 				return
 			}
-			err = chaining.ContainerAddRoute(pid, payload.ContainterRtInsert.GetRoute())
+			err = chaining.ContainerAddRoute(pid, payload.ContainterRtInsert.GetRoute(), clusterclient)
 			if err != nil {
 				return
 			}
 
 		case *pb.Notification_PodAddNetwork:
+			log.Info("Notification_PodAddNetwork")
 			id := payload.PodAddNetwork.GetContainerId()
 			pid, err := chaining.GetPidForContainer(id)
 			if err != nil {
@@ -294,7 +308,7 @@ func handleNotif(msg *pb.Notification) {
 				return
 			}
 
-			err = chaining.ContainerAddInteface(pid, payload.PodAddNetwork)
+			err = chaining.ContainerAddInteface(pid, payload.PodAddNetwork, clusterclient)
 			if err != nil {
 				log.Errorf("Failed to add interface for containerID-%v & podaddnetwork-%v | err-%v", id, payload.PodAddNetwork, err)
 				return
@@ -302,25 +316,27 @@ func handleNotif(msg *pb.Notification) {
 
 			var route []*pb.RouteData
 			route = append(route, payload.PodAddNetwork.GetRoute()...)
-			err = chaining.ContainerAddRoute(pid, route)
+			err = chaining.ContainerAddRoute(pid, route, clusterclient)
 			if err != nil {
 				log.Errorf("Failed to add route for containerID-%v & route-%v | err-%v", id, route, err)
 				return
 			}
 
 		case *pb.Notification_ContainterRtRemove:
+			log.Info("Notification_ContainterRtRemove")
 			id := payload.ContainterRtRemove.GetContainerId()
 			pid, err := chaining.GetPidForContainer(id)
 			if err != nil {
 				log.Error(err, "Failed to get pid", "containerID", id)
 				return
 			}
-			err = chaining.ContainerDelRoute(pid, payload.ContainterRtRemove.GetRoute())
+			err = chaining.ContainerDelRoute(pid, payload.ContainterRtRemove.GetRoute(), clusterclient)
 			if err != nil {
 				return
 			}
 
 		case *pb.Notification_PodDelNetwork:
+			log.Info("Notification_PodDelNetwork")
 			id := payload.PodDelNetwork.GetContainerId()
 			pid, err := chaining.GetPidForContainer(id)
 			if err != nil {
@@ -331,7 +347,7 @@ func handleNotif(msg *pb.Notification) {
 			var route []*pb.RouteData
 			route = append(route, payload.PodDelNetwork.GetRoute()...)
 			log.Info("route information from msg", "route", route)
-			err = chaining.ContainerDelRoute(pid, route)
+			err = chaining.ContainerDelRoute(pid, route, clusterclient)
 			if err != nil {
 				return
 			}
@@ -342,6 +358,7 @@ func handleNotif(msg *pb.Notification) {
 			}
 
 		case *pb.Notification_InSync:
+			log.Info("Notification_InSync")
 			inSyncVlanProvidernetwork()
 			inSyncDirectProvidernetwork()
 			pnCreateStore = nil
@@ -390,9 +407,56 @@ func shutDownAgent(reason string) {
 	panic("Shutdown failed. Panicking.")
 }
 
+// var (
+// 	schemeBuilder = runtime.NewSchemeBuilder(addKnownTypes)
+// 	addToScheme   = schemeBuilder.AddToScheme
+// )
+
+// func addKnownTypes(scheme *runtime.Scheme) error {
+// 	schemeGroupVersion := schema.GroupVersion{Group: confv1.GroupName, Version: "v1"}
+//     scheme.AddKnownTypes(schemeGroupVersion,
+// 		&operv1.Network{},
+//     )
+
+//     metav1.AddToGroupVersion(scheme, schemeGroupVersion)
+//     return nil
+// }
+
 func main() {
 	//logf.SetLogger(zap.Logger(true))
 	log.Info("nfn-agent Started")
+
+	// creates the in-cluster config
+	config, err := rest.InClusterConfig()
+	if err != nil {
+		log.Error(err, "Unable to create in-cluster config")
+		return
+	}
+
+	// creates the clientset
+	clientset, err := kubernetes.NewForConfig(config)
+	if err != nil {
+		log.Error(err, "Unable to create clientset for in-cluster config")
+		return
+	}
+
+	var clustercli kube.Interface
+	isOpenshift := false
+
+	// Checks if eiteher k8s or OpenShift cluster is in use and creates proper client for it
+	if kube.CheckIfKubernetesCluster(clientset) {
+		clustercli, err = kube.GetKubeClient()
+		if err != nil {
+			log.Errorf("Error getting kube client: %v", err)
+		}
+	} else {
+		isOpenshift = true
+		clustercli, err = openshift.GetOpenShiftClient()
+		if err != nil {
+			log.Errorf("Error getting kube client: %v", err)
+		}
+		openshift.AddToScheme(kubescheme.Scheme)
+	}
 
 	serverIP := os.Getenv("NFN_OPERATOR_SERVICE_HOST")
 	if strings.Contains(serverIP, ":") {
@@ -401,21 +465,26 @@ func main() {
 
 	serverAddr := serverIP + ":" + os.Getenv("NFN_OPERATOR_SERVICE_PORT")
 
+	namespace := os.Getenv(auth.NamespaceEnv)
+
+	if err := auth.PrepareOVNSecrets(namespace, clustercli); err != nil {
+		log.Error(err, "")
+		os.Exit(1)
+	}
+
 	// Setup ovn utilities
 	exec := kexec.New()
-	err := ovn.SetExec(exec)
+	err = ovn.SetExec(exec, isOpenshift)
 	if err != nil {
-		fmt.Println(err.Error())
 		log.Error(err, "Unable to setup OVN Utils")
 		return
 	}
 
-	namespace := os.Getenv(auth.NamespaceEnv)
 	nfnSvcIP := os.Getenv(auth.NfnOperatorHostEnv)
 
 	// obtain certifcates
-	kubecli, err := auth.GetKubeClient()
-	crt, err := auth.GetCert(namespace, auth.DefaultCert)
+	// kubecli, err := kube.GetKubeClient()
+	crt, err := auth.GetCert(namespace, auth.DefaultCert, clustercli)
 	if err != nil {
 		log.Error(err, "Error while obtaining certificate")
 	}
@@ -424,10 +493,10 @@ func main() {
 	var sec *kapi.Secret
 	if !auth.IsCertIPUpToDate(crt, nfnSvcIP) {
 		// update the IP address of the certificate if required
-		crt, sec, err = auth.UpdateCertIP(crt, nfnSvcIP)
+		crt, sec, err = auth.UpdateCertIP(crt, nfnSvcIP, clustercli)
 	} else {
 		// wait for secret to be updated by cert-manager
-		sec, err = auth.WaitForSecretIP(kubecli, crt)
+		sec, err = auth.WaitForSecretIP(crt, clustercli)
 	}
 	if err != nil {
 		log.Error(err, "Error while obtaining secret")
@@ -448,28 +517,14 @@ func main() {
 	client := pb.NewNfnNotifyClient(conn)
 	errorChannel = make(chan string)
 
-	// creates the in-cluster config
-	config, err := rest.InClusterConfig()
-	if err != nil {
-		log.Error(err, "Unable to create in-cluster config")
-		return
-	}
-
-	// creates the clientset
-	clientset, err := kubernetes.NewForConfig(config)
-	if err != nil {
-		log.Error(err, "Unable to create clientset for in-cluster config")
-		return
-	}
-
-	cniserver := cs.NewCNIServer("", clientset)
+	cniserver := cs.NewCNIServer("", clientset, clustercli)
 	err = cniserver.Start(cs.HandleCNIcommandRequest)
 	if err != nil {
 		log.Error(err, "Unable to start cni server")
 		return
 	}
 	// Run client in background
-	go subscribeNotif(client)
+	go subscribeNotif(client, cniserver.GetClusterClient())
 	shutdownHandler(errorChannel)
 
 }

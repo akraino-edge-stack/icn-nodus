@@ -26,6 +26,7 @@ import (
 	"github.com/akraino-edge-stack/icn-nodus/internal/pkg/auth"
 	"github.com/akraino-edge-stack/icn-nodus/internal/pkg/kube"
 	"github.com/akraino-edge-stack/icn-nodus/internal/pkg/node"
+	"github.com/akraino-edge-stack/icn-nodus/internal/pkg/openshift"
 	chaining "github.com/akraino-edge-stack/icn-nodus/internal/pkg/utils"
 	v1alpha1 "github.com/akraino-edge-stack/icn-nodus/pkg/apis/k8s/v1alpha1"
 	clientset "github.com/akraino-edge-stack/icn-nodus/pkg/generated/clientset/versioned"
@@ -574,10 +575,23 @@ func SetupNotifServer(kConfig *rest.Config) {
 	namespace := os.Getenv(auth.NamespaceEnv)
 	nfnSvcIP := os.Getenv(auth.NfnOperatorHostEnv)
 
-	kubecli := &kube.Kube{KClient: kubeClientset}
+	var clustercli kube.Interface
+	if kube.CheckIfKubernetesCluster(kubeClientset) {
+		clustercli, err = kube.GetKubeClient()
+		if err != nil {
+			log.Error(err, "error getting kube client")
+		}
+	} else {
+		clustercli, err = openshift.GetOpenShiftClient()
+		if err != nil {
+			log.Error(err, "error getting kube client: %v")
+		}
+	}
+
+	// kubecli := &kube.Kube{KClient: kubeClientset}
 
 	// get certificate
-	crt, err := auth.GetCert(namespace, auth.DefaultCert)
+	crt, err := auth.GetCert(namespace, auth.DefaultCert, clustercli)
 	if err != nil {
 		log.Error(err, "Error while obtaining the certificate")
 	}
@@ -586,13 +600,13 @@ func SetupNotifServer(kConfig *rest.Config) {
 	var sec *kapi.Secret
 	if !auth.IsCertIPUpToDate(crt, nfnSvcIP) {
 		// update certificate IP if not up-to-date
-		crt, sec, err = auth.UpdateCertIP(crt, nfnSvcIP)
+		crt, sec, err = auth.UpdateCertIP(crt, nfnSvcIP, clustercli)
 		if err != nil {
 			log.Error(err, "Error while updating the certificate")
 		}
 	} else {
 		// wait for secret to be updated
-		sec, err = auth.WaitForSecretIP(kubecli, crt)
+		sec, err = auth.WaitForSecretIP(crt, clustercli)
 	}
 	if err != nil {
 		log.Error(err, "Error while obtaining secret")

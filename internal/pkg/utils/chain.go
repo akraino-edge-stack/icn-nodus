@@ -1197,7 +1197,7 @@ func CalculateRoutes(cr *k8sv1alpha1.NetworkChaining, cs bool, onlyPodSelector b
 }
 
 //ContainerAddInteface return
-func ContainerAddInteface(containerPid int, payload *pb.PodAddNetwork) error {
+func ContainerAddInteface(containerPid int, payload *pb.PodAddNetwork, clusterclient kube.Interface) error {
 	klog.Infof("Value of ContainerAddInteface containerPid - %v", containerPid)
 	klog.Infof("Value of ContainerAddInteface payload.GetNet() - %v", payload.GetNet())
 	klog.Infof("Value of ContainerAddInteface payload.GetPod() - %v", payload.GetPod())
@@ -1223,12 +1223,12 @@ func ContainerAddInteface(containerPid int, payload *pb.PodAddNetwork) error {
 		PodNamespace: podinfo.Namespace,
 		PodName:      podinfo.Name,
 		SandboxID:    config.GeneratePodNameID(podinfo.Name),
-		Netns:        fmt.Sprintf("/proc/%d/ns/net", containerPid),
+		Netns:        fmt.Sprintf("/host/proc/%d/ns/net", containerPid),
 		IfName:       nets[len(nets)-1].Interface,
 		CNIConf:      nil,
 	}
 
-	result := cnishimreq.AddMultipleInterfaces("", podnetconf.Data, podinfo.Namespace, podinfo.Name)
+	result := cnishimreq.AddMultipleInterfaces("", podnetconf.Data, podinfo.Namespace, podinfo.Name, clusterclient)
 	if result == nil {
 		return fmt.Errorf("result is nil from cni server for adding interface in the existing pod")
 	}
@@ -1261,7 +1261,7 @@ func ContainerDelInteface(containerPid int, payload *pb.PodDelNetwork) error {
 		PodNamespace: podinfo.Namespace,
 		PodName:      podinfo.Name,
 		SandboxID:    config.GeneratePodNameID(podinfo.Name),
-		Netns:        fmt.Sprintf("/proc/%d/ns/net", containerPid),
+		Netns:        fmt.Sprintf("/host/proc/%d/ns/net", containerPid),
 		IfName:       nets[len(nets)-1].Interface,
 		CNIConf:      nil,
 	}
@@ -1275,8 +1275,8 @@ func ContainerDelInteface(containerPid int, payload *pb.PodDelNetwork) error {
 }
 
 // ContainerDelRoute return containerPid and route
-func ContainerDelRoute(containerPid int, route []*pb.RouteData) error {
-	str := fmt.Sprintf("/proc/%d/ns/net", containerPid)
+func ContainerDelRoute(containerPid int, route []*pb.RouteData, clusterclient kube.Interface) error {
+	str := fmt.Sprintf("/host/proc/%d/ns/net", containerPid)
 
 	hostNet, err := network.GetHostNetwork()
 	if err != nil {
@@ -1284,14 +1284,7 @@ func ContainerDelRoute(containerPid int, route []*pb.RouteData) error {
 		return err
 	}
 
-	k, err := kube.GetKubeConfig()
-	if err != nil {
-		log.Error(err, "Error in kube clientset")
-		return err
-	}
-
-	kubecli := &kube.Kube{KClient: k}
-	kn, err := kubecli.GetControlPlaneServiceIPRange()
+	kn, err := clusterclient.GetControlPlaneServiceIPRange()
 	if err != nil {
 		log.Error(err, "Error in getting svc cidr range")
 		return err
@@ -1363,8 +1356,8 @@ func ContainerDelRoute(containerPid int, route []*pb.RouteData) error {
 }
 
 // ContainerAddRoute return containerPid and route
-func ContainerAddRoute(containerPid int, route []*pb.RouteData) error {
-	str := fmt.Sprintf("/proc/%d/ns/net", containerPid)
+func ContainerAddRoute(containerPid int, route []*pb.RouteData, clusterclient kube.Interface) error {
+	str := fmt.Sprintf("/host/proc/%d/ns/net", containerPid)
 
 	hostNet, err := network.GetHostNetwork()
 	if err != nil {
@@ -1372,14 +1365,7 @@ func ContainerAddRoute(containerPid int, route []*pb.RouteData) error {
 		return err
 	}
 
-	k, err := kube.GetKubeConfig()
-	if err != nil {
-		log.Error(err, "Error in kube clientset")
-		return err
-	}
-
-	kubecli := &kube.Kube{KClient: k}
-	kn, err := kubecli.GetControlPlaneServiceIPRange()
+	kn, err := clusterclient.GetControlPlaneServiceIPRange()
 	if err != nil {
 		log.Error(err, "Error in getting svc cidr range")
 		return err

@@ -401,16 +401,22 @@ func main() {
 
 	serverAddr := serverIP + ":" + os.Getenv("NFN_OPERATOR_SERVICE_PORT")
 
+	namespace := os.Getenv(auth.NamespaceEnv)
+	isOpenshift, err := auth.PrepareOVNSecrets(namespace)
+	if err != nil {
+		log.Error(err, "")
+		os.Exit(1)
+	}
+
 	// Setup ovn utilities
 	exec := kexec.New()
-	err := ovn.SetExec(exec)
+	err = ovn.SetExec(exec, isOpenshift)
 	if err != nil {
 		fmt.Println(err.Error())
 		log.Error(err, "Unable to setup OVN Utils")
 		return
 	}
 
-	namespace := os.Getenv(auth.NamespaceEnv)
 	nfnSvcIP := os.Getenv(auth.NfnOperatorHostEnv)
 
 	// obtain certifcates

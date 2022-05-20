@@ -676,15 +676,6 @@ spec:
                   fieldPath: metadata.namespace
             - name: OPERATOR_NAME
               value: "nfn-operator"
-          volumeMounts:
-            - mountPath: /opt/ovn-certs
-              name: cert
-              readOnly: true
-      volumes:
-        - name: cert
-          secret:
-            defaultMode: 420
-            secretName: nodus-ovn-cert
 ---
 kind: ConfigMap
 apiVersion: v1
@@ -863,9 +854,6 @@ spec:
               name: host-sys
             - mountPath: /var/run/ovn4nfv-k8s-plugin
               name: host-var-cniserver-socket-dir
-            - mountPath: /opt/ovn-certs
-              name: cert
-              readOnly: true
       volumes:
         - name: host-run-ovs
           hostPath:
@@ -888,7 +876,3 @@ spec:
         - name: host-sys
           hostPath:
             path: /sys
-        - name: cert
-          secret:
-            defaultMode: 420
-            secretName: nodus-ovn-cert

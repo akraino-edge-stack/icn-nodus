@@ -60,7 +60,7 @@ var SetupOvnUtils = func() error {
 
 // SetExec validates executable paths and saves the given exec interface
 // to be used for running various OVS and OVN utilites
-func SetExec(exec kexec.Interface) error {
+func SetExec(exec kexec.Interface, isOpenshift bool) error {
 	var err error
 
 	runner = &execHelper{exec: exec}
@@ -76,9 +76,15 @@ func SetExec(exec kexec.Interface) error {
 	if err != nil {
 		return err
 	}
-	runner.hostIP = getHostIP()
-	// OVN Host Port
-	runner.hostPort = "6641"
+
+	if !isOpenshift {
+		runner.hostIP = getHostIP()
+		// OVN Host Port
+		runner.hostPort = os.Getenv("OVN_NB_TCP_SERVICE_PORT")
+	} else {
+		runner.hostIP = "ovnkube-db." + auth.OpenshiftNamespace + ".svc.cluster.local"
+		runner.hostPort = "9641"
+	}
 	log.Info("Host Port", "IP", runner.hostIP, "Port", runner.hostPort)
 
 	return nil

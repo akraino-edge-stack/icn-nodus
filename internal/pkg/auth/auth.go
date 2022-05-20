@@ -4,6 +4,8 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
+	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -24,8 +26,10 @@ const (
 	DefaultCert        = "nodus-cert"
 	// DefaultCniCert is a name of the certificate and the secret used by cniserver and cnishim
 	DefaultCniCert     = "nodus-cni-cert"
+	// DefaultOVNCert is a name of the certificate and the secret used by OVN
+	DefaultOVNCert     = "nodus-ovn-cert"
 	// DefaultOvnCertDir is a directory where OVN certificates are stored
-	DefaultOvnCertDir = "/opt/ovn-certs"
+	DefaultOvnCertDir  = "/opt/ovn-certs"
 	// NamespaceEnv is a name of env variable that holds namespace Nodus is deployed in
 	NamespaceEnv       = "POD_NAMESPACE"
 	// NfnOperatorHostEnv is a name of env variable that holds nfn-operator's service IP address
@@ -40,6 +44,13 @@ const (
 	KeyFile  = "tls.key"
 
 	ipAddrSecretAnnotationKey = "cert-manager.io/ip-sans"
+
+	// OpenshiftNamespace is a namespace where OVN secret is available when deployed on Openshift
+	OpenshiftNamespace = "openshift-ovn-kubernetes"
+	// OpenshiftCAName is a name of OVN CA cert secret in Openshift deployment
+	OpenshiftCAName = "ovn-ca"
+	// OpenshiftCertName is a name of OVN cert secret in Openshift deployment
+	OpenshiftCertName = "ovn-cert"
 )
 
 // LoadCertsFromSecret creates TLS certificate using provided secret
@@ -59,7 +70,7 @@ func LoadCertsFromSecret(secret *kapi.Secret) (*tls.Certificate, *x509.CertPool,
 	return &peerCert, caCertPool, nil
 }
 
-// CreateClientTLSFromSecret creates TLS credentials for the GRPC server
+// CreateServerTLSFromSecret creates TLS credentials for the GRPC server
 func CreateServerTLSFromSecret(secret *kapi.Secret) (*credentials.TransportCredentials, error) {
 	return createTLS(secret, true)
 }
@@ -169,6 +180,39 @@ func IsCertIPUpToDate(crt *cmv1.Certificate, ipAddr string) bool {
 	return false
 }
 
+// PrepareOVNSecrets gets and saves OVN related secrets on k8s/Openshift cluster if possible
+func PrepareOVNSecrets(namespace string) (bool, error) {
+	isOpenshift := false
+	c, err := GetKubeClient()
+	if err != nil { 
+		return isOpenshift, err
+	}
+	s, err := c.GetSecret(namespace, DefaultOVNCert)
+
+	if s == nil || err != nil {
+		isOpenshift = true
+
+		s, err = c.GetSecret(OpenshiftNamespace, OpenshiftCAName)
+		if err != nil {
+			return isOpenshift, err
+		}
+
+		ss, err := c.GetSecret(OpenshiftNamespace, OpenshiftCertName)
+		if err != nil {
+			return isOpenshift, err
+		}
+
+		if err = saveOpenshiftOVNSecret(s, ss, DefaultOvnCertDir); err != nil {
+			return isOpenshift, err
+		}
+	} else {
+		if err = saveKubernetesOVNSecret(s, DefaultOvnCertDir); err != nil {
+			return isOpenshift, err
+		}
+	}
+	return isOpenshift, nil
+}
+
 func getCertClient(namespace string) (*cm.CertificateInterface, error) {
 	kubecli, err := GetKubeClient()
 	if err != nil {
@@ -263,4 +307,50 @@ func updateCertAndWait(cert *cmv1.Certificate) (*cmv1.Certificate, *kapi.Secret,
 	}
 
 	return cc, s, nil
+}
+
+// saveOpenshiftOVNSecret saves secret to files in provided path when deployed on Openshift
+func saveOpenshiftOVNSecret(caSecret, ovnSecret *kapi.Secret, path string) error {
+	ca := caSecret.Data[CertFile]
+	cert := ovnSecret.Data[CertFile]
+	key := ovnSecret.Data[KeyFile]
+
+	return saveFiles(ca, cert, key, path)
+}
+
+// saveKubernetesOVNSecret saves secret to files in provided path when deployed on Kubernetes
+func saveKubernetesOVNSecret(secret *kapi.Secret, path string) error {
+	ca := secret.Data[CAFile]
+	cert := secret.Data[CertFile]
+	key := secret.Data[KeyFile]
+
+	return saveFiles(ca, cert, key, path)
+}
+
+func saveFiles(ca, cert, key []byte, path string) error {
+	if err := saveFile(ca, path, CAFile); err != nil {
+		return err
+	}
+
+	if err := saveFile(cert, path, CertFile); err != nil {
+		return err
+	}
+	
+	if err := saveFile(key, path, KeyFile); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func saveFile(data []byte, path, filename string) error {
+	f, err := os.Create(filepath.Join(path, CAFile))
+	defer f.Close()
+	if err != nil {
+		return err
+	}
+	if _, err = f.Write(data); err != nil {
+		return err
+	}
+	return nil
 }

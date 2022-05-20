@@ -11,7 +11,6 @@ import (
 	k8sv1alpha1 "github.com/akraino-edge-stack/icn-nodus/pkg/generated/clientset/versioned/typed/k8s/v1alpha1"
 
 	cm "github.com/cert-manager/cert-manager/pkg/client/clientset/versioned/typed/certmanager/v1"
-	cmv1 "github.com/cert-manager/cert-manager/pkg/apis/certmanager/v1"
 
 	kapi "k8s.io/api/core/v1"
 	kapisnetworking "k8s.io/api/networking/v1"
@@ -21,14 +20,19 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/util/retry"
-	kubeadmtypes "sigs.k8s.io/cluster-api/bootstrap/kubeadm/types/v1beta1"
+	kubeadmtypes "sigs.k8s.io/cluster-api/bootstrap/kubeadm/types/upstreamv1beta1"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
 	"sigs.k8s.io/yaml"
 )
 
-const kubeconfigmap = "kubeadm-config"
-const kubesystemNamespace = "kube-system"
-const nodusKubeConfigFile = "/etc/cni/net.d/ovn4nfv-k8s.d/ovn4nfv-k8s.kubeconfig"
+const (
+	kubeconfigmap = "kubeadm-config"
+	kubesystemNamespace = "kube-system"
+	nodusKubeConfigFile = "/etc/cni/net.d/ovn4nfv-k8s.d/ovn4nfv-k8s.kubeconfig"
+
+	openshiftKubeConfigFile = "/etc/kubernetes/cni/net.d/ovn4nfv-k8s.d/ovn4nfv-k8s.kubeconfig"
+)
+
 
 // Interface represents the exported methods for dealing with getting/setting
 // kubernetes resources
@@ -44,13 +48,14 @@ type Interface interface {
 	GetNode(name string) (*kapi.Node, error)
 	GetService(namespace, name string) (*kapi.Service, error)
 	GetEndpoints(namespace string) (*kapi.EndpointsList, error)
+	GetEndpoint(namespace, endpoint string) (*kapi.Endpoints, error)
 	GetNamespace(name string) (*kapi.Namespace, error)
 	GetNamespaces() (*kapi.NamespaceList, error)
 	GetNetworkPolicies(namespace string) (*kapisnetworking.NetworkPolicyList, error)
 	GetCertManagerClient() (*cm.CertmanagerV1Client, error)
 	GetSecret(namespace, name string) (*kapi.Secret, error)
 	GetSecrets(namespace string) (*kapi.SecretList, error)
-	GetCertificates(client *cm.CertmanagerV1Client, name string)
+	GetControlPlaneServiceIPRange() (kubeadmtypes.Networking, error)
 }
 
 // Kube is the structure object upon which the Interface is implemented
@@ -94,14 +99,30 @@ func GetKubeConfig() (*kubernetes.Clientset, error) {
 	return k, nil
 }
 
+// GetKubeClient can be used to obtain a pointer to k8s client
+func GetKubeClient() (*Kube, error) {
+	clientset, err := GetKubeConfig()
+	if err != nil {
+		return nil, err
+	}
+
+	kubecli := &Kube{KClient: clientset}
+	return kubecli, nil
+}
+
 // GetKubeConfigfromFile return kubernetes Clientset
 func GetKubeConfigfromFile() (*kubernetes.Clientset, error) {
 	var k *kubernetes.Clientset
 
 	cfg, err := clientcmd.BuildConfigFromFlags("", nodusKubeConfigFile)
 	if err != nil {
-		logrus.Errorf("Error in getting the context for the kubeconfig - %v : %v", nodusKubeConfigFile, err)
-		return nil, err
+		logrus.Infof("Error in getting the context for the kubeconfig - %v : %v", nodusKubeConfigFile, err)
+		logrus.Info("Will try openshift configuration now")
+		cfg, err = clientcmd.BuildConfigFromFlags("", openshiftKubeConfigFile)
+		if err != nil {
+			logrus.Errorf("Error in getting the context for the kubeconfig - %v : %v", openshiftKubeConfigFile, err)
+			return nil, err
+		}
 	}
 
 	k, err = kubernetes.NewForConfig(cfg)
@@ -220,11 +241,8 @@ func (k *Kube) SetAnnotationOnNamespace(ns *kapi.Namespace, key,
 
 // GetControlPlaneServiceIPRange return the service IP
 func (k *Kube) GetControlPlaneServiceIPRange() (kubeadmtypes.Networking, error) {
-
 	configmap, err := k.KClient.CoreV1().ConfigMaps(kubesystemNamespace).Get(context.TODO(), kubeconfigmap, metav1.GetOptions{})
-	if err != nil {
-		return kubeadmtypes.Networking{}, fmt.Errorf("Error in gettin the config %s on the namespace %s - %v", kubeconfigmap, kubesystemNamespace, err)
-	}
+
 	var clusterconf kubeadmtypes.ClusterConfiguration
 
 	//fmt.Printf("Value of the config Data - %v\n", configmap.Data)
@@ -251,7 +269,6 @@ func (k *Kube) GetControlPlaneServiceIPRange() (kubeadmtypes.Networking, error) 
 	//podCidr = controlplaneNetwork.PodSubnet
 
 	return clusterconf.Networking, nil
-
 }
 
 // GetAnnotationsOnPod obtains the pod annotations from kubernetes apiserver, given the name and namespace
@@ -294,6 +311,12 @@ func (k *Kube) GetNode(name string) (*kapi.Node, error) {
 // GetService returns the Service resource from kubernetes apiserver, given its name and namespace
 func (k *Kube) GetService(namespace, name string) (*kapi.Service, error) {
 	return k.KClient.CoreV1().Services(namespace).Get(context.TODO(), name, metav1.GetOptions{})
+}
+
+// GetEndpoint returns an Endpoint resource from kubernetes
+// apiserver, given namespace and endpoint name
+func (k *Kube) GetEndpoint(namespace, endpoint string) (*kapi.Endpoints, error) {
+	return k.KClient.CoreV1().Endpoints(namespace).Get(context.TODO(), endpoint, metav1.GetOptions{})
 }
 
 // GetEndpoints returns all the Endpoint resources from kubernetes
@@ -341,11 +364,10 @@ func (k *Kube) GetCertManagerClient() (*cm.CertmanagerV1Client, error) {
 	return client, nil
 }
 
-func (k *Kube) GetCertificate(client *cm.CertmanagerV1Client, namespace, name string) (*cmv1.Certificate, error) {
-	crts := client.Certificates(namespace)
-	c, err := crts.Get(context.TODO(), name, metav1.GetOptions{})
-	if err != nil {
-		return nil, err
+// CheckIfKubernetesCluster can be used if we are running on k8s cluster created with kubeadm
+func CheckIfKubernetesCluster(client kubernetes.Interface) (bool) {
+	if _, err := client.CoreV1().ConfigMaps(kubesystemNamespace).Get(context.TODO(), kubeconfigmap, metav1.GetOptions{}); err != nil {
+		return false
 	}
-	return c, nil
+	return true
 }

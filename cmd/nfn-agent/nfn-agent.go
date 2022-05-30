@@ -19,6 +19,9 @@ package main
 import (
 	"context"
 	"fmt"
+	"github.com/akraino-edge-stack/icn-nodus/internal/pkg/network"
+	"github.com/coreos/go-iptables/iptables"
+	"github.com/sirupsen/logrus"
 	"io"
 	"os"
 	"os/signal"
@@ -34,10 +37,10 @@ import (
 	chaining "github.com/akraino-edge-stack/icn-nodus/internal/pkg/utils"
 
 	"google.golang.org/grpc"
+	kapi "k8s.io/api/core/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	kexec "k8s.io/utils/exec"
-	kapi "k8s.io/api/core/v1"
 
 	log "k8s.io/klog"
 
@@ -391,9 +394,36 @@ func shutDownAgent(reason string) {
 	panic("Shutdown failed. Panicking.")
 }
 
+func configureFirewall() error {
+	logrus.Info("Configuring firewall")
+
+	ipv4Rules, ipv6Rules := network.FilterRules()
+	err := network.SetupAndEnsureIPTables(ipv4Rules, iptables.ProtocolIPv4)
+	if err != nil {
+		logrus.Errorf("failed to apply IPv4 filter rules: %v", err)
+		return fmt.Errorf("failed to apply filter rules: %v", err)
+	}
+
+	if ipv6Rules != nil {
+		err = network.SetupAndEnsureIPTables(ipv6Rules, iptables.ProtocolIPv6)
+		if err != nil {
+			logrus.Errorf("failed to apply IPv6 filter rules: %v", err)
+			return fmt.Errorf("failed to apply filter rules: %v", err)
+		}
+	}
+	return nil
+}
+
 func main() {
 	//logf.SetLogger(zap.Logger(true))
 	log.Info("nfn-agent Started")
+
+	err := configureFirewall()
+	if err != nil {
+		fmt.Println(err.Error())
+		log.Error(err, "Unable to configure firewall")
+		return
+	}
 
 	serverIP := os.Getenv("NFN_OPERATOR_SERVICE_HOST")
 	if strings.Contains(serverIP, ":") {
@@ -404,7 +434,7 @@ func main() {
 
 	// Setup ovn utilities
 	exec := kexec.New()
-	err := ovn.SetExec(exec)
+	err = ovn.SetExec(exec)
 	if err != nil {
 		fmt.Println(err.Error())
 		log.Error(err, "Unable to setup OVN Utils")

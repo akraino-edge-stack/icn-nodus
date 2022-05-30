@@ -24,7 +24,7 @@ type IPTablesRule struct {
 	rulespec []string
 }
 
-func MasqRules(ifname string) ([]IPTablesRule,[]IPTablesRule) {
+func MasqRules(ifname string) ([]IPTablesRule, []IPTablesRule) {
 
 	subnet := os.Getenv("OVN_SUBNET")
 	subnetV6 := os.Getenv("OVN_SUBNET_V6")
@@ -52,6 +52,25 @@ func MasqRules(ifname string) ([]IPTablesRule,[]IPTablesRule) {
 			// NAT if it's not multicast traffic
 			{"nat", "POSTROUTING", []string{"-s", subnet, "!", "-d", "ff00::/8", "-j", "MASQUERADE"}},
 		}
+	}
+
+	return ipv4Rules, ipv6Rules
+}
+
+func FilterRules() ([]IPTablesRule, []IPTablesRule) {
+	var ipv4Rules []IPTablesRule
+	var ipv6Rules []IPTablesRule
+
+	for _, port := range []string{"6081", "6641", "6642", "8080", "50000"} {
+		ipv4Rules = append(ipv4Rules, IPTablesRule{
+			"filter", "INPUT", []string{"-p", "tcp", "-m", "tcp", "--dport", port, "-j", "ACCEPT"}})
+		ipv4Rules = append(ipv4Rules, IPTablesRule{
+			"filter", "INPUT", []string{"-p", "udp", "-m", "udp", "--dport", port, "-j", "ACCEPT"}})
+
+		ipv6Rules = append(ipv6Rules, IPTablesRule{
+			"filter", "INPUT", []string{"-p", "tcp", "-m", "tcp", "--dport", port, "-j", "ACCEPT"}})
+		ipv6Rules = append(ipv6Rules, IPTablesRule{
+			"filter", "INPUT", []string{"-p", "udp", "-m", "udp", "--dport", port, "-j", "ACCEPT"}})
 	}
 
 	return ipv4Rules, ipv6Rules

@@ -809,6 +809,8 @@ spec:
     type: RollingUpdate
   template:
     metadata:
+      annotations:
+        container.apparmor.security.beta.kubernetes.io/nfn-agent: unconfined
       labels:
         app: nfn-agent
     spec:

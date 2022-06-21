@@ -19,6 +19,7 @@ package nfn
 import (
 	"context"
 	"fmt"
+	"github.com/akraino-edge-stack/icn-nodus/internal/pkg/bandwidth"
 	"reflect"
 	"strconv"
 	"strings"
@@ -1222,13 +1223,19 @@ func ContainerAddInteface(containerPid int, payload *pb.PodAddNetwork) error {
 		Command:      cniserver.CNIAdd,
 		PodNamespace: podinfo.Namespace,
 		PodName:      podinfo.Name,
-		SandboxID:    config.GeneratePodNameID(podinfo.Name),
-		Netns:        fmt.Sprintf("/proc/%d/ns/net", containerPid),
-		IfName:       nets[len(nets)-1].Interface,
-		CNIConf:      nil,
+		Bandwidth: bandwidth.Bandwidth{
+			Ingress: podinfo.Bandwidth.Ingress,
+			Egress:  podinfo.Bandwidth.Egress},
+		SandboxID: config.GeneratePodNameID(podinfo.Name),
+		Netns:     fmt.Sprintf("/proc/%d/ns/net", containerPid),
+		IfName:    nets[len(nets)-1].Interface,
+		CNIConf:   nil,
 	}
 
-	result := cnishimreq.AddMultipleInterfaces("", podnetconf.Data, podinfo.Namespace, podinfo.Name)
+	result := cnishimreq.AddMultipleInterfaces("", podnetconf.Data, podinfo.Namespace, podinfo.Name,
+		&bandwidth.Bandwidth{
+			Ingress: podinfo.Bandwidth.Ingress,
+			Egress:  podinfo.Bandwidth.Egress})
 	if result == nil {
 		return fmt.Errorf("result is nil from cni server for adding interface in the existing pod")
 	}

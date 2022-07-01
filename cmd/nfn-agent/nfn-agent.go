@@ -34,10 +34,10 @@ import (
 	chaining "github.com/akraino-edge-stack/icn-nodus/internal/pkg/utils"
 
 	"google.golang.org/grpc"
+	kapi "k8s.io/api/core/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	kexec "k8s.io/utils/exec"
-	kapi "k8s.io/api/core/v1"
 
 	log "k8s.io/klog"
 

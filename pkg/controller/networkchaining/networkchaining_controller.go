@@ -230,6 +230,7 @@ func (r *ReconcileNetworkChaining) createChain(cr *k8sv1alpha1.NetworkChaining, 
 	case cr.Spec.ChainType == "Routing":
 		err := r.checkChain(cr)
 		if err != nil {
+			log.V(1).Error(err, "Error on chainCheck")
 			return err
 		}
 
@@ -242,7 +243,7 @@ func (r *ReconcileNetworkChaining) createChain(cr *k8sv1alpha1.NetworkChaining, 
 		//	cr.Spec.RoutingSpec.NetworkChain = UpdatedChain
 		//}
 
-		log.Info("Value of networkchain in chain creation", "cr.Spec.RoutingSpec.NetworkChain", cr.Spec.RoutingSpec.NetworkChain)
+		log.V(1).Info("Value of networkchain in chain creation", "cr.Spec.RoutingSpec.NetworkChain", cr.Spec.RoutingSpec.NetworkChain)
 
 		podnetworkList, routeList, err := chaining.CalculateRoutes(cr, false, false)
 		if err != nil {
@@ -257,9 +258,9 @@ func (r *ReconcileNetworkChaining) createChain(cr *k8sv1alpha1.NetworkChaining, 
 			cr.Status.State = k8sv1alpha1.Created
 		}
 
-		log.Info("length of the podnetworkList", "len(podnetworkList)", len(podnetworkList))
-		log.Info("value of the podnetworkList", "podnetworkList", podnetworkList)
-		log.Info("value of the cr.Status.State", "cr.Status.State", cr.Status.State)
+		log.V(1).Info("length of the podnetworkList", "len(podnetworkList)", len(podnetworkList))
+		log.V(1).Info("value of the podnetworkList", "podnetworkList", podnetworkList)
+		log.V(1).Info("value of the cr.Status.State", "cr.Status.State", cr.Status.State)
 
 		if cr.Status.State != k8sv1alpha1.CreateInternalError {
 			err = notif.SendPodNetworkNotif(podnetworkList, "create")

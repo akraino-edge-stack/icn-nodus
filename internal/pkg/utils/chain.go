@@ -22,6 +22,7 @@ import (
 	"reflect"
 	"strconv"
 	"strings"
+	"syscall"
 
 	"github.com/akraino-edge-stack/icn-nodus/internal/pkg/cniserver"
 	"github.com/akraino-edge-stack/icn-nodus/internal/pkg/config"
@@ -443,10 +444,15 @@ func calculateDeploymentRoutes(namespace, label string, pos int, num int, ln []k
 		}
 	}
 
+	zeroAddress := "0.0.0.0"
+	if strings.Contains(nextRightIP, ":") {
+		zeroAddress = "::"
+	}
+
 	//Add Default Route based on Right Network
 	rt := k8sv1alpha1.Route{
 		GW:  nextRightIP,
-		Dst: "0.0.0.0",
+		Dst: zeroAddress,
 	}
 	r.DynamicNetworkRoutes = append(r.DynamicNetworkRoutes, rt)
 	return
@@ -1278,7 +1284,13 @@ func ContainerDelInteface(containerPid int, payload *pb.PodDelNetwork) error {
 func ContainerDelRoute(containerPid int, route []*pb.RouteData) error {
 	str := fmt.Sprintf("/proc/%d/ns/net", containerPid)
 
-	hostNet, err := network.GetHostNetwork()
+	afInetVersion := syscall.AF_INET
+
+	if len(route) > 0 && strings.Contains(route[0].Gw, ":") {
+		afInetVersion = syscall.AF_INET6
+	}
+
+	hostNet, err := network.GetHostNetwork(afInetVersion)
 	if err != nil {
 		log.Error(err, "Failed to get host network")
 		return err
@@ -1366,7 +1378,13 @@ func ContainerDelRoute(containerPid int, route []*pb.RouteData) error {
 func ContainerAddRoute(containerPid int, route []*pb.RouteData) error {
 	str := fmt.Sprintf("/proc/%d/ns/net", containerPid)
 
-	hostNet, err := network.GetHostNetwork()
+	afInetVersion := syscall.AF_INET
+
+	if len(route) > 0 && strings.Contains(route[0].Gw, ":") {
+		afInetVersion = syscall.AF_INET6
+	}
+
+	hostNet, err := network.GetHostNetwork(afInetVersion)
 	if err != nil {
 		log.Error(err, "Failed to get host network")
 		return err
@@ -1392,42 +1410,56 @@ func ContainerAddRoute(containerPid int, route []*pb.RouteData) error {
 	}
 	defer nms.Close()
 	err = nms.Do(func(_ ns.NetNS) error {
-		podGW, err := network.GetDefaultGateway()
+		afInetVersion := syscall.AF_INET
+		if strings.Contains(kn.PodSubnet, ":") {
+			afInetVersion = syscall.AF_INET6
+		}
+		podGW, err := network.GetDefaultGateway(afInetVersion)
 		if err != nil {
 			log.Error(err, "Failed to get pod default gateway")
 			return err
 		}
 
-		stdout, stderr, err := ovn.RunIP("route", "add", hostNet, "via", podGW)
-		if err != nil && !strings.Contains(stderr, "RTNETLINK answers: File exists") {
-			log.Error(err, "Failed to ip route add", "stdout", stdout, "stderr", stderr)
+		if err := ovn.SetExtraRoutes(hostNet, kn.ServiceSubnet, kn.PodSubnet, podGW); err != nil {
+			log.Error(err, "Failed to set routes")
 			return err
 		}
 
-		stdout, stderr, err = ovn.RunIP("route", "add", kn.ServiceSubnet, "via", podGW)
-		if err != nil && !strings.Contains(stderr, "RTNETLINK answers: File exists") {
-			log.Error(err, "Failed to ip route add", "stdout", stdout, "stderr", stderr)
-			return err
-		}
+		// stdout, stderr, err := ovn.RunIP("route", "add", hostNet, "via", podGW)
+		// if err != nil && !strings.Contains(stderr, "RTNETLINK answers: File exists") {
+		// 	log.Error(err, "Failed to ip route add", "stdout", stdout, "stderr", stderr)
+		// 	return err
+		// }
 
-		stdout, stderr, err = ovn.RunIP("route", "add", kn.PodSubnet, "via", podGW)
-		if err != nil && !strings.Contains(stderr, "RTNETLINK answers: File exists") {
-			log.Error(err, "Failed to ip route add", "stdout", stdout, "stderr", stderr)
-			return err
-		}
+		// stdout, stderr, err = ovn.RunIP("route", "add", kn.ServiceSubnet, "via", podGW)
+		// if err != nil && !strings.Contains(stderr, "RTNETLINK answers: File exists") {
+		// 	log.Error(err, "Failed to ip route add", "stdout", stdout, "stderr", stderr)
+		// 	return err
+		// }
+
+		// stdout, stderr, err = ovn.RunIP("route", "add", kn.PodSubnet, "via", podGW)
+		// if err != nil && !strings.Contains(stderr, "RTNETLINK answers: File exists") {
+		// 	log.Error(err, "Failed to ip route add", "stdout", stdout, "stderr", stderr)
+		// 	return err
+		// }
 
 		for _, r := range route {
 			dst := r.GetDst()
 			gw := r.GetGw()
+
+			ipVersionArg := "-4"
+			if strings.Contains(gw, ":") {
+				ipVersionArg = "-6"
+			}
 			// Replace default route
-			if dst == "0.0.0.0" {
-				stdout, stderr, err := ovn.RunIP("route", "replace", "default", "via", gw)
+			if dst == "0.0.0.0" || dst == "::" {
+				stdout, stderr, err := ovn.RunIP(ipVersionArg, "route", "replace", "default", "via", gw)
 				if err != nil {
 					log.Error(err, "Failed to ip route replace", "stdout", stdout, "stderr", stderr)
 					return err
 				}
 			} else {
-				stdout, stderr, err := ovn.RunIP("route", "add", dst, "via", gw)
+				stdout, stderr, err := ovn.RunIP(ipVersionArg, "route", "add", dst, "via", gw)
 				if err != nil && !strings.Contains(stderr, "RTNETLINK answers: File exists") {
 					log.Error(err, "Failed to ip route add", "stdout", stdout, "stderr", stderr)
 					return err
@@ -1461,10 +1493,6 @@ func GetPidForContainer(id string) (int, error) {
 	return cj.State.Pid, nil
 }
 
-const (
-	nfnNetAnnotation = "k8s.plugin.opnfv.org/nfn-network"
-)
-
 type nfnNet struct {
 	Type      string                   "json:\"type\""
 	Interface []map[string]interface{} "json:\"interface\""
@@ -1474,7 +1502,7 @@ type nfnNet struct {
 func IsPodNetwork(pod corev1.Pod, networkname string) (bool, error) {
 	log.Info("checking the pod network %s on pod %s", networkname, pod.GetName())
 	annotations := pod.GetAnnotations()
-	annotationsValue, result := annotations[nfnNetAnnotation]
+	annotationsValue, result := annotations[cniserver.NfnNetworkAnnotationTag]
 	if !result {
 		return false, nil
 	}
@@ -1586,7 +1614,7 @@ func AddPodNetworkAnnotations(pod corev1.Pod, networkname string, toDelete bool)
 	annotations := pod.GetAnnotations()
 	sfcIfname := ovn.GetSFCNetworkIfname()
 	inet := sfcIfname()
-	annotationsValue, result := annotations[nfnNetAnnotation]
+	annotationsValue, result := annotations[cniserver.NfnNetworkAnnotationTag]
 	if !result {
 		// no nfn-network annotations, create a new one
 		networkInfo, err := buildNfnAnnotations(pod, inet, networkname, toDelete)

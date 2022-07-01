@@ -3,6 +3,7 @@ package ovn
 import (
 	"fmt"
 	"math/rand"
+	"net"
 	"os"
 	"strings"
 	"time"
@@ -138,7 +139,7 @@ func (oc *Controller) AddNodeLogicalPorts(node string) (ipAddr, ipv6Addr, macAdd
 
 // AddLogicalPorts adds ports to the Pod
 func (oc *Controller) AddLogicalPorts(pod *kapi.Pod, ovnNetObjs []map[string]interface{}, IsExtraInterfaces bool) (key, value string) {
-
+	fmt.Printf("ovnNetObjs: %v\n", ovnNetObjs)
 	if pod.Spec.HostNetwork {
 		return
 	}
@@ -292,7 +293,14 @@ func (oc *Controller) CreateNetwork(cr *k8sv1alpha1.Network) error {
 
 func createNetwork(name, subnet, gatewayIP, excludeIps, logicalRouterPortName string) error {
 	var stdout, stderr string
-	gatewayIPMask, _, err := createOvnLS(name, subnet, gatewayIP, excludeIps, "", "")
+	var gatewayIPMask, gatewayIPv6Mask string
+	var err error
+	if strings.Contains(subnet, ":") {
+		gatewayIPMask, gatewayIPv6Mask, err = createOvnLS(name, "", "", excludeIps, subnet, gatewayIP)
+	} else {
+		gatewayIPMask, gatewayIPv6Mask, err = createOvnLS(name, subnet, gatewayIP, excludeIps, "", "")
+	}
+
 	if err != nil {
 		return err
 	}
@@ -308,7 +316,12 @@ func createNetwork(name, subnet, gatewayIP, excludeIps, logicalRouterPortName st
 		routerMac = fmt.Sprintf("%s:%02x:%02x:%02x", prefix, newRand.Intn(255), newRand.Intn(255), newRand.Intn(255))
 	}
 
-	_, stderr, err = RunOVNNbctl("--wait=hv", "--may-exist", "lrp-add", ovn4nfvRouterName, logicalRouterPortName, routerMac, gatewayIPMask)
+	if gatewayIPMask != "" {
+		_, stderr, err = RunOVNNbctl("--wait=hv", "--may-exist", "lrp-add", ovn4nfvRouterName, logicalRouterPortName, routerMac, gatewayIPMask)
+	} else {
+		_, stderr, err = RunOVNNbctl("--wait=hv", "--may-exist", "lrp-add", ovn4nfvRouterName, logicalRouterPortName, routerMac, gatewayIPv6Mask)
+	}
+
 	if err != nil {
 		log.Error(err, "Failed to add logical port to router", "stderr", stderr)
 		return err
@@ -438,7 +451,13 @@ func (oc *Controller) DeleteProviderNetwork(cr *k8sv1alpha1.ProviderNetwork) err
 func createProviderNetwork(name, subnet, gatewayIP, excludeIps string) error {
 	var stdout, stderr string
 
-	_, _, err := createOvnLS(name, subnet, gatewayIP, excludeIps, "", "")
+	var err error
+	if strings.Contains(subnet, ":") {
+		_, _, err = createOvnLS(name, "", "", excludeIps, subnet, gatewayIP)
+	} else {
+		_, _, err = createOvnLS(name, subnet, gatewayIP, excludeIps, "", "")
+	}
+
 	if err != nil {
 		return err
 	}
@@ -501,7 +520,7 @@ func (oc *Controller) getGatewayFromSwitch(logicalSwitch string) ([]string, []st
 		gatewayIPs = append(gatewayIPs, gatewayIPMask[0])
 		masks = append(masks, gatewayIPMask[1])
 	}
-	
+
 	return gatewayIPs, masks, nil
 }
 
@@ -556,7 +575,7 @@ func (oc *Controller) addNodeLogicalPortWithSwitch(logicalSwitch, portName strin
 		log.Error(err, "Error obtaining gateway address for switch", "logicalSwitch", logicalSwitch)
 		return "", "", "", err
 	}
-	
+
 	macAddr = fmt.Sprintf("%s", addresses[0])
 
 	addresses = addresses[1:]
@@ -733,7 +752,7 @@ func (oc *Controller) addLogicalPortWithSwitch(pod *kapi.Pod, logicalSwitch, ipA
 			return
 		}
 	}
-	
+
 	macAddr := addresses[0]
 	addresses = addresses[1:]
 
@@ -785,4 +804,57 @@ func GetSFCNetworkIfname() (f func() string) {
 	}
 
 	return
+}
+
+// SetExtraRoutes runs ip route command to create routing
+func SetExtraRoutes(hostNet, serviceSubnet, podSubnet, gatewayIP string) error {
+	fmt.Printf("hostNet: %s, serviceSubnet: %s, podSubnet: %s, gatewayIP: %s\n", hostNet, serviceSubnet, podSubnet, gatewayIP)
+	ipVersionArg := "-4"
+	if strings.Contains(hostNet, ":") {
+		ipVersionArg = "-6"
+	}
+
+	_, hostNetIPNet, err := net.ParseCIDR(hostNet)
+	if err != nil {
+		log.Error(err, "Failed to parse host network subnet")
+		return err
+	}
+
+	stdout, stderr, err := RunIP(ipVersionArg, "route", "add", hostNetIPNet.String(), "via", gatewayIP)
+	fmt.Printf("setExtraRoutes - hostNet - stdout: %s\n", stdout)
+	fmt.Printf("setExtraRoutes - hostNet - stderr: %s\n", stderr)
+	if err != nil && !strings.Contains(stderr, "RTNETLINK answers: File exists") {
+		log.Error(err, "Failed to ip route add", "stdout", stdout, "stderr", stderr)
+		return err
+	}
+
+	_, serviceSubnetIPNet, err := net.ParseCIDR(serviceSubnet)
+	if err != nil {
+		log.Error(err, "Failed to parse service subnet")
+		return err
+	}
+
+	stdout, stderr, err = RunIP(ipVersionArg, "route", "add", serviceSubnetIPNet.String(), "via", gatewayIP)
+	fmt.Printf("setExtraRoutes - serviceSubnet - stdout: %s\n", stdout)
+	fmt.Printf("setExtraRoutes - serviceSubnet - stderr: %s\n", stderr)
+	if err != nil && !strings.Contains(stderr, "RTNETLINK answers: File exists") {
+		log.Error(err, "Failed to ip route add", "stdout", stdout, "stderr", stderr)
+		return err
+	}
+
+	_, podSubnetIPNet, err := net.ParseCIDR(podSubnet)
+	if err != nil {
+		log.Error(err, "Failed to parse pod subnet")
+		return err
+	}
+
+	stdout, stderr, err = RunIP(ipVersionArg, "route", "add", podSubnetIPNet.String(), "via", gatewayIP)
+	fmt.Printf("setExtraRoutes - gatewayIP - stdout: %s\n", stdout)
+	fmt.Printf("setExtraRoutes - gatewayIP - stderr: %s\n", stderr)
+	if err != nil && !strings.Contains(stderr, "RTNETLINK answers: File exists") {
+		log.Error(err, "Failed to ip route add", "stdout", stdout, "stderr", stderr)
+		return err
+	}
+
+	return nil
 }

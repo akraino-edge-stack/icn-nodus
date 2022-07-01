@@ -9,6 +9,7 @@ import (
 	"os/exec"
 	"strconv"
 	"strings"
+	"syscall"
 
 	"github.com/akraino-edge-stack/icn-nodus/internal/pkg/config"
 	"github.com/akraino-edge-stack/icn-nodus/internal/pkg/kube"
@@ -158,7 +159,11 @@ func setGateway(link netlink.Link, gatewayIP string) error {
 }
 
 func setpodGWRoutes(hostNet, serviceSubnet, podSubnet, gatewayIP string) error {
-	podGW, err := network.GetDefaultGateway()
+	afInetVersion := syscall.AF_INET
+	if strings.Contains(podSubnet, ":") {
+		afInetVersion = syscall.AF_INET6
+	}
+	podGW, err := network.GetDefaultGateway(afInetVersion)
 	if err != nil {
 		logrus.Error(err, "Failed to get pod default gateway")
 		return err
@@ -191,42 +196,34 @@ func setpodGWRoutes(hostNet, serviceSubnet, podSubnet, gatewayIP string) error {
 	return nil
 }
 
-func setExtraRoutes(hostNet, serviceSubnet, podSubnet, gatewayIP string) error {
-
-	stdout, stderr, err := ovn.RunIP("route", "add", hostNet, "via", gatewayIP)
-	if err != nil && !strings.Contains(stderr, "RTNETLINK answers: File exists") {
-		logrus.Error(err, "Failed to ip route add", "stdout", stdout, "stderr", stderr)
-		return err
-	}
-
-	stdout, stderr, err = ovn.RunIP("route", "add", serviceSubnet, "via", gatewayIP)
-	if err != nil && !strings.Contains(stderr, "RTNETLINK answers: File exists") {
-		logrus.Error(err, "Failed to ip route add", "stdout", stdout, "stderr", stderr)
-		return err
-	}
-
-	stdout, stderr, err = ovn.RunIP("route", "add", podSubnet, "via", gatewayIP)
-	if err != nil && !strings.Contains(stderr, "RTNETLINK answers: File exists") {
-		logrus.Error(err, "Failed to ip route add", "stdout", stdout, "stderr", stderr)
-		return err
-	}
-
-	return nil
-}
-
 func setupInterface(netns ns.NetNS, containerID, ifName, macAddress string, ipAddress, gatewayIP []string, defaultGateway string, idx, mtu int, isDefaultGW bool) (*current.Interface, *current.Interface, error) {
 	hostIface := &current.Interface{}
 	contIface := &current.Interface{}
-	var hostNet string
+	var hostNet []string
 	var serviceSubnet string
 	var podSubnet string
 	var err error
 
-	hostNet, err = network.GetHostNetwork()
-	if err != nil {
-		logrus.Error(err, "Failed to get host network")
-		return nil, nil, fmt.Errorf("failed to get host network: %v", err)
+	for _, gw := range gatewayIP {
+		afInetVersion := syscall.AF_INET
+		if strings.Contains(gw, ":") {
+			afInetVersion = syscall.AF_INET6
+		}
+
+		hostNetwork, err := network.GetHostNetwork(afInetVersion)
+		if err != nil {
+			logrus.Error(err, "Failed to get host network")
+			return nil, nil, fmt.Errorf("failed to get host network: %v", err)
+		}
+
+		hostNet = append(hostNet, hostNetwork)
 	}
+
+	// hostNet, err = network.GetHostNetwork()
+	// if err != nil {
+	// 	logrus.Error(err, "Failed to get host network")
+	// 	return nil, nil, fmt.Errorf("failed to get host network: %v", err)
+	// }
 
 	k, err := kube.GetKubeConfig()
 	if err != nil {
@@ -245,7 +242,10 @@ func setupInterface(netns ns.NetNS, containerID, ifName, macAddress string, ipAd
 	err = netns.Do(func(hostNS ns.NetNS) error {
 		// create the veth pair in the container and move host end into host netns
 		hostVeth, containerVeth, err := ip.SetupVeth(ifName, mtu, hostNS)
+		fmt.Printf("hostVeth: %v\n", hostVeth)
+		fmt.Printf("containerVeth: %v\n", containerVeth)
 		if err != nil {
+			fmt.Printf("failed to setup veth %s: %v\n", ifName, err)
 			return fmt.Errorf("failed to setup veth %s: %v", ifName, err)
 			//return err
 		}
@@ -254,32 +254,42 @@ func setupInterface(netns ns.NetNS, containerID, ifName, macAddress string, ipAd
 
 		link, err := netlink.LinkByName(contIface.Name)
 		if err != nil {
+			fmt.Printf("failed to lookup %s: %v\n", contIface.Name, err)
 			return fmt.Errorf("failed to lookup %s: %v", contIface.Name, err)
 		}
 
 		hwAddr, err := net.ParseMAC(macAddress)
 		if err != nil {
+			fmt.Printf("failed to parse mac address for %s: %v\n", contIface.Name, err)
 			return fmt.Errorf("failed to parse mac address for %s: %v", contIface.Name, err)
 		}
 		err = netlink.LinkSetHardwareAddr(link, hwAddr)
 		if err != nil {
+			fmt.Printf("failed to add mac address %s to %s: %v", macAddress, contIface.Name, err)
 			return fmt.Errorf("failed to add mac address %s to %s: %v", macAddress, contIface.Name, err)
 		}
 		contIface.Mac = macAddress
 		contIface.Sandbox = netns.Path()
 
+		fmt.Printf("ipAddress: %v\n", ipAddress)
+
 		for _, address := range ipAddress {
+			fmt.Printf("Prceeding address: %s\n", address)
 			err = addIpAddressToLinkDevice(address, &link, contIface.Name)
 			if err != nil {
+				fmt.Printf("addIpAddressToLinkDevice: %s\n", err.Error())
 				return nil
 			}
 		}
 
+		fmt.Printf("Value of defaultGateway- %v and ifname- %v\n", defaultGateway, ifName)
 		logrus.Infof("Value of defaultGateway- %v and ifname- %v", defaultGateway, ifName)
 		if defaultGateway == "true" && ifName == "eth0" {
 			for _, address := range gatewayIP {
+				fmt.Printf("gateway address true, eth0: %s\n", address)
 				err := setGateway(link, address)
 				if err != nil {
+					fmt.Printf("setGateway: %s\n", err.Error())
 					return err
 				}
 			}
@@ -288,21 +298,26 @@ func setupInterface(netns ns.NetNS, containerID, ifName, macAddress string, ipAd
 		if defaultGateway == "true" && ifName != "eth0" {
 			_, err = GetPrimaryInterface()
 			if err != nil {
+				fmt.Printf("GetPrimaryInterface: %s\n", err.Error())
 				if strings.Contains(err.Error(), "Link not found") {
 					for _, address := range gatewayIP {
+						fmt.Printf("gateway address true, !eth0: %s\n", address)
 						err := setGateway(link, address)
 						if err != nil {
+							fmt.Printf("setGateway: %s\n", err.Error())
 							return err
 						}
 					}
 				} else {
+					fmt.Printf("Error in getting the eth0 link in container ns: %s\n", err.Error())
 					logrus.Error(err, "Error in getting the eth0 link in container ns")
 					return err
 				}
 			} else {
-				for _, address := range gatewayIP {
-					err := setpodGWRoutes(hostNet, serviceSubnet, podSubnet, address)
+				for index, address := range gatewayIP {
+					err := setpodGWRoutes(hostNet[index], serviceSubnet, podSubnet, address)
 					if err != nil {
+						fmt.Printf("setpodGWRoutes: %s\n", err.Error())
 						return err
 					}
 				}
@@ -310,15 +325,19 @@ func setupInterface(netns ns.NetNS, containerID, ifName, macAddress string, ipAd
 		}
 
 		if defaultGateway == "false" && isDefaultGW == true && ifName == "eth0" {
-			for _, address := range gatewayIP {
-				err = setExtraRoutes(hostNet, serviceSubnet, podSubnet, address)
+			for index, address := range gatewayIP {
+				fmt.Printf("gateway address false, true, eth0: %d: %s\n", index, address)
+				err = ovn.SetExtraRoutes(hostNet[index], serviceSubnet, podSubnet, address)
 				if err != nil {
+					fmt.Printf("setExtraRoutes: %s\n", err.Error())
 					return err
 				}
 			}
 		}
 
 		oldHostVethName = hostVeth.Name
+
+		fmt.Printf("oldHostVethName: %s\n", oldHostVethName)
 
 		return nil
 	})
@@ -328,6 +347,7 @@ func setupInterface(netns ns.NetNS, containerID, ifName, macAddress string, ipAd
 
 	// rename the host end of veth pair
 	hostIface.Name = containerID[:14] + strconv.Itoa(idx)
+	fmt.Printf("renameLink - oldHostVethName: %s\n", oldHostVethName)
 	if err := renameLink(oldHostVethName, hostIface.Name); err != nil {
 		return nil, nil, fmt.Errorf("failed to rename %s to %s: %v", oldHostVethName, hostIface.Name, err)
 	}
@@ -336,22 +356,32 @@ func setupInterface(netns ns.NetNS, containerID, ifName, macAddress string, ipAd
 }
 
 func addIpAddressToLinkDevice(ipAddress string, link *netlink.Link, contIfaceName string) error {
+	if link == nil {
+		fmt.Println("Link is nil")
+	}
+	fmt.Printf("ipAddress: %s\n", ipAddress)
 	addr, err := netlink.ParseAddr(ipAddress)
 	if err != nil {
+		fmt.Printf("parsing address failed: %s\n", err.Error())
 		logrus.Error("parsing address failed: ", err)
 		return err
 	}
 
+	fmt.Printf("addr: %v\n", addr)
+
 	if addr.IP.To4() == nil {
 		_, _, err = ovn.RunSysctl("net.ipv6.conf." + (*link).Attrs().Name + ".disable_ipv6=0")
 		if err != nil {
+			fmt.Printf("enabling IPv6 failed: %s\n", err.Error())
 			logrus.Error("enabling IPv6 failed: ", err)
 			return fmt.Errorf("failed to enable IPv6")
 		}
 	}
 
+	fmt.Printf("link: %v\n", *link)
 	err = netlink.AddrAdd(*link, addr)
 	if err != nil {
+		fmt.Printf("failed to add IP addr %s to %s: %vsn", ipAddress, contIfaceName, err.Error())
 		return fmt.Errorf("failed to add IP addr %s to %s: %v", ipAddress, contIfaceName, err)
 	}
 	return nil

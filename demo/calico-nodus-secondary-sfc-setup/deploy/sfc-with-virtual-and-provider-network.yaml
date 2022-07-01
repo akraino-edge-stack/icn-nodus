@@ -10,8 +10,8 @@ spec:
     networkChain: "net=virtual-net1,app=slb,net=dync-net1,app=ngfw,net=dync-net2,app=sdewan,net=virtual-net2"
     left:
     - networkName: "left-pnetwork"
-      gatewayIp: "172.30.10.2"
-      subnet: "172.30.10.0/24"
+      gatewayIp: "bef0:1234:0030:0010::2"
+      subnet: "bef0:1234:0030:0010::/123"
       podSelector:
         matchLabels:
           sfc: head
@@ -20,8 +20,8 @@ spec:
           sfc: head
     right:
     - networkName: "right-pnetwork"
-      gatewayIp: "172.30.20.2"
-      subnet: "172.30.20.0/24"
+      gatewayIp: "bef0:1234:0030:0020::2"
+      subnet: "bef0:1234:0030:0020::/123"
       podSelector:
         matchLabels:
           sfc: tail

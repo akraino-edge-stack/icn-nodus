@@ -238,6 +238,7 @@ func createNodeOVSInternalPort(payload *pb.Notification_InSync) error {
 }
 
 func handleNotif(msg *pb.Notification) {
+	fmt.Printf("Notif arrived: %v\n", msg)
 	switch msg.GetCniType() {
 	case "ovn4nfv":
 		switch payload := msg.Payload.(type) {

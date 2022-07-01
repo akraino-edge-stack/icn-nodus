@@ -6,6 +6,7 @@ import (
 	"net"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -14,6 +15,7 @@ import (
 	"github.com/akraino-edge-stack/icn-nodus/cmd/ovn4nfvk8s-cni/app"
 	"github.com/akraino-edge-stack/icn-nodus/internal/pkg/config"
 	"github.com/akraino-edge-stack/icn-nodus/internal/pkg/kube"
+	"github.com/akraino-edge-stack/icn-nodus/internal/pkg/ovn"
 
 	"github.com/containernetworking/cni/pkg/types"
 	"github.com/containernetworking/cni/pkg/types/current"
@@ -22,8 +24,7 @@ import (
 )
 
 const (
-	nfnNetworkAnnotationTag = "k8s.plugin.opnfv.org/nfn-network"
-	ovn4nfvAnnotationTag    = "k8s.plugin.opnfv.org/ovnInterfaces"
+	NfnNetworkAnnotationTag = "k8s.plugin.opnfv.org/nfn-network"
 )
 
 type nfnNetwork struct {
@@ -237,11 +238,15 @@ func (cr *CNIServerRequest) AddMultipleInterfaces(nfnAnnotation, ovnAnnotation, 
 			klog.Errorf("Failed to configure interface in pod: %v", err)
 			return nil
 		}
-		if defaultGateway == "true" {
-			defaultAddr, defaultAddrNet, _ := net.ParseCIDR("0.0.0.0/0")
 
+		if defaultGateway == "true" {
 			var routes []*types.Route
 			for _, gateway := range gatewayIP {
+				zeroAddress := "0.0.0.0/0"
+				if strings.Contains(gateway, ":") {
+					zeroAddress = "::/0"
+				}
+				defaultAddr, defaultAddrNet, _ := net.ParseCIDR(zeroAddress)
 				routes = append(routes, &types.Route{Dst: net.IPNet{IP: defaultAddr, Mask: defaultAddrNet.Mask}, GW: net.ParseIP(gateway)})
 			}
 
@@ -370,7 +375,7 @@ func (cr *CNIServerRequest) cmdAdd(kclient kubernetes.Interface) ([]byte, error)
 			klog.Infof("ovn4nfvk8s-cni: cmdAdd Warning - Error while obtaining pod annotations - %v", err)
 			return false, nil
 		}
-		if _, ok := annotation[ovn4nfvAnnotationTag]; ok {
+		if _, ok := annotation[ovn.Ovn4nfvAnnotationTag]; ok {
 			return true, nil
 		}
 		return false, nil
@@ -379,18 +384,18 @@ func (cr *CNIServerRequest) cmdAdd(kclient kubernetes.Interface) ([]byte, error)
 	}
 
 	klog.Infof("ovn4nfvk8s-cni: cmdAdd Annotations Found")
-	nfnAnnotation, ok := annotation[nfnNetworkAnnotationTag]
+	nfnAnnotation, ok := annotation[NfnNetworkAnnotationTag]
 	if !ok {
-		klog.Infof("%v pod annotation doesn't exist", nfnNetworkAnnotationTag)
+		klog.Infof("%v pod annotation doesn't exist", NfnNetworkAnnotationTag)
 	}
 
 	if len(nfnAnnotation) != 0 {
 		klog.Infof("ovn4nfvk8s-cni: cmdAdd Annotation Found is %v", nfnAnnotation)
 	}
 
-	ovnAnnotation, ok := annotation[ovn4nfvAnnotationTag]
+	ovnAnnotation, ok := annotation[ovn.Ovn4nfvAnnotationTag]
 	if !ok {
-		return nil, fmt.Errorf("Error while obtaining %v pod annotation", ovn4nfvAnnotationTag)
+		return nil, fmt.Errorf("Error while obtaining %v pod annotation", ovn.Ovn4nfvAnnotationTag)
 	}
 
 	if len(ovnAnnotation) != 0 {

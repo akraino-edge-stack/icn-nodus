@@ -22,6 +22,7 @@ import (
 	"reflect"
 	"strconv"
 	"strings"
+	"syscall"
 
 	"github.com/akraino-edge-stack/icn-nodus/internal/pkg/cniserver"
 	"github.com/akraino-edge-stack/icn-nodus/internal/pkg/config"
@@ -1278,7 +1279,13 @@ func ContainerDelInteface(containerPid int, payload *pb.PodDelNetwork) error {
 func ContainerDelRoute(containerPid int, route []*pb.RouteData) error {
 	str := fmt.Sprintf("/proc/%d/ns/net", containerPid)
 
-	hostNet, err := network.GetHostNetwork()
+	afInetVersion := syscall.AF_INET
+
+	if len(route) > 0 && strings.Contains(route[0].Gw, ":") {
+		afInetVersion = syscall.AF_INET6
+	}
+
+	hostNet, err := network.GetHostNetwork(afInetVersion)
 	if err != nil {
 		log.Error(err, "Failed to get host network")
 		return err
@@ -1366,7 +1373,13 @@ func ContainerDelRoute(containerPid int, route []*pb.RouteData) error {
 func ContainerAddRoute(containerPid int, route []*pb.RouteData) error {
 	str := fmt.Sprintf("/proc/%d/ns/net", containerPid)
 
-	hostNet, err := network.GetHostNetwork()
+	afInetVersion := syscall.AF_INET
+
+	if len(route) > 0 && strings.Contains(route[0].Gw, ":") {
+		afInetVersion = syscall.AF_INET6
+	}
+
+	hostNet, err := network.GetHostNetwork(afInetVersion)
 	if err != nil {
 		log.Error(err, "Failed to get host network")
 		return err
@@ -1461,10 +1474,6 @@ func GetPidForContainer(id string) (int, error) {
 	return cj.State.Pid, nil
 }
 
-const (
-	nfnNetAnnotation = "k8s.plugin.opnfv.org/nfn-network"
-)
-
 type nfnNet struct {
 	Type      string                   "json:\"type\""
 	Interface []map[string]interface{} "json:\"interface\""
@@ -1474,7 +1483,7 @@ type nfnNet struct {
 func IsPodNetwork(pod corev1.Pod, networkname string) (bool, error) {
 	log.Info("checking the pod network %s on pod %s", networkname, pod.GetName())
 	annotations := pod.GetAnnotations()
-	annotationsValue, result := annotations[nfnNetAnnotation]
+	annotationsValue, result := annotations[cniserver.NfnNetworkAnnotationTag]
 	if !result {
 		return false, nil
 	}
@@ -1586,7 +1595,7 @@ func AddPodNetworkAnnotations(pod corev1.Pod, networkname string, toDelete bool)
 	annotations := pod.GetAnnotations()
 	sfcIfname := ovn.GetSFCNetworkIfname()
 	inet := sfcIfname()
-	annotationsValue, result := annotations[nfnNetAnnotation]
+	annotationsValue, result := annotations[cniserver.NfnNetworkAnnotationTag]
 	if !result {
 		// no nfn-network annotations, create a new one
 		networkInfo, err := buildNfnAnnotations(pod, inet, networkname, toDelete)

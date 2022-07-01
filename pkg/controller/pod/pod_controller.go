@@ -7,6 +7,7 @@ import (
 
 	"github.com/akraino-edge-stack/icn-nodus/pkg/controller/networkpolicy"
 
+	"github.com/akraino-edge-stack/icn-nodus/internal/pkg/cniserver"
 	"github.com/akraino-edge-stack/icn-nodus/internal/pkg/ovn"
 
 	"github.com/akraino-edge-stack/icn-nodus/internal/pkg/kube"
@@ -33,10 +34,6 @@ import (
 )
 
 var log = logf.Log.WithName("controller_pod")
-
-const (
-	nfnNetworkAnnotation = "k8s.plugin.opnfv.org/nfn-network"
-)
 
 type nfnNetwork struct {
 	Type      string                   "json:\"type\""
@@ -306,7 +303,7 @@ func (r *ReconcilePod) deleteLogicalPorts(name, namesapce string) error {
 }
 
 func (r *ReconcilePod) readPodAnnotation(pod *corev1.Pod) (*nfnNetwork, error) {
-	annotaion, ok := pod.Annotations[nfnNetworkAnnotation]
+	annotaion, ok := pod.Annotations[cniserver.NfnNetworkAnnotationTag]
 	if !ok {
 		return nil, fmt.Errorf("Invalid annotations")
 	}

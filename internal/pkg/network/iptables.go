@@ -50,7 +50,7 @@ func MasqRules(ifname string) ([]IPTablesRule,[]IPTablesRule) {
 			// This rule makes sure ifname is SNAT
 			{"nat", "POSTROUTING", []string{"-o", ifname, "-j", "MASQUERADE"}},
 			// NAT if it's not multicast traffic
-			{"nat", "POSTROUTING", []string{"-s", subnet, "!", "-d", "ff00::/8", "-j", "MASQUERADE"}},
+			{"nat", "POSTROUTING", []string{"-s", subnetV6, "!", "-d", "ff00::/8", "-j", "MASQUERADE"}},
 		}
 	}
 

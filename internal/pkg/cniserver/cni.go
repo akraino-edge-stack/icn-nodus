@@ -6,6 +6,7 @@ import (
 	"net"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -237,11 +238,15 @@ func (cr *CNIServerRequest) AddMultipleInterfaces(nfnAnnotation, ovnAnnotation, 
 			klog.Errorf("Failed to configure interface in pod: %v", err)
 			return nil
 		}
-		if defaultGateway == "true" {
-			defaultAddr, defaultAddrNet, _ := net.ParseCIDR("0.0.0.0/0")
 
+		if defaultGateway == "true" {
 			var routes []*types.Route
 			for _, gateway := range gatewayIP {
+				zeroAddress := "0.0.0.0/0"
+				if strings.Contains(gateway, ":") {
+					zeroAddress = "::/0"
+				}
+				defaultAddr, defaultAddrNet, _ := net.ParseCIDR(zeroAddress)
 				routes = append(routes, &types.Route{Dst: net.IPNet{IP: defaultAddr, Mask: defaultAddrNet.Mask}, GW: net.ParseIP(gateway)})
 			}
 

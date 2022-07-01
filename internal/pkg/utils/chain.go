@@ -22,6 +22,7 @@ import (
 	"reflect"
 	"strconv"
 	"strings"
+	"syscall"
 
 	"github.com/akraino-edge-stack/icn-nodus/internal/pkg/cniserver"
 	"github.com/akraino-edge-stack/icn-nodus/internal/pkg/config"
@@ -1278,7 +1279,13 @@ func ContainerDelInteface(containerPid int, payload *pb.PodDelNetwork) error {
 func ContainerDelRoute(containerPid int, route []*pb.RouteData) error {
 	str := fmt.Sprintf("/proc/%d/ns/net", containerPid)
 
-	hostNet, err := network.GetHostNetwork()
+	afInetVersion := syscall.AF_INET
+
+	if len(route) > 0 && strings.Contains(route[0].Gw, ":") {
+		afInetVersion = syscall.AF_INET6
+	}
+
+	hostNet, err := network.GetHostNetwork(afInetVersion)
 	if err != nil {
 		log.Error(err, "Failed to get host network")
 		return err
@@ -1366,7 +1373,13 @@ func ContainerDelRoute(containerPid int, route []*pb.RouteData) error {
 func ContainerAddRoute(containerPid int, route []*pb.RouteData) error {
 	str := fmt.Sprintf("/proc/%d/ns/net", containerPid)
 
-	hostNet, err := network.GetHostNetwork()
+	afInetVersion := syscall.AF_INET
+
+	if len(route) > 0 && strings.Contains(route[0].Gw, ":") {
+		afInetVersion = syscall.AF_INET6
+	}
+
+	hostNet, err := network.GetHostNetwork(afInetVersion)
 	if err != nil {
 		log.Error(err, "Failed to get host network")
 		return err

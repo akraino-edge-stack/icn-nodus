@@ -91,14 +91,22 @@ func CheckRoute(dst, gw string) (bool, error) {
 }
 
 // GetDefaultGatewayInterface return default gateway interface link
-func GetDefaultGatewayInterface() (*net.Interface, error) {
-	routes, err := netlink.RouteList(nil, syscall.AF_INET)
+func getDefaultGatewayInterface(afInetVersion int) (*net.Interface, error) {
+	routes, err := netlink.RouteList(nil, afInetVersion)
 	if err != nil {
 		return nil, err
 	}
 
+	fmt.Printf("Routes: %v\n", routes)
+
+	zeroAddress :=  "0.0.0.0/0"
+
+	if afInetVersion == syscall.AF_INET6 {
+		zeroAddress = "::"
+	}
+
 	for _, route := range routes {
-		if route.Dst == nil || route.Dst.String() == "0.0.0.0/0" {
+		if route.Dst == nil || route.Dst.String() == zeroAddress {
 			if route.LinkIndex <= 0 {
 				return nil, errors.New("Found default route but could not determine interface")
 			}
@@ -109,7 +117,7 @@ func GetDefaultGatewayInterface() (*net.Interface, error) {
 	return nil, errors.New("Unable to find default route")
 }
 
-func getIfaceAddrs(iface *net.Interface) ([]netlink.Addr, error) {
+func getIfaceAddrs(iface *net.Interface, afInetVersion int) ([]netlink.Addr, error) {
 
 	link := &netlink.Device{
 		netlink.LinkAttrs{
@@ -117,12 +125,12 @@ func getIfaceAddrs(iface *net.Interface) ([]netlink.Addr, error) {
 		},
 	}
 
-	return netlink.AddrList(link, syscall.AF_INET)
+	return netlink.AddrList(link, afInetVersion)
 }
 
 //GetInterfaceIP4Addr return IP4addr of a interface
-func GetInterfaceIP4Addr(iface *net.Interface) (netlink.Addr, error) {
-	addrs, err := getIfaceAddrs(iface)
+func GetInterfaceIPAddr(iface *net.Interface, afInetVersion int) (netlink.Addr, error) {
+	addrs, err := getIfaceAddrs(iface, afInetVersion)
 	if err != nil {
 		return netlink.Addr{}, err
 	}
@@ -131,8 +139,15 @@ func GetInterfaceIP4Addr(iface *net.Interface) (netlink.Addr, error) {
 	var ll netlink.Addr
 
 	for _, addr := range addrs {
-		if addr.IP.To4() == nil {
-			continue
+
+		if afInetVersion == syscall.AF_INET {
+			if addr.IP.To4() == nil {
+				continue
+			}
+		} else {
+			if addr.IP.To16() == nil {
+				continue
+			}
 		}
 
 		if addr.IP.IsGlobalUnicast() {
@@ -144,34 +159,43 @@ func GetInterfaceIP4Addr(iface *net.Interface) (netlink.Addr, error) {
 		}
 	}
 
-	if ll.IP.To4() != nil {
-		// didn't find global but found link-local. it'll do.
-		return ll, nil
+	// didn't find global but found link-local. it'll do.
+	if afInetVersion == syscall.AF_INET {
+		if ll.IP.To4() != nil {
+			return ll, nil
+		}
+	} else {
+		if ll.IP.To16() != nil {
+			return ll, nil
+		}
 	}
 
-	return netlink.Addr{}, errors.New("No IPv4 address found for given interface")
+	return netlink.Addr{}, errors.New("No IP address found for given interface")
 }
 
 //GetHostNetwork return default gateway interface network
-func GetHostNetwork() (string, error) {
+func GetHostNetwork(afInetVersion int) (string, error) {
 
-	iface, err := GetDefaultGatewayInterface()
+	iface, err := getDefaultGatewayInterface(afInetVersion)
 	if err != nil {
+		fmt.Printf("error in gettting default gateway interface: %s\n", err.Error())
 		log.Error(err, "error in gettting default gateway interface")
 		return "", err
 	}
 
-	ipv4addr, err := GetInterfaceIP4Addr(iface)
+	ipaddr, err := GetInterfaceIPAddr(iface, afInetVersion)
 	if err != nil {
+		fmt.Printf("error in gettting default gateway interface IPv4 address: %s\n", err.Error())
 		log.Error(err, "error in gettting default gateway interface IPv4 address")
 		return "", err
 	}
 
-	_, ipv4Net, err := net.ParseCIDR(ipv4addr.IPNet.String())
+	_, ipNet, err := net.ParseCIDR(ipaddr.IPNet.String())
 	if err != nil {
+		fmt.Printf("error in gettting default gateway interface network: %s\n", err.Error())
 		log.Error(err, "error in gettting default gateway interface network")
 		return "", err
 	}
 
-	return ipv4Net.String(), nil
+	return ipNet.String(), nil
 }

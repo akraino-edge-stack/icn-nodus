@@ -850,6 +850,7 @@ spec:
             runAsUser: 0
             capabilities:
               add: ["NET_ADMIN", "SYS_ADMIN", "SYS_PTRACE"]
+            privileged: true
           volumeMounts:
             - mountPath: /var/run/dbus/
               name: host-var-run-dbus

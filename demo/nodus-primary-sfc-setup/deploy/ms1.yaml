@@ -14,7 +14,7 @@ spec:
       labels:
         app: ms1
       annotations:
-        k8s.plugin.opnfv.org/nfn-network: '{ "type": "ovn4nfv", "interface": [{ "name": "left-pnetwork", "interface": "net0", "defaultgateway": "true", "gwipaddress": "172.30.10.3" }]}'
+        k8s.plugin.opnfv.org/nfn-network: '{ "type": "ovn4nfv", "interface": [{ "name": "left-pnetwork", "interface": "net0", "defaultgateway": "true", "gwipaddress": "bef0:1234:30:10:107f:25ff:fe00:7" }]}'
 
     spec:
       containers:
@@ -30,7 +30,7 @@ spec:
       dnsPolicy: "None"
       dnsConfig:
         nameservers:
-          - 8.8.8.8
+          - 2001:4860:4860::8888
         searches:
           - default.svc.cluster.local
           - svc.cluster.local

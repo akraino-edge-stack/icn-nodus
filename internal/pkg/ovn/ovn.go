@@ -292,7 +292,14 @@ func (oc *Controller) CreateNetwork(cr *k8sv1alpha1.Network) error {
 
 func createNetwork(name, subnet, gatewayIP, excludeIps, logicalRouterPortName string) error {
 	var stdout, stderr string
-	gatewayIPMask, _, err := createOvnLS(name, subnet, gatewayIP, excludeIps, "", "")
+	var gatewayIPMask, gatewayIPv6Mask string
+	var err error
+	if strings.Contains(subnet, ":") {
+		gatewayIPMask, gatewayIPv6Mask, err = createOvnLS(name, "", "", excludeIps, subnet, gatewayIP)
+	} else {
+		gatewayIPMask, gatewayIPv6Mask, err = createOvnLS(name, subnet, gatewayIP, excludeIps, "", "")
+	}
+
 	if err != nil {
 		return err
 	}
@@ -308,7 +315,12 @@ func createNetwork(name, subnet, gatewayIP, excludeIps, logicalRouterPortName st
 		routerMac = fmt.Sprintf("%s:%02x:%02x:%02x", prefix, newRand.Intn(255), newRand.Intn(255), newRand.Intn(255))
 	}
 
-	_, stderr, err = RunOVNNbctl("--wait=hv", "--may-exist", "lrp-add", ovn4nfvRouterName, logicalRouterPortName, routerMac, gatewayIPMask)
+	if gatewayIPMask != "" {
+		_, stderr, err = RunOVNNbctl("--wait=hv", "--may-exist", "lrp-add", ovn4nfvRouterName, logicalRouterPortName, routerMac, gatewayIPMask)
+	} else {
+		_, stderr, err = RunOVNNbctl("--wait=hv", "--may-exist", "lrp-add", ovn4nfvRouterName, logicalRouterPortName, routerMac, gatewayIPv6Mask)
+	}
+
 	if err != nil {
 		log.Error(err, "Failed to add logical port to router", "stderr", stderr)
 		return err
@@ -438,7 +450,13 @@ func (oc *Controller) DeleteProviderNetwork(cr *k8sv1alpha1.ProviderNetwork) err
 func createProviderNetwork(name, subnet, gatewayIP, excludeIps string) error {
 	var stdout, stderr string
 
-	_, _, err := createOvnLS(name, subnet, gatewayIP, excludeIps, "", "")
+	var err error
+	if strings.Contains(subnet, ":") {
+		_, _, err = createOvnLS(name, "", "", excludeIps, subnet, gatewayIP)
+	} else {
+		_, _, err = createOvnLS(name, subnet, gatewayIP, excludeIps, "", "")
+	}
+
 	if err != nil {
 		return err
 	}
@@ -501,7 +519,7 @@ func (oc *Controller) getGatewayFromSwitch(logicalSwitch string) ([]string, []st
 		gatewayIPs = append(gatewayIPs, gatewayIPMask[0])
 		masks = append(masks, gatewayIPMask[1])
 	}
-	
+
 	return gatewayIPs, masks, nil
 }
 
@@ -556,7 +574,7 @@ func (oc *Controller) addNodeLogicalPortWithSwitch(logicalSwitch, portName strin
 		log.Error(err, "Error obtaining gateway address for switch", "logicalSwitch", logicalSwitch)
 		return "", "", "", err
 	}
-	
+
 	macAddr = fmt.Sprintf("%s", addresses[0])
 
 	addresses = addresses[1:]
@@ -733,7 +751,7 @@ func (oc *Controller) addLogicalPortWithSwitch(pod *kapi.Pod, logicalSwitch, ipA
 			return
 		}
 	}
-	
+
 	macAddr := addresses[0]
 	addresses = addresses[1:]
 

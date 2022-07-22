@@ -850,6 +850,7 @@ spec:
             runAsUser: 0
             capabilities:
               add: ["NET_ADMIN", "SYS_ADMIN", "SYS_PTRACE"]
+            privileged: true
           volumeMounts:
             - mountPath: /var/run/dbus/
               name: host-var-run-dbus
@@ -860,6 +861,7 @@ spec:
               name: host-var-run-ovs
             - mountPath: /var/run
               name: host-var-run
+              mountPropagation: Bidirectional
             - mountPath: /host/proc
               name: host-proc
             - mountPath: /host/sys

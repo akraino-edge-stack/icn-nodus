@@ -28,6 +28,7 @@ import (
 
 	"github.com/akraino-edge-stack/icn-nodus/internal/pkg/auth"
 	cs "github.com/akraino-edge-stack/icn-nodus/internal/pkg/cniserver"
+	"github.com/akraino-edge-stack/icn-nodus/internal/pkg/criclient"
 	pb "github.com/akraino-edge-stack/icn-nodus/internal/pkg/nfnNotify/proto"
 	"github.com/akraino-edge-stack/icn-nodus/internal/pkg/ovn"
 	chaining "github.com/akraino-edge-stack/icn-nodus/internal/pkg/utils"
@@ -50,7 +51,7 @@ var inSync bool
 var pnCreateStore []*pb.Notification_ProviderNwCreate
 
 // subscribe Notifications
-func subscribeNotif(client pb.NfnNotifyClient) error {
+func subscribeNotif(client pb.NfnNotifyClient, criclient criclient.CRIClient) error {
 	log.Info("Subscribe Notification from server")
 	ctx := context.Background()
 	var n pb.SubscribeContext
@@ -76,7 +77,7 @@ func subscribeNotif(client pb.NfnNotifyClient) error {
 				return err
 			}
 
-			handleNotif(in)
+			handleNotif(in, criclient)
 		}
 	}
 }
@@ -237,7 +238,7 @@ func createNodeOVSInternalPort(payload *pb.Notification_InSync) error {
 	return nil
 }
 
-func handleNotif(msg *pb.Notification) {
+func handleNotif(msg *pb.Notification, criclient criclient.CRIClient) {
 	switch msg.GetCniType() {
 	case "ovn4nfv":
 		switch payload := msg.Payload.(type) {
@@ -276,7 +277,7 @@ func handleNotif(msg *pb.Notification) {
 
 		case *pb.Notification_ContainterRtInsert:
 			id := payload.ContainterRtInsert.GetContainerId()
-			pid, err := chaining.GetPidForContainer(id)
+			pid, err := criclient.GetPidForContainer(id)
 			if err != nil {
 				log.Error(err, "Failed to get pid", "containerID", id)
 				return
@@ -288,9 +289,9 @@ func handleNotif(msg *pb.Notification) {
 
 		case *pb.Notification_PodAddNetwork:
 			id := payload.PodAddNetwork.GetContainerId()
-			pid, err := chaining.GetPidForContainer(id)
+			pid, err := criclient.GetPidForContainer(id)
 			if err != nil {
-				log.Errorf("Failed to get pid - containerID - %v | err-%v", id, err)
+				log.Error(err, "Failed to get pid", "containerID", id)
 				return
 			}
 
@@ -310,7 +311,7 @@ func handleNotif(msg *pb.Notification) {
 
 		case *pb.Notification_ContainterRtRemove:
 			id := payload.ContainterRtRemove.GetContainerId()
-			pid, err := chaining.GetPidForContainer(id)
+			pid, err := criclient.GetPidForContainer(id)
 			if err != nil {
 				log.Error(err, "Failed to get pid", "containerID", id)
 				return
@@ -322,7 +323,7 @@ func handleNotif(msg *pb.Notification) {
 
 		case *pb.Notification_PodDelNetwork:
 			id := payload.PodDelNetwork.GetContainerId()
-			pid, err := chaining.GetPidForContainer(id)
+			pid, err := criclient.GetPidForContainer(id)
 			if err != nil {
 				log.Error(err, "Failed to get pid", "containerID", id)
 				return
@@ -462,6 +463,18 @@ func main() {
 		return
 	}
 
+	node, err := kubecli.GetNode(os.Getenv("HOSTNAME"))
+	if err != nil {
+		log.Error(err, "failed to get node's data")
+		return
+	}
+
+	criclient, err := criclient.NewCRIClient(node)
+	if err != nil {
+		log.Error(err, "failed to create CRI client")
+		return
+	}
+
 	cniserver := cs.NewCNIServer("", clientset)
 	err = cniserver.Start(cs.HandleCNIcommandRequest)
 	if err != nil {
@@ -469,7 +482,7 @@ func main() {
 		return
 	}
 	// Run client in background
-	go subscribeNotif(client)
+	go subscribeNotif(client, criclient)
 	shutdownHandler(errorChannel)
 
 }

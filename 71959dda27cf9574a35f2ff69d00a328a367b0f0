@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "79f01ad3_8c62aa84",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 1
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 356
+      },
+      "writtenOn": "2022-07-27T22:16:37Z",
+      "side": 1,
+      "message": "This adds back in the deploy YAML so that the instructions can remain unchanged.  If you merge this one, just remember any changes to the base or other layers will require these to be rebuilt.",
+      "revId": "71959dda27cf9574a35f2ff69d00a328a367b0f0",
+      "serverId": "4cada01b-0314-4fe0-84a1-f9ddc89863f9"
+    }
+  ]
+}

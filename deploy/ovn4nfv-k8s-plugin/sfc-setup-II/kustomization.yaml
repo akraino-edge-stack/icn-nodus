@@ -1,0 +1,62 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+- ../base
+
+configMapGenerator:
+- name: ovn-controller-network
+  namespace: kube-system
+  behavior: merge
+  files:
+  - virtual-net-conf.json
+
+patchesStrategicMerge:
+- |-
+  apiVersion: apps/v1
+  kind: Deployment
+  metadata:
+    name: nfn-operator
+    namespace: kube-system
+  spec:
+    template:
+      spec:
+        containers:
+          - name: nfn-operator
+            volumeMounts:
+              - name: subnet
+                mountPath: "/etc/subnet"
+                readOnly: true
+        volumes:
+          - name: subnet
+            configMap:
+              name: ovn-controller-network
+              items:
+                - key: "virtual-net-conf.json"
+                  path: "virtual-net-conf.json"
+- |-
+  apiVersion: apps/v1
+  kind: DaemonSet
+  metadata:
+    name: nfn-agent
+    namespace: kube-system
+  spec:
+    template:
+      spec:
+        containers:
+          - name: nfn-agent
+            securityContext:
+              privileged: true
+- |-
+  apiVersion: apps/v1
+  kind: DaemonSet
+  metadata:
+    name: ovn4nfv-cni
+    namespace: kube-system
+  spec:
+    template:
+      spec:
+        containers:
+          - name: ovn4nfv
+            securityContext:
+              privileged: true

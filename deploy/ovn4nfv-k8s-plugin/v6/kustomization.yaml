@@ -1,0 +1,59 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+- ../base
+
+configMapGenerator:
+- name: ovn-controller-network
+  namespace: kube-system
+  behavior: merge
+  literals:
+  - ovn_subnet_v6="bef0:1234:a890:5678::/123"
+  - ovn_gatewayip_v6="bef0:1234:a890:5678::1/123"
+
+patchesStrategicMerge:
+- |-
+  apiVersion: apps/v1
+  kind: Deployment
+  metadata:
+    name: nfn-operator
+    namespace: kube-system
+  spec:
+    template:
+      spec:
+        containers:
+          - name: nfn-operator
+            env:
+              - name: OVN_SUBNET_V6
+                valueFrom:
+                  configMapKeyRef:
+                    name: ovn-controller-network
+                    key: ovn_subnet_v6
+              - name: OVN_GATEWAYIP_V6
+                valueFrom:
+                  configMapKeyRef:
+                    name: ovn-controller-network
+                    key: ovn_gatewayip_v6
+- |-
+  apiVersion: apps/v1
+  kind: DaemonSet
+  metadata:
+    name: nfn-agent
+    namespace: kube-system
+  spec:
+    template:
+      spec:
+        containers:
+          - name: nfn-agent
+            env:
+              - name: OVN_SUBNET_V6
+                valueFrom:
+                  configMapKeyRef:
+                    name: ovn-controller-network
+                    key: ovn_subnet_v6
+              - name: OVN_GATEWAYIP_V6
+                valueFrom:
+                  configMapKeyRef:
+                    name: ovn-controller-network
+                    key: ovn_gatewayip_v6

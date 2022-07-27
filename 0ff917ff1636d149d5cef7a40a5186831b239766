@@ -1,0 +1,73 @@
+{
+  "comments": [
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "2e0f3743_b57387ce",
+        "filename": "deploy/ovn4nfv-k8s-plugin/base/ovn4nfv-k8s-plugin.yaml",
+        "patchSetId": 1
+      },
+      "lineNbr": 622,
+      "author": {
+        "id": 356
+      },
+      "writtenOn": "2022-07-27T22:14:54Z",
+      "side": 1,
+      "message": "I switched to the lower-case and env instead of envFrom in the base YAML to allow virtual-net-conf.json to be patched in later.",
+      "range": {
+        "startLine": 620,
+        "startChar": 0,
+        "endLine": 622,
+        "endChar": 34
+      },
+      "revId": "0ff917ff1636d149d5cef7a40a5186831b239766",
+      "serverId": "4cada01b-0314-4fe0-84a1-f9ddc89863f9"
+    },
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "234684d4_3be374b3",
+        "filename": "deploy/ovn4nfv-k8s-plugin/base/ovn4nfv-k8s-plugin.yaml",
+        "patchSetId": 1
+      },
+      "lineNbr": 852,
+      "author": {
+        "id": 356
+      },
+      "writtenOn": "2022-07-27T22:14:54Z",
+      "side": 1,
+      "message": "This envFrom was not present in the previous sfc-setup-II.yaml.  I\u0027m not sure if that was intentional or not...  It will be present in the new sfc-setup-II.yaml.",
+      "range": {
+        "startLine": 834,
+        "startChar": 1,
+        "endLine": 852,
+        "endChar": 36
+      },
+      "revId": "0ff917ff1636d149d5cef7a40a5186831b239766",
+      "serverId": "4cada01b-0314-4fe0-84a1-f9ddc89863f9"
+    },
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "cd758e8f_b8907c7b",
+        "filename": "deploy/ovn4nfv-k8s-plugin/sfc-setup-II/kustomization.yaml",
+        "patchSetId": 1
+      },
+      "lineNbr": 62,
+      "author": {
+        "id": 356
+      },
+      "writtenOn": "2022-07-27T22:14:54Z",
+      "side": 1,
+      "message": "I want to call your attention to one detail.  The prior YAML had the following:\n\n         securityContext:\n           privileged: true\n           \nwhile the new kustomize built YAML will have:\n\n         securityContext:\n           capabilities:\n             add:\n             - NET_ADMIN\n           privileged: true\n           \nThe kustomize YAML can be made to look like the prior one but it\u0027s a bit uglier, requiring JSONPatch to replace instead of the merge here.",
+      "range": {
+        "startLine": 50,
+        "startChar": 0,
+        "endLine": 62,
+        "endChar": 30
+      },
+      "revId": "0ff917ff1636d149d5cef7a40a5186831b239766",
+      "serverId": "4cada01b-0314-4fe0-84a1-f9ddc89863f9"
+    }
+  ]
+}

@@ -80,6 +80,30 @@
       },
       "revId": "6f105f6e5ea9fe339c1937b734cc2bd655bb810d",
       "serverId": "4cada01b-0314-4fe0-84a1-f9ddc89863f9"
+    },
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "0d57d785_878cb918",
+        "filename": "deploy/ovn4nfv-k8s-plugin.yaml",
+        "patchSetId": 2
+      },
+      "lineNbr": 853,
+      "author": {
+        "id": 239
+      },
+      "writtenOn": "2022-08-05T14:25:13Z",
+      "side": 1,
+      "message": "Thanks Patryk. I remember the issue now. Thanks for the heads up. \nwe required bidirectional for the /var/run/netns mountpoint, But I thought with net_admin capabilities, we don\u0027t required privileged access.\nQiang could you please investigate the issue ?",
+      "parentUuid": "95915f39_33e00fc2",
+      "range": {
+        "startLine": 853,
+        "startChar": 12,
+        "endLine": 853,
+        "endChar": 28
+      },
+      "revId": "6f105f6e5ea9fe339c1937b734cc2bd655bb810d",
+      "serverId": "4cada01b-0314-4fe0-84a1-f9ddc89863f9"
     }
   ]
 }

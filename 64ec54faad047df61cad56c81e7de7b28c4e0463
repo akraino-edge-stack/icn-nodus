@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "29a6b2e3_e9cd8ae2",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 3
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 239
+      },
+      "writtenOn": "2022-08-05T14:08:12Z",
+      "side": 1,
+      "message": "@Jiahao: Enable the firewall and test the patch.",
+      "revId": "64ec54faad047df61cad56c81e7de7b28c4e0463",
+      "serverId": "4cada01b-0314-4fe0-84a1-f9ddc89863f9"
+    }
+  ]
+}

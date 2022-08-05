@@ -56,6 +56,30 @@
       },
       "revId": "6f105f6e5ea9fe339c1937b734cc2bd655bb810d",
       "serverId": "4cada01b-0314-4fe0-84a1-f9ddc89863f9"
+    },
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "95915f39_33e00fc2",
+        "filename": "deploy/ovn4nfv-k8s-plugin.yaml",
+        "patchSetId": 2
+      },
+      "lineNbr": 853,
+      "author": {
+        "id": 474
+      },
+      "writtenOn": "2022-08-05T13:56:51Z",
+      "side": 1,
+      "message": "Just FYI: As far as I remember it is impossible to use \u0027mountPropagation: Bidirectional\u0027 (line 864) without \u0027privileged\u0027 and without this \u0027mount: Bidirectional\u0027 I\u0027ve got this \u0027unknown fs magic\u0027 error when containerd was used.",
+      "parentUuid": "9b435af6_cf62b52b",
+      "range": {
+        "startLine": 853,
+        "startChar": 12,
+        "endLine": 853,
+        "endChar": 28
+      },
+      "revId": "6f105f6e5ea9fe339c1937b734cc2bd655bb810d",
+      "serverId": "4cada01b-0314-4fe0-84a1-f9ddc89863f9"
     }
   ]
 }

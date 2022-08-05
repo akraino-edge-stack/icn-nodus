@@ -104,6 +104,30 @@
       },
       "revId": "6f105f6e5ea9fe339c1937b734cc2bd655bb810d",
       "serverId": "4cada01b-0314-4fe0-84a1-f9ddc89863f9"
+    },
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "352e2364_97a789f8",
+        "filename": "deploy/ovn4nfv-k8s-plugin.yaml",
+        "patchSetId": 2
+      },
+      "lineNbr": 853,
+      "author": {
+        "id": 471
+      },
+      "writtenOn": "2022-08-05T14:58:24Z",
+      "side": 1,
+      "message": "ok.\nWarning: Bidirectional mount propagation can be dangerous. It can damage the host operating system and therefore it is allowed only in privileged containers. \nhttps://kubernetes.io/docs/concepts/storage/volumes/#mount-propagation",
+      "parentUuid": "0d57d785_878cb918",
+      "range": {
+        "startLine": 853,
+        "startChar": 12,
+        "endLine": 853,
+        "endChar": 28
+      },
+      "revId": "6f105f6e5ea9fe339c1937b734cc2bd655bb810d",
+      "serverId": "4cada01b-0314-4fe0-84a1-f9ddc89863f9"
     }
   ]
 }

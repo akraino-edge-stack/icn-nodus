@@ -16,6 +16,23 @@
       "message": "@Qiang: Please review the patch for crio, containerd and docker. Please give +1.",
       "revId": "6f105f6e5ea9fe339c1937b734cc2bd655bb810d",
       "serverId": "4cada01b-0314-4fe0-84a1-f9ddc89863f9"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "225498d4_0e4b7a87",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 2
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 239
+      },
+      "writtenOn": "2022-08-05T13:48:41Z",
+      "side": 1,
+      "message": "Tested by Qiang in both docker, crio and containerd.",
+      "revId": "6f105f6e5ea9fe339c1937b734cc2bd655bb810d",
+      "serverId": "4cada01b-0314-4fe0-84a1-f9ddc89863f9"
     }
   ]
 }

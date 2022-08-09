@@ -3,7 +3,6 @@ package cniserver
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/akraino-edge-stack/icn-nodus/internal/pkg/bandwidth"
 	"io/ioutil"
 	"net"
 	"net/http"
@@ -40,7 +39,6 @@ type CNIServerRequest struct {
 	SandboxID    string
 	Netns        string
 	IfName       string
-	Bandwidth    bandwidth.Bandwidth
 	CNIConf      *config.NetConf
 }
 
@@ -88,7 +86,7 @@ func NewCNIServer(serverRunDir string, k8sclient kubernetes.Interface) *CNIServe
 	router := mux.NewRouter()
 	cs := &CNIServer{
 		Server: http.Server{
-			Handler:   router,
+			Handler: router,
 			TLSConfig: auth.CreateTLSConfig(cert, pool, true),
 		},
 		serverrundir: serverRunDir,
@@ -162,13 +160,6 @@ func loadCNIRequestToCNIServer(r *CNIEndpointRequest) (*CNIServerRequest, error)
 	}
 
 	cnishimreq.CNIConf = netconf
-
-	bndwdth, err := bandwidth.GetBandwidth(cnishimreq.PodNamespace, cnishimreq.PodName)
-	if err != nil {
-		return nil, err
-	}
-	cnishimreq.Bandwidth = *bndwdth
-
 	return cnishimreq, nil
 }
 

@@ -5,7 +5,6 @@ package app
 
 import (
 	"fmt"
-	"github.com/akraino-edge-stack/icn-nodus/internal/pkg/bandwidth"
 	"net"
 	"os/exec"
 	"strconv"
@@ -359,13 +358,8 @@ func addIpAddressToLinkDevice(ipAddress string, link *netlink.Link, contIfaceNam
 }
 
 //DeleteInterface return ...
-func DeleteInterface(netns ns.NetNS, ifName, sandboxID string) error {
+func DeleteInterface(netns ns.NetNS, ifName string) error {
 	var err error
-
-	err = clearAndDestroyInterfaceQos(ifName, sandboxID)
-	if err != nil {
-		return err
-	}
 
 	err = netns.Do(func(hostNS ns.NetNS) error {
 		link, err := netlink.LinkByName(ifName)
@@ -388,14 +382,14 @@ func DeleteInterface(netns ns.NetNS, ifName, sandboxID string) error {
 }
 
 // ConfigureDeleteInterface sets up the container interface
-var ConfigureDeleteInterface = func(containerNetns, ifName, sandboxID string) error {
+var ConfigureDeleteInterface = func(containerNetns, ifName string) error {
 	netns, err := ns.GetNS(containerNetns)
 	if err != nil {
 		return fmt.Errorf("failed to open netns %q: %v", containerNetns, err)
 	}
 	defer netns.Close()
 
-	err = DeleteInterface(netns, ifName, sandboxID)
+	err = DeleteInterface(netns, ifName)
 	if err != nil {
 		return err
 	}
@@ -404,7 +398,7 @@ var ConfigureDeleteInterface = func(containerNetns, ifName, sandboxID string) er
 }
 
 // ConfigureInterface sets up the container interface
-var ConfigureInterface = func(containerNetns, containerID, ifName, namespace, podName, macAddress string, ipAddress, gatewayIP []string, interfaceName, defaultGateway string, bndwth *bandwidth.Bandwidth, idx, mtu int, isDefaultGW bool) ([]*current.Interface, error) {
+var ConfigureInterface = func(containerNetns, containerID, ifName, namespace, podName, macAddress string, ipAddress, gatewayIP []string, interfaceName, defaultGateway string, idx, mtu int, isDefaultGW bool) ([]*current.Interface, error) {
 	netns, err := ns.GetNS(containerNetns)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open netns %q: %v", containerNetns, err)
@@ -432,38 +426,9 @@ var ConfigureInterface = func(containerNetns, containerID, ifName, namespace, po
 		fmt.Sprintf("external_ids:sandbox=%s", containerID),
 	}
 
-	if bndwth != nil {
-		if bndwth.Egress != "" {
-			egressBandwidthRate, err := bandwidth.ParseBandwidthAsRateInKbps(bndwth.Egress)
-			if err != nil {
-				logrus.Error(err.Error())
-				return nil, err
-			}
-
-			ovsArgs = append(ovsArgs,
-				"ingress_policing_rate="+strconv.FormatInt(egressBandwidthRate, 10),
-				"ingress_policing_burst="+strconv.FormatInt(bandwidth.ComputeBurst(egressBandwidthRate), 10))
-		}
-
-		if bndwth.Ingress != "" {
-			ingressBandwidthRate, err := bandwidth.ParseBandwidthAsRate(bndwth.Ingress)
-			if err != nil {
-				logrus.Error(err.Error())
-				return nil, err
-			}
-
-			ovsArgs = append(ovsArgs,
-				"--", "set", "port", hostIface.Name, "qos=@newqos", "--",
-				"--id=@newqos", "create", "qos", "type=linux-htb",
-				"other-config:max-rate="+strconv.FormatInt(ingressBandwidthRate, 10),
-				"external-ids=sandbox="+containerID)
-		}
-	}
-
 	var out []byte
 	out, err = exec.Command("ovs-vsctl", ovsArgs...).CombinedOutput()
 	if err != nil {
-		logrus.Error(ovsArgs)
 		return nil, fmt.Errorf("failure in plugging pod interface: %v\n  %q", err, string(out))
 	}
 
@@ -497,14 +462,8 @@ var ConfigureRoute = func(containerNetns, dst, gw, dev string) error {
 }
 
 // PlatformSpecificCleanup deletes the OVS port
-func PlatformSpecificCleanup(ifaceName, sandboxID string) (bool, error) {
+func PlatformSpecificCleanup(ifaceName string) (bool, error) {
 	done := false
-
-	err := clearAndDestroyInterfaceQos(ifaceName, sandboxID)
-	if err != nil {
-		logrus.Warningf("failed to clear OVS port %s: %v\n  %q", ifaceName, err)
-	}
-
 	ovsArgs := []string{
 		"del-port", "br-int", ifaceName,
 	}
@@ -516,74 +475,4 @@ func PlatformSpecificCleanup(ifaceName, sandboxID string) (bool, error) {
 	}
 
 	return done, nil
-}
-
-func clearAndDestroyInterfaceQos(portName, sandboxID string) error {
-	err := clearInterfaceQos(portName)
-	if err != nil {
-		return err
-	}
-
-	qos_uuids, err := findInterfaceQos(sandboxID)
-	if err != nil {
-		return err
-	}
-
-	err = destroyInterfaceQos(qos_uuids)
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func clearInterfaceQos(portName string) error {
-	logrus.Info("clearing interface qos")
-	ovsArgs := []string{"clear", "port", portName, "qos"}
-
-	var out []byte
-	logrus.Info("calling ovs-vsctl " + strings.Join(ovsArgs, " "))
-	out, err := exec.Command("ovs-vsctl", ovsArgs...).CombinedOutput()
-	if err != nil {
-		logrus.Error(ovsArgs)
-		return fmt.Errorf("failure in clearing pod interface qos: %v\n  %q", err, string(out))
-	}
-
-	logrus.Info("clearing interface qos performed successfully")
-	return nil
-}
-
-func findInterfaceQos(sandboxID string) ([]string, error) {
-	logrus.Info("finding interface qos")
-	ovsArgs := []string{"--no-heading", "--format=csv", "--data=bare",
-		"--columns=_uuid", "find", "qos", "external-ids:sandbox=" + sandboxID}
-
-	var out []byte
-	logrus.Info("calling ovs-vsctl " + strings.Join(ovsArgs, " "))
-	out, err := exec.Command("ovs-vsctl", ovsArgs...).CombinedOutput()
-	if err != nil {
-		logrus.Error(ovsArgs)
-		return nil, fmt.Errorf("failure in finding pod interface qos: %v\n  %q", err, string(out))
-	}
-
-	logrus.Info("finding interface qos performed successfully")
-	return strings.Split(strings.TrimSuffix(string(out), "\n"), "\n"), nil
-}
-
-func destroyInterfaceQos(qosUuids []string) error {
-	for _, qosUuid := range qosUuids {
-		logrus.Info("destroying interface qos " + qosUuid)
-		ovsArgs := []string{"--if-exists", "destroy", "qos", qosUuid}
-
-		var out []byte
-		logrus.Info("calling ovs-vsctl " + strings.Join(ovsArgs, " "))
-		out, err := exec.Command("ovs-vsctl", ovsArgs...).CombinedOutput()
-		if err != nil {
-			logrus.Error(ovsArgs)
-			return fmt.Errorf("failure in destroying pod interface qos: %v\n  %q", err, string(out))
-		}
-
-		logrus.Info("destroying interface qos performed successfully")
-	}
-	return nil
 }

@@ -13,7 +13,6 @@
 package nfn
 
 import (
-	"github.com/akraino-edge-stack/icn-nodus/internal/pkg/bandwidth"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	reflect "reflect"
@@ -638,9 +637,8 @@ type PodInfo struct {
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	Namespace string              `protobuf:"bytes,1,opt,name=namespace,proto3" json:"namespace,omitempty"`
-	Name      string              `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
-	Bandwidth bandwidth.Bandwidth `protobuf:"bytes,2,opt,name=bandwidth,proto3" json:"bandwidth,omitempty"`
+	Namespace string `protobuf:"bytes,1,opt,name=namespace,proto3" json:"namespace,omitempty"`
+	Name      string `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
 }
 
 func (x *PodInfo) Reset() {

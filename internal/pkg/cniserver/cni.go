@@ -3,7 +3,6 @@ package cniserver
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/akraino-edge-stack/icn-nodus/internal/pkg/bandwidth"
 	"net"
 	"net/http"
 	"strconv"
@@ -139,7 +138,7 @@ func isNotFoundError(err error) bool {
 	return ok && statusErr.Status().Code == http.StatusNotFound
 }
 
-func (cr *CNIServerRequest) AddMultipleInterfaces(nfnAnnotation, ovnAnnotation, namespace, podName string, bndwth *bandwidth.Bandwidth) types.Result {
+func (cr *CNIServerRequest) AddMultipleInterfaces(nfnAnnotation, ovnAnnotation, namespace, podName string) types.Result {
 	klog.Infof("ovn4nfvk8s-cni: addMultipleInterfaces ovn annotation %v namespace %v podName %v", ovnAnnotation, namespace, podName)
 	var nfnNetworks *nfnNetwork
 	var networkname string
@@ -233,7 +232,7 @@ func (cr *CNIServerRequest) AddMultipleInterfaces(nfnAnnotation, ovnAnnotation, 
 		}
 
 		klog.Infof("addMultipleInterfaces: ipAddress-%v ovn4nfv-interface-%v cni-ifname-%v", ipAddress, interfaceName, cr.IfName)
-		interfacesArray, err = app.ConfigureInterface(cr.Netns, cr.SandboxID, cr.IfName, namespace, podName, macAddress, ipAddress, gatewayIP, interfaceName, defaultGateway, bndwth, index, config.Default.MTU, isDefaultGW)
+		interfacesArray, err = app.ConfigureInterface(cr.Netns, cr.SandboxID, cr.IfName, namespace, podName, macAddress, ipAddress, gatewayIP, interfaceName, defaultGateway, index, config.Default.MTU, isDefaultGW)
 		if err != nil {
 			klog.Errorf("Failed to configure interface in pod: %v", err)
 			return nil
@@ -398,11 +397,7 @@ func (cr *CNIServerRequest) cmdAdd(kclient kubernetes.Interface) ([]byte, error)
 		klog.Infof("ovn4nfvk8s-cni: cmdAdd Annotation Found is %v", ovnAnnotation)
 	}
 
-	result := cr.AddMultipleInterfaces(nfnAnnotation, ovnAnnotation, namespace, podname,
-		&bandwidth.Bandwidth{
-			Ingress: annotation[bandwidth.IngressBandwidthAnnotation],
-			Egress:  annotation[bandwidth.EgressBandwidthAnnotation]})
-
+	result := cr.AddMultipleInterfaces(nfnAnnotation, ovnAnnotation, namespace, podname)
 	//Add Routes to the pod if annotation found for routes
 	ovnRouteAnnotation, ok := annotation["ovnNetworkRoutes"]
 	if ok {
@@ -427,7 +422,7 @@ func (cr *CNIServerRequest) cmdDel() ([]byte, error) {
 	klog.Infof("cmdDel ")
 	for i := 0; i < 10; i++ {
 		ifaceName := cr.SandboxID[:14] + strconv.Itoa(i)
-		done, err := app.PlatformSpecificCleanup(ifaceName, cr.SandboxID)
+		done, err := app.PlatformSpecificCleanup(ifaceName)
 		if err != nil {
 			klog.Errorf("Teardown error: %v", err)
 		}
@@ -473,14 +468,14 @@ func (cr *CNIServerRequest) DeleteMultipleInterfaces(ovnAnnotation, namespace, p
 		}
 
 		klog.Infof("Delete MultipleInterfaces: ipAddress-%v ovn4nfv-interface-%v cni-ifname-%v", ipAddress, interfaceName, cr.IfName)
-		err = app.ConfigureDeleteInterface(cr.Netns, cr.IfName, cr.SandboxID)
+		err = app.ConfigureDeleteInterface(cr.Netns, cr.IfName)
 		if err != nil {
 			klog.Errorf("Failed to configure interface in pod: %v", err)
 			return nil
 		}
 
 		ifaceName := cr.SandboxID[:14] + strconv.Itoa(i)
-		done, err := app.PlatformSpecificCleanup(ifaceName, cr.SandboxID)
+		done, err := app.PlatformSpecificCleanup(ifaceName)
 		if err != nil {
 			klog.Errorf("Teardown error: %v", err)
 		}

@@ -14,7 +14,8 @@ its usage. This script supports two Virtualization technologies
 (Libvirt and VirtualBox).
 
 ```
-    $ sudo ./setup.sh -p libvirt
+    $ pushd demo/vm-setup
+    $ ./setup.sh -p libvirt
 ```
 There is a `default.yml` in the `./config` directory which creates multiple vm.
 
@@ -22,6 +23,7 @@ Once Vagrant is installed, it's possible to provision a vm using
 the following instructions:
 ```
     $ vagrant up
+    $ popd
 ```
 In-depth documentation and use cases of various Vagrant commands [Vagrant commands][3]
 is available on the Vagrant site.

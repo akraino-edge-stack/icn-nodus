@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "fe375f0b_34acbddf",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 4
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 514
+      },
+      "writtenOn": "2022-08-25T07:16:30Z",
+      "side": 1,
+      "message": "I have applied this patch in the VM with the firewall enabled, and checked that the IPtable rule was generated successfully. Then when I call an SVC from a pod, an error occurs, indicating that the domain name of SVC cannot be resolved. After I disable the firewall, everything is normal again.",
+      "revId": "1280acabce0b43ca1a46c16da83eb48fd23797f0",
+      "serverId": "4cada01b-0314-4fe0-84a1-f9ddc89863f9"
+    }
+  ]
+}

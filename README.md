@@ -111,6 +111,7 @@ Add `/var/log/openvswitch/ovn4k8s.log` in the audit.rules to monitor the log fil
 - [Development](doc/development.md)
 - [Validation & testcase](https://wiki.akraino.org/display/AK/ICN+R6+Test+Document#ICNR6TestDocument-NodusValidationandtestcaseresults)
 - [Akraino ICN Recommended Operating system security tools](https://wiki.akraino.org/display/AK/ICN+R6+Test+Document#ICNR6TestDocument-BluValTesting)
+- [Latest Slide & Demo](https://wiki.akraino.org/display/AK/ICN+Nodus#ICNNodus-Presentation:)
 
 ## Contact Us
 
